@@ -8,6 +8,11 @@ from dataclasses import dataclass, field, make_dataclass
 from functools import wraps
 from urllib import parse
 
+import bleach
+import mistune
+import pytz
+from asgiref.sync import sync_to_async
+from dateutil.relativedelta import *
 from django.conf import settings
 from django.contrib.auth import REDIRECT_FIELD_NAME
 from django.contrib.auth.decorators import login_required, permission_required
@@ -17,11 +22,6 @@ from django.template import engines
 from django.urls import path, re_path
 from django.utils.safestring import mark_safe
 
-import bleach
-import mistune
-import pytz
-from asgiref.sync import sync_to_async
-from dateutil.relativedelta import *
 from text.translate import gettext_lazy as _
 
 ALLOWED_TAGS = ["li", "ol", "ul", "p", "br", "span"]

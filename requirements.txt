@@ -13,6 +13,7 @@ django-extensions
 django-js-asset
 django-mptt
 django-simple-history
+whitenoise
 hiredis
 Jinja2
 #lxml

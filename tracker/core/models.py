@@ -1,18 +1,10 @@
 from django.contrib.auth.models import AbstractUser, UserManager
+from django.db.models import (CASCADE, PROTECT, SET_NULL, BigAutoField,
+                              CharField, DateTimeField, ForeignKey, Model,
+                              Prefetch, TextField)
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-from django.db.models import (
-    Prefetch,
-    ForeignKey,
-    BigAutoField,
-    CharField,
-    DateTimeField,
-    TextField,
-    Model,
-    CASCADE,
-    PROTECT,
-    SET_NULL
-)
+
 from text.translate import gettext_lazy as _
 
 

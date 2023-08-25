@@ -18,7 +18,7 @@ def create_product(apps, schema_editor):
        competency(name="Achieve Results"),
     ])
 
-    root = user.objects.create(username="root")
+    root = user.objects.create(username="root", )
     andrew = user.objects.create(username="andrew")
     root.is_superuser = True
     root.set_password(config("ROOT_PASSWORD"))

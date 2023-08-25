@@ -12,23 +12,24 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 
 import sys
 from pathlib import Path
+
 from decouple import config
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 LOGIN_URL = "/core/login/"
-ALLOWED_HOSTS = ["0.0.0.0","app.simcoe.is"]
-AUTH_USER_MODEL = "core.User"  
-DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'
-INTERNAL_IPS = [                                                                                                                                     
-    "0.0.0.0",                                                                                                                                     
-]                                                                                                                                                    
-CSRF_TRUSTED_ORIGINS  = ["https://app.simcoe.is"]                                                                                                      
-SESSION_SAVE_EVERY_REQUEST = False #When set to True, Django will save the session to the database on every single request.                          
-CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"                                                                                                         
-CRISPY_TEMPLATE_PACK = "bootstrap5"       
+ALLOWED_HOSTS = ["0.0.0.0", "127.0.0.1"]
+AUTH_USER_MODEL = "core.User"
+DEFAULT_AUTO_FIELD = "django.db.models.AutoField"
+INTERNAL_IPS = [
+    "0.0.0.0",
+]
+CSRF_TRUSTED_ORIGINS = ["https://app.simcoe.is"]
+SESSION_SAVE_EVERY_REQUEST = False  # When set to True, Django will save the session to the database on every single request.
+CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
+CRISPY_TEMPLATE_PACK = "bootstrap5"
 STATIC_ROOT = BASE_DIR / "static"
-STATIC_URL = 'static/'
+STATIC_URL = "static/"
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
@@ -37,26 +38,26 @@ STATIC_URL = 'static/'
 SECRET_KEY = config("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = config("DEBUG",cast=bool) 
-
+DEBUG = config("DEBUG", cast=bool)
 
 
 # Application definition
 
 INSTALLED_APPS = [
-    'django_extensions',
+    "django_extensions",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    "core",  
+    "core",
     "project",
 ]
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -68,6 +69,14 @@ MIDDLEWARE = [
 ROOT_URLCONF = "tracker.urls"
 
 TEMPLATES = [
+    {
+        "BACKEND": "django.template.backends.jinja2.Jinja2",
+        "DIRS": [],
+        "APP_DIRS": True,
+        "OPTIONS": {
+            "environment": "tracker.jinja2.environment",
+        },
+    },
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
         "DIRS": [],
@@ -92,28 +101,28 @@ WSGI_APPLICATION = "tracker.wsgi.application"
 
 if "pytest" in "".join(sys.argv):
     DATABASES = {
-        'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        "NAME" : "tracker_test",
-        "USER" : 'tracker_test',
-        "PASSWORD" : config("TEST_DB_PASSWORD"),
-        "HOST" : "localhost",
-        "PORT" : "" ,
-        'OPTIONS': {'sslmode': 'require'},
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": "tracker_test",
+            "USER": "tracker_test",
+            "PASSWORD": config("TEST_DB_PASSWORD"),
+            "HOST": "localhost",
+            "PORT": "",
+            "OPTIONS": {"sslmode": "require"},
         }
     }
 
 else:
     DATABASES = {
-            'default': {
-                'ENGINE': 'django.db.backends.postgresql',
-                "USER" : 'app',
-                "PASSWORD" : config("DB_PASSWORD"),
-                "HOST" : config("DB_HOST"),
-                "PORT" : config("DB_PORT"),
-                "NAME" : config("DB_NAME"),
-                'OPTIONS': {'sslmode': 'require'},
-                }
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "USER": "app",
+            "PASSWORD": config("DB_PASSWORD"),
+            "HOST": config("DB_HOST"),
+            "PORT": config("DB_PORT"),
+            "NAME": config("DB_NAME"),
+            "OPTIONS": {"sslmode": "require"},
+        }
     }
 
 

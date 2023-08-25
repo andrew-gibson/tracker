@@ -1,0 +1,31 @@
+body {
+  min-height: 45rem;
+  padding-top: 4.5rem;
+}
+[x-cloak] { display: none !important; }
+.hover-highlight:hover {
+  background-color: #eee;
+}
+.hover-show{
+  visibility: hidden;
+}
+.hover-parent:hover .hover-show{
+  visibility: visible;
+}
+.hide {
+    visibility: hidden;
+    height: 0px;
+    opacity:0;
+    transition: height 0s linear .5s, opacity .5s linear; 
+}
+.hide.show {
+    visibility: visible;
+    height: 100%;
+    opacity: 1;
+    transition: opacity .5s linear; 
+
+}
+.fade-me-out.htmx-swapping {
+  opacity: 0;
+  transition: opacity 1s ease-out;
+}

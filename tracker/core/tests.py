@@ -1,9 +1,11 @@
 import sys
-import pytest
-from django.test import TestCase
+
 import faker
-from .models import User, EXCompetency, Project
+import pytest
 from decouple import config
+from django.test import TestCase
+
+from .models import EXCompetency, Project, User
 
 pytestmark = pytest.mark.django_db
 fake = faker.Faker()

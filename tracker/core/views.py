@@ -1,14 +1,17 @@
 import json
-from . import models
-from .utils import API
-from django.views.decorators.http import require_http_methods
-from django.http import JsonResponse, HttpResponse
-from django.shortcuts import get_object_or_404, render, redirect
-from django.views.decorators.csrf import ensure_csrf_cookie
+
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
-from text.translate import gettext_lazy as _
+from django.http import HttpResponse, JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.views.decorators.csrf import ensure_csrf_cookie
+from django.views.decorators.http import require_http_methods
+
+from text.translate import gettext_lazy as _
+
+from . import models
+from .utils import API
 
 api = API(namespace="core")
 
