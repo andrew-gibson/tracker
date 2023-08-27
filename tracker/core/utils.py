@@ -17,7 +17,7 @@ from django.conf import settings
 from django.contrib.auth import REDIRECT_FIELD_NAME
 from django.contrib.auth.decorators import login_required, permission_required
 from django.http import HttpResponse, HttpResponseBadRequest
-from django.shortcuts import resolve_url
+from django.shortcuts import resolve_url, render as _render
 from django.template import engines
 from django.urls import path, re_path
 from django.utils.safestring import mark_safe
@@ -25,6 +25,17 @@ from django.utils.safestring import mark_safe
 from text.translate import gettext_lazy as _
 
 ALLOWED_TAGS = ["li", "ol", "ul", "p", "br", "span"]
+
+
+
+def render(
+    request, template_name, context=None, content_type=None, status=None, using=None
+):
+    response = _render( request, template_name, context, content_type, status, using )
+    if settings.TESTING:
+        setattr(response, "__context__", context)
+    return response
+
 
 
 def sanitize_html(html_str, allow_weird_characters=False):

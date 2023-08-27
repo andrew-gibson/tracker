@@ -4,6 +4,9 @@ from django.db import models
 
 
 class Project(models.Model):
+    user = models.ForeignKey("core.User", 
+                             related_name="projects",
+                             on_delete=models.CASCADE)
     name = models.CharField(max_length=255)
     parent_project = models.ForeignKey(
         "self",

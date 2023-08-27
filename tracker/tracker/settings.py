@@ -30,6 +30,7 @@ CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
 CRISPY_TEMPLATE_PACK = "bootstrap5"
 STATIC_ROOT = BASE_DIR / "static"
 STATIC_URL = "static/"
+TESTING = "pytest" in "".join(sys.argv)
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
@@ -54,6 +55,7 @@ INSTALLED_APPS = [
     "core",
     "project",
 ]
+
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -99,7 +101,7 @@ WSGI_APPLICATION = "tracker.wsgi.application"
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
 
-if "pytest" in "".join(sys.argv):
+if TESTING:
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.postgresql",
