@@ -6,7 +6,7 @@ from django.db import migrations
 
 def create_product(apps, schema_editor):
     from django.apps import apps
-    competency = apps.get_model('core', 'EXCompetency')
+    competency = apps.get_model('project', 'EXCompetency')
     user = apps.get_model('core', 'User')
 
     competency.objects.bulk_create([
@@ -29,7 +29,7 @@ def create_product(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('core', '0001_initial'),
+        ('project', '0001_initial'),
     ]
 
     operations = [

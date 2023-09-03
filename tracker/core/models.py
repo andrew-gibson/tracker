@@ -2,10 +2,9 @@ from django.contrib.auth.models import AbstractUser, UserManager
 from django.db.models import (CASCADE, PROTECT, SET_NULL, BigAutoField,
                               CharField, DateTimeField, ForeignKey, Model,
                               Prefetch, TextField)
-from django.db.models.signals import post_save
-from django.dispatch import receiver
 
 from text.translate import gettext_lazy as _
+
 
 
 def field_names(model):
@@ -87,61 +86,4 @@ class ActiveChannels(Model):
 
     channel_name = CharField(max_length=300, null=True, blank=True)
     user = ForeignKey(User, related_name="active_channels", on_delete=CASCADE)
-
-class Lead(Model):
-
-    name = CharField(max_length=300)
-
-class Partner(Model):
-
-    name = CharField(max_length=300)
-
-class EXCompetency(Model):
-
-    name = CharField(max_length=300, unique=True)
-
-class Project(Model):
-
-    name = CharField(max_length=300)
-    description = TextField()
-    user = ForeignKey(User, on_delete=CASCADE)
-
-
-@receiver(post_save, sender=Project)
-def create_default_substruture(sender, instance, created, **kwargs):
-    if created:
-        for competency in EXCompetency.objects.all():
-            instance.theme_set.create(
-                competency = competency,
-                name = competency.name)
-            
-class Theme(Model):
-
-    results = ForeignKey(Project, on_delete=CASCADE)
-    competency = ForeignKey(EXCompetency, on_delete=PROTECT, null=True)
-    name = CharField(max_length=300)
-
-class SubTheme(Model):
-
-    theme = ForeignKey(Theme, on_delete=CASCADE)
-    name = CharField(max_length=300)
-
-class _WorkLine(Model):
-
-    target_date = DateTimeField()
-    text = TextField()
-    lead = ForeignKey( Lead, on_delete=SET_NULL, null=True)
-    partner = ForeignKey( Partner, on_delete=SET_NULL, null=True)
-
-    class Meta:
-        abstract = True
-
-
-class ThemeWork(_WorkLine):
-
-    parent = ForeignKey( Theme, on_delete=CASCADE)
-
-class SubThemeWork(_WorkLine):
-
-    parent = ForeignKey( SubTheme, on_delete=CASCADE)
 

@@ -1,15 +1,18 @@
+from asgiref.sync import sync_to_async
 from django.apps import apps
 from core.utils import API, render
 from django.http import HttpResponse, JsonResponse, HttpResponseBadRequest
 from django.urls import reverse
 from text.translate import gettext_lazy as _
 
-from .models import Project, Tag, Team, Contact
+from .models import Project, Tag, Team, Contact, ThemeWork
 
-lookups = {
+generic_models = {
         "tag" : Tag,
         "team" : Team,
-        "contact" : Contact
+        "contact" : Contact,
+        "project" : Project,
+        "themework" : ThemeWork,
 }
 
 api = API(namespace="project", session={})
@@ -19,52 +22,19 @@ api = API(namespace="project", session={})
 def main(request):
     return HttpResponse("success")
 
-
-@api.get_post_delete_put(["project/", "project/<int:pk>/"])
-async def project(request, pk=None):
+@api.get_post_delete_put(["m/<str:modelname>/", "m/<str:modelname>/<int:pk>/"])
+def project(request, modelname='',pk=None):
     session, set_session = api.get_url_session(request)
-    if request.method == "GET" and not pk:
-        return render(
-            request,
-            "projects/projects.html",
-            {"projects": [p async for p in Project.objects.filter(user=request.user)]},
-        )
-    if request.method == "GET" and pk:
-        return render(
-            request,
-            "projects/project.html",
-            {"project": await Project.objects.filter(user=request.user).aget(pk=pk)},
-        )
-    if request.method == "POST" and not pk:
-        pass
-    if request.method == "PUT" and pk:
-        pass
-    if request.method == "DELETE" and pk:
-        qs = Project.objects.filter(user=request.user, pk=pk)
-        if await qs.acount() == 1:
-            await qs.adelete()
-        return render(
-            request,
-            "projects/projects.html",
-            {"projects": [p async for p in Project.objects.filter(user=request.user)]},
-        )
-
-@api.get_post_delete_put(["lookup/<str:modelname>/", "lookup/<str:modelname>/<int:pk>/"])
-async def project(request, modelname='',pk=None):
-    model = lookups.get(modelname)
+    model = generic_models.get(modelname)
     if not model:
         return HttpResponseBadRequest()
-    if request.method == "GET" and not pk:
-        pass
-    if request.method == "GET" and pk:
-        pass
+    if request.method == "GET":                  
+        return  model.get(request,pk)
     if request.method == "POST" and not pk:
-        pass
+        return  model.post(request)
     if request.method == "PUT" and pk:
-        pass
+        return  model.put(request,pk)
     if request.method == "DELETE" and pk:
-        pass
+        return  model.delete(request,pk)
     return HttpResponseBadRequest()
-    
-
 
