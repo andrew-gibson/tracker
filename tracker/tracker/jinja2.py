@@ -2,7 +2,7 @@ import random
 import string
 from urllib import parse
 
-from core.models import to_dict
+from core.utils import to_dict
 from crispy_forms.utils import render_crispy_form
 from django.templatetags.static import static
 from django.urls import reverse

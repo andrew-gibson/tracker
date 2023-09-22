@@ -4,7 +4,7 @@ from decouple import config
 from django.db import migrations
 
 
-def create_product(apps, schema_editor):
+def setup(apps, schema_editor):
     from django.apps import apps
     competency = apps.get_model('project', 'EXCompetency')
     user = apps.get_model('core', 'User')
@@ -26,6 +26,24 @@ def create_product(apps, schema_editor):
     andrew.set_password(config("ANDREW_PASSWORD"))
     andrew.save()
 
+    Tag = apps.get_model('project', 'Tag')
+    tags =[
+        Tag(name="HR"),
+        Tag(name="Urgent"),
+        Tag(name="Important"),
+    ]
+
+    Tag.objects.bulk_create(tags)
+
+    for tag in tags[1:]:
+        tag.users.add(andrew)
+
+def teardown(apps, schema_editor):
+    from django.apps import apps
+    User = apps.get_model('core', 'User')
+    User.objects.filter(username__in=["root","andrew"]).delete()
+    
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -33,6 +51,6 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RunPython(create_product, migrations.RunPython.noop),
+        migrations.RunPython(setup, teardown),
     ]
 

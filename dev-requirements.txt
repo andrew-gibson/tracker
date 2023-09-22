@@ -5,4 +5,5 @@ jupyterlab
 pip-autoremove
 pytest-django
 Faker
+gnureadline
 

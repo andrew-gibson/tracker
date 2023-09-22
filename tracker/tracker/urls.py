@@ -16,7 +16,6 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import include, path
-
 from core.views import api as core_api
 from project.views import api as project_api
 

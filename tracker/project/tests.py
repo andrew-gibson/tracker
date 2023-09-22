@@ -11,8 +11,6 @@ from .models import (
     Contact,
     EXCompetency,
     Project,
-    SubTheme,
-    SubThemeWork,
     Tag,
     Team,
     Theme,
@@ -26,6 +24,8 @@ def test_project_create(transactional_db, client):
     cache.clear()
     User = apps.get_model("core.User")
 
+    user2 = User.objects.create_user("user2")
+    user2.set_password("user2")
     assert 6 == EXCompetency.objects.count()
 
     # login
@@ -43,7 +43,7 @@ def test_project_create(transactional_db, client):
         resp = client.post("/project/m/team/",
                            { "name":fake.name(), 
                             })
-        team = resp.__context__["team"]
+        team = resp.__context__["inst"]
         teams.append(team)
         assert team.pk
     assert Team.objects.count() == 10
@@ -53,7 +53,7 @@ def test_project_create(transactional_db, client):
         resp = client.post("/project/m/tag/",
                            { "name":fake.name(), 
                             })
-        tag = resp.__context__["tag"]
+        tag = resp.__context__["inst"]
         assert tag.pk
     assert Tag.objects.count() == 10
 
@@ -64,7 +64,7 @@ def test_project_create(transactional_db, client):
                            { "name":fake.name(), 
                             "email": fake.email()
                             })
-        contact = resp.__context__["contact"]
+        contact = resp.__context__["inst"]
         contacts.append(contact)
         assert contact.pk
     assert Contact.objects.count() == 10
@@ -78,8 +78,6 @@ def test_project_create(transactional_db, client):
         )
         projects.append(project)
         project.save()
-
-        assert project.theme_set.count() == EXCompetency.objects.count()
 
         if x == 0:
             project.users.add(User.objects.get(username="root"))
@@ -104,12 +102,14 @@ def test_project_create(transactional_db, client):
     # test all but the root owned project is in the group template
     # context
     for project in projects[1:]:
-        assert project in resp.__context__["projects"]
+        assert project in resp.__context__["insts"]
+
+    assert projects[0] not in resp.__context__["insts"]
 
     # check each project is in the resp context
     for project in projects[1:]:
         resp = client.get(f"/project/m/project/{project.pk}/")
-        assert project == resp.__context__["project"]
+        assert project == resp.__context__["inst"]
 
     # this delete shouldn't work, project is owned by root
     client.delete(f"/project/m/project/{projects[0].pk}/")
@@ -121,20 +121,57 @@ def test_project_create(transactional_db, client):
     
     # add themework
     for project in projects[2:]:
-        for theme in project.theme_set.all():
+        resp = client.post("/project/m/theme/",
+                    {"name" : fake.name(),
+                     "project" : project.pk,
+                    })
+        assert project.themes.count() == 1
+        theme =  resp.__context__["inst"]
+
+        for x in range(10):
             resp = client.post("/project/m/themework/",
-                        {"title" : fake.name(),
+                        {"name" : fake.name(),
                          "target_date" : fake.date(),
-                         "parent" : theme.pk,
+                         "theme" : theme.pk,
                          "text" : fake.text(),
                          "lead" : random.choice(contacts).pk,
+                         "competency" : "",
                          "teams" : [x.pk for x in random.choices(teams,k=2)]
-                         })
-            themework = resp.__context__["themework"]
-            assert theme.work_details.count() == 1
-            assert theme.work_details.first() == themework
+                        })
+            themework = resp.__context__["inst"]
+
+            assert theme.work_details.last() == themework
+
+
+        assert theme.work_details.count() == 10
+        client.post(f"/project/m2m/project.project/{project.pk}/core.user/{user2.pk}/")
+        assert project.users.count() == 2
+
+        tagsk
+
+    # login as second user
+    client.post(
+        "/core/login/",
+        {
+            "username": "user2",
+            "password": "user2",
+        },
+        follow=True,
+    )
+    # check that the other user can add a new theme
+    for project in projects[2:]:
+        resp = client.post("/project/m/theme/",
+                    {"name" : fake.name(),
+                     "project" : project.pk,
+                    })
+        #check we now have two themes
+        assert project.themes.count() == 2
+        # remove user from project
+        client.delete(f"/project/mp2m/project.project/{project.pk}/core.user/{user2.pk}/")
+        assert project.users.count() == 1
 
 
 
-                     
 
+        
+        ##assert project.users.count() == 2

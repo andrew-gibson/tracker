@@ -13,29 +13,124 @@ import mistune
 import pytz
 from asgiref.sync import sync_to_async
 from dateutil.relativedelta import *
+from django import forms
+from django.apps import apps
 from django.conf import settings
+from django.contrib import admin
 from django.contrib.auth import REDIRECT_FIELD_NAME
 from django.contrib.auth.decorators import login_required, permission_required
-from django.http import HttpResponse, HttpResponseBadRequest
-from django.shortcuts import resolve_url, render as _render
+from django.http import Http404, HttpResponse, HttpResponseBadRequest
+from django.shortcuts import render as _render
+from django.shortcuts import resolve_url
 from django.template import engines
 from django.urls import path, re_path
 from django.utils.safestring import mark_safe
-
 from text.translate import gettext_lazy as _
 
 ALLOWED_TAGS = ["li", "ol", "ul", "p", "br", "span"]
 
 
+class AdminForm(forms.ModelForm):
+    """admin forms by default have 0 required fields and must declare required fields as
+    class Meta:
+      required = [ field1_name, .... ]
+
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        for name in self.fields:
+            if not (hasattr(self.Meta, "required") and name in self.Meta.required):
+                self.fields[name].required = False
+
+            if isinstance(self.fields[name], forms.models.ModelMultipleChoiceField):
+                self.fields[name].widget.widget.attrs[
+                    "style"
+                ] = "min-width:100%;width:100%;"
+
+
+class ModelAdmin(admin.ModelAdmin):
+    form = AdminForm
+
+    def get_actions(self, request):
+        actions = super().get_actions(request)
+        return actions
+
+
+def add_to_admin(cls):
+    cls.__add_to_admin = True
+    return cls
+
+
+class classproperty:
+    def __init__(self, func):
+        self.fget = func
+
+    def __get__(self, instance, owner):
+        return self.fget(owner)
+
+
+def link_m2m_or_404(o1, o2, attr=None):
+    try:
+        if attr:
+            return getattr(o1, attr).add(o2)
+        else:
+            for m2m_rel in o1.__class__._meta.many_to_many:
+                if m2m_rel.related_model == o2.__class__:
+                    return getattr(o1, m2m_rel.name).add(o2)
+            raise Exception
+    except:
+        raise Http404("No Model matches the given query")
+
+
+def unlink_m2m_or_404(o1, o2, attr=None):
+    try:
+        if attr:
+            return getattr(o1, attr).remove(o2)
+        else:
+            for m2m_rel in o1.__class__._meta.many_to_many:
+                if m2m_rel.related_model == o2.__class__:
+                    return getattr(o1, m2m_rel.name).remove(o2)
+            raise Exception
+    except:
+        raise Http404("No Model matches the given query")
+
+
+def get_model_or_404(s, test=lambda x: True):
+    try:
+        assert not any(
+            x in s.split(".")[0]
+            for x in (
+                "django_extensions",
+                "admin",
+                "contenttypes",
+                "auth",
+                "sessions",
+                "messages",
+                "staticfiles",
+            )
+        )
+        model = apps.get_model(s)  
+        assert test(model)
+        return model
+    except:
+        raise Http404("No Model matches the given query")
+
+
+class belongs_to:
+    @classmethod
+    def belongs_to_user(cls, request):
+        return cls.objects
+
 
 def render(
     request, template_name, context=None, content_type=None, status=None, using=None
 ):
-    response = _render( request, template_name, context, content_type, status, using )
+    response = _render(request, template_name, context, content_type, status, using)
     if settings.TESTING:
         setattr(response, "__context__", context)
     return response
-
 
 
 def sanitize_html(html_str, allow_weird_characters=False):
@@ -196,9 +291,7 @@ class API:
 
     def load_session_data(self, query):
         try:
-            return json.loads(
-                base64.urlsafe_b64decode(query.encode("utf-8")).decode()
-            )
+            return json.loads(base64.urlsafe_b64decode(query.encode("utf-8")).decode())
         except binascii.Error:
             return self.session
 
@@ -229,9 +322,7 @@ class API:
         return session, set_session
 
     def add_header(self, response, header, value):
-        response.headers[header] = (
-            json.dumps(value) if type(value) == dict else value
-        )
+        response.headers[header] = json.dumps(value) if type(value) == dict else value
         return response
 
     def hx_trigger(self, view, triggers):
@@ -243,9 +334,7 @@ class API:
                 if triggers["ALL"]:
                     response.headers[HXTRIGGER] = triggers["ALL"]
                 else:
-                    for method, event in [
-                        t for t in triggers.items() if t[0] != "ALL"
-                    ]:
+                    for method, event in [t for t in triggers.items() if t[0] != "ALL"]:
                         if request.method == method and event:
                             response.headers[HXTRIGGER] = event
                 return response
@@ -259,9 +348,7 @@ class API:
                 if triggers["ALL"]:
                     response.headers[HXTRIGGER] = triggers["ALL"]
                 else:
-                    for method, event in [
-                        t for t in triggers.items() if t[0] != "ALL"
-                    ]:
+                    for method, event in [t for t in triggers.items() if t[0] != "ALL"]:
                         if request.method == method and event:
                             response.headers[HXTRIGGER] = event
                 return response
@@ -271,9 +358,7 @@ class API:
     def _register_route(self, re, view, route, urlname):
         name = urlname or view.__name__
         path_func = re_path if re else path
-        self.urlpatterns.append(
-            path_func(route or (name + "/"), view, name=name)
-        )
+        self.urlpatterns.append(path_func(route or (name + "/"), view, name=name))
 
     def route(
         self,
@@ -324,9 +409,7 @@ class API:
 
                 wrapped_view = async_login_required(set_htmx)
                 if permissions:
-                    wrapped_view = async_permission_required(
-                        wrapped_view, permissions
-                    )
+                    wrapped_view = async_permission_required(wrapped_view, permissions)
 
             elif require_login:
 
@@ -337,9 +420,7 @@ class API:
 
                 wrapped_view = login_required(set_htmx)
                 if permissions:
-                    wrapped_view = permission_required(permissions)(
-                        wrapped_view
-                    )
+                    wrapped_view = permission_required(permissions)(wrapped_view)
 
             else:
                 wrapped_view = view
@@ -401,7 +482,6 @@ class API:
         return _
 
 
-
 def add_global_context(request):
     return {
         "app_version": app_version,
@@ -425,4 +505,24 @@ def is_valid_employee_email(email: str):
     """
     return email.endswith("@canada.ca") or email.endswith(".gc.ca")
 
+
+def to_dict(instance, field_list=None, exclude=None):
+    opts = instance._meta
+    data = {}
+    if not field_list:
+        fields_iter = [
+            f for f in (opts.concrete_fields + opts.related_objects + opts.many_to_many)
+        ]
+    else:
+        fields_iter = [opts.get_field(f) for f in field_list]
+    if exclude:
+        fields_iter = [f for f in fields_iter if f.name not in exclude]
+
+    for f in fields_iter:
+        name = f.get_accessor_name() if hasattr(f, "get_accessor_name") else f.name
+        if f.one_to_many or f.one_to_many or f.many_to_many:
+            data[name] = [x for x in getattr(instance, name).all()]
+        else:
+            data[name] = getattr(instance, name)
+    return data
 
