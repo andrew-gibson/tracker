@@ -136,17 +136,16 @@ class Tag(RESTModel):
     text_search_trigger = "#"
 
     @classmethod
-    def ac(cls, request, query="", variant=None):
-        if not isinstance(query,(tuple,list)):
+    def ac(cls, request, query="", variant=None, filter_qs=None):
+        if not isinstance(query, (tuple, list)):
             query = [query]
         q = Q()
         for _ in query:
             q.add(Q(name__icontains=_), Q.OR)
-        print(q)
-        return [
-                to_dict(x, field_list=["name","id"])
-                for x in cls.belongs_to_user(request).filter(q).distinct()
-                ]
+        qs = cls.belongs_to_user(request).filter(q).distinct()
+        if filter_qs:
+            qs = qs.filter(filter_qs)
+        return [to_dict(x, field_list=["name", "id"]) for x in qs]
 
     name = CharField(max_length=100)
 

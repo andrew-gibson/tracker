@@ -1,0 +1,15 @@
+<div class="mb-3 row col-12">
+    <div class="col-6">
+        <input class="form-control" 
+               name="q"
+               id="__{{attr}}__" 
+               hx-post="{{make_url('core:m2m_lookup')}}"
+               hx-trigger="keyup"
+               hx-params="q, id_{{attr}}"
+               autocomplete="off"/>
+        {% include "typeahead_results.html"%}
+    </div>
+    <div class="col-3 border border-secondary pt-2">
+        {% include "typeahead_selected.html"%}
+    </div>
+</div>

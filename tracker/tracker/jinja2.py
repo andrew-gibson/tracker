@@ -1,5 +1,6 @@
 import random
 import string
+import json
 from urllib import parse
 
 from core.utils import to_dict
@@ -48,10 +49,12 @@ def environment(**options):
             "random_id": random_id,
             "crispy": crispy,
             "to_dict": to_dict,
+            "len" : len,
             "url_translate": url_translate,
             "_": _,
             "getattr": getattr,
             "print": print,
+            "json" : json,
         }
     )
     return env

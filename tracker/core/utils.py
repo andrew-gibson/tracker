@@ -70,12 +70,27 @@ class classproperty:
     def __get__(self, instance, owner):
         return self.fget(owner)
 
+def assert_or_404(condition):
+    try:
+        assert condition
+    except:
+        raise Http404("Incorrect request")
+
+def get_related_model_or_404(m,attr,test=lambda x: True):
+    try:
+        rel =  m._meta.get_field(attr)
+        assert test(rel.related_model)
+        return rel.related_model, rel
+    except:
+        raise Http404("No Model matches the given query")
+
 
 def link_m2m_or_404(o1, o2, attr=None):
     try:
         if attr:
             return getattr(o1, attr).add(o2)
         else:
+            relations = get_related_model_or_404(o1, o2)
             for m2m_rel in o1.__class__._meta.many_to_many:
                 if m2m_rel.related_model == o2.__class__:
                     return getattr(o1, m2m_rel.name).add(o2)
