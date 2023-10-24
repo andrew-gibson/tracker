@@ -43,27 +43,12 @@ def main(request):
         {
             "form": form,
             "typeahead_url_kwargs": reverse(
-                "core:lookup_setup", kwargs=typeahead_url_kwargs
+                "core:sel_setup", kwargs=typeahead_url_kwargs
             ),
         },
     )
 
 
-@api.get_post_delete_put(["m/<str:modelname>/", "m/<str:modelname>/<int:pk>/"])
-def project(request, modelname="", pk=None):
-    session, set_session = api.get_url_session(request)
-    model = get_model_or_404(f"project.{modelname}")
-    if not model:
-        return HttpResponseBadRequest()
-    if request.method == "GET":
-        return model.GET(request, pk)
-    if request.method == "POST" and not pk:
-        return model.POST(request)
-    if request.method == "PUT" and pk:
-        return model.PUT(request, pk)
-    if request.method == "DELETE" and pk:
-        return model.DELETE(request, pk)
-    return HttpResponseBadRequest()
 
 
 @api.post_delete(

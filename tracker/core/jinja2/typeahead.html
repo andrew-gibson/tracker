@@ -1,15 +1,70 @@
-<div class="mb-3 row col-12">
-    <div class="col-6">
-        <input class="form-control" 
-               name="q"
-               id="__{{attr}}__" 
-               hx-post="{{make_url('core:m2m_lookup')}}"
-               hx-trigger="keyup"
-               hx-params="q, id_{{attr}}"
-               autocomplete="off"/>
-        {% include "typeahead_results.html"%}
-    </div>
-    <div class="col-3 border border-secondary pt-2">
-        {% include "typeahead_selected.html"%}
+<div class="mb-3 row col-12"
+     id="typeaheadid_{{attr}}" >
+    <div class="col-4 border border-secondary p-0">
+        <div class="{%if not display_sel%}d-none{%endif%}">
+            <select id="id_{{attr}}" 
+                    name="id_{{attr}}" 
+                    multiple
+                    class="form-control d-none" >
+                {% for select in selected %}
+                <option selected value='{"id" : {{select.id}}, "name" : "{{select.name}}"}'>{{select.name}}</option>
+                {% endfor %}
+            </select>
+
+            <ul style="min-height: 300px; max-height: 300px; overflow-y: scroll;"
+                 class="list-group">
+                <li class="list-group-item bg-secondary border-bottom d-flex justify-content-between" >
+                    <span>  </span>   
+                    <a href="#" class="text-dark text-decoration-none"
+                            hx-trigger="click"
+                            hx-params="obj,q,id_{{attr}}"
+                            hx-swap="outerHTMK swap:1s"
+                            hx-select-oob="typeaheadid_{{attr}}"
+                            hx-get="{{make_url('core:lookup_setup')}}" >+
+                    </a>
+
+                </li>
+                {% for select in selected %}
+                <li class="list-group-item border-bottom d-flex justify-content-between" >
+                    <span >{{select.name}}  </span>   
+                    <a href="#" class="text-dark text-decoration-none"
+                            hx-trigger="click"
+                            hx-params="obj,q,id_{{attr}}"
+                            hx-post="{{select.__path__}}"
+                            hx-vals='{"obj" : {"id" : {{select.id}}, "name" : "{{select.name}}"}}'>x
+                    </a>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        <div class="{%if display_sel%}d-none{%endif%}"
+            style="min-height: 300px; max-height: 300px; overflow-y: scroll" >
+            <div class='d-flex justify-content-between'>
+                <button type="button" 
+                        class="btn btn-secondary"
+                        hx-get="{{make_url('core:sel_setup')}}"
+                        hx-select-oob="typeaheadid_{{attr}}"
+
+                        > X</button>
+                <input class="form-control border-dark" 
+                       name="q"
+                       id="__{{attr}}__" 
+                       hx-post="{{make_url('core:m2m_lookup')}}"
+                       hx-trigger="keyup"
+                       hx-swap="innerHTML"
+                       hx-target="#typeaheadid_{{attr}}_results"
+                       hx-params="q, id_{{attr}}"
+                       autocomplete="off"/>
+            </div>
+            <div id="typeahead_{{attr}}_results_add_button" class="d-grid"> </div>
+
+            <ul 
+                hx-trigger="refreshQResults{{m.replace(".","")}}{{attr}} from:body"
+                hx-params="q, id_{{attr}}"
+                hx-post="{{make_url('core:m2m_lookup')}}"
+                id="typeaheadid_{{attr}}_results"
+                class="list-group mt-1" >
+            </ul>
+        </div>
     </div>
 </div>

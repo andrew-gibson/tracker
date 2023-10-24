@@ -1,31 +1,26 @@
-{% if len(results) > 0 %}
-<ul id="ta{{attr}}"
-    {%if hx_swap_oob%}hx-swap-oob="true"{%endif%}
-    style="max-height: 300px; y-overflow: scroll"
-    hx-trigger="refreshQResults{{m.replace(".","")}}{{attr}} from:body"
-    hx-params="q, id_{{attr}}"
-    hx-post="{{make_url('core:m2m_lookup')}}"
-    class="list-group border border-dark mt-1" >
-    {% for result in results %}
-    <li class="list-group-item"
-        hx-trigger="click"
-        hx-swap="delete"
-        hx-params="obj,id_{{attr}}"
-        hx-post="{{result.__path__}}"
-        hx-vals='{"obj" : {"id" : {{result.id}}, "name" : "{{result.name}}"}}'>
-        
-    <span class="badge bg-success">{{result.name}}</span> 
-    </li>
-    {% endfor %}
-</ul>
+{% for result in results %}
+<li class="list-group-item border-bottom d-flex justify-content-between" >
+    <span >{{result.name}}</span> 
+    <a class="text-dark text-decoration-none"
+       href="#"
+       hx-trigger="click"
+       hx-swap="delete"
+       hx-params="obj,id_{{attr}}"
+       hx-post="{{result.__path__}}"
+       hx-vals='{"obj" : {"id" : {{result.id}}, "name" : "{{result.name}}"}}' >+</a> 
+</li>
+{% endfor %}
 
-{%else%}
 
-<ul id="ta{{attr}}"
-    {%if hx_swap_oob%}hx-swap-oob="true"{%endif%}
-    hx-trigger="refreshQResults{{m.replace(".","")}}{{attr}} from:body"
-    hx-params="q, id_{{attr}}"
-    hx-post="{{make_url('core:m2m_lookup')}}" >
-</ul>
 
-{%endif%}
+{% if q and len(results) == 0 %}
+<div id="typeahead_{{attr}}_results_add_button" class="d-grid" hx-swap-oob="True">
+<button class="btn-primary btn" 
+        hx-post="{{create_new}}"
+        hx-params="name"
+        hx-vals='{"name" : "{{q}}"}'>
+    Add
+ </button>
+</div>
+{% endif %}
+

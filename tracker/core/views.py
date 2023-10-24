@@ -1,13 +1,25 @@
+import time
 import json
 
-from core.utils import (API, assert_or_404, get_model_or_404,
-                        get_related_model_or_404, link_m2m_or_404, render,
-                        unlink_m2m_or_404)
+from core.utils import (
+    API,
+    assert_or_404,
+    get_model_or_404,
+    get_related_model_or_404,
+    link_m2m_or_404,
+    render,
+    unlink_m2m_or_404,
+)
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.db.models import Q
-from django.http import (Http404, HttpResponse, HttpResponseBadRequest,
-                         JsonResponse, QueryDict)
+from django.http import (
+    Http404,
+    HttpResponse,
+    HttpResponseBadRequest,
+    JsonResponse,
+    QueryDict,
+)
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.csrf import ensure_csrf_cookie
@@ -52,6 +64,25 @@ def _login(request):
 def _logout(request):
     logout(request)
     return render(request, "login.html", {})
+
+
+@api.get_post_delete_put(["m/<str:m>/", "m/<str:m>/<int:pk>/"])
+def rest(request, m="", pk=None):
+    session, set_session = api.get_url_session(request)
+    model = get_model_or_404(m)
+    import pdb
+    pdb.set_trace()
+    if not model:
+        return HttpResponseBadRequest()
+    if request.method == "GET":
+        return model.GET(request, pk)
+    if request.method == "POST" and not pk:
+        return model.POST(request)
+    if request.method == "PUT" and pk:
+        return model.PUT(request, pk)
+    if request.method == "DELETE" and pk:
+        return model.DELETE(request, pk)
+    return HttpResponseBadRequest()
 
 
 def parse_lookup_args(
@@ -104,15 +135,25 @@ def parse_lookup_args(
 
 @api.get(
     [
+        "sel_setup/<str:m>/<int:pk>/<str:attr>/",
+        "sel_setup/<str:m>/<str:attr>/",
+    ]
+)
+def sel_setup(request, m: str = None, pk: int = None, attr: str = None):
+    c: dict = parse_lookup_args(request, m, pk, attr)
+    c["display_sel"] = True
+    return render(request, "typeahead.html", c)
+
+
+@api.get(
+    [
         "lkp_setup/<str:m>/<int:pk>/<str:attr>/",
         "lkp_setup/<str:m>/<str:attr>/",
     ]
 )
 def lookup_setup(request, m: str = None, pk: int = None, attr: str = None):
     c: dict = parse_lookup_args(request, m, pk, attr)
-    url_kwargs = {"m": m, "attr": attr}
-    if pk:
-        url_kwargs["pk"] = pk
+    c["display_sel"] = False
     return render(request, "typeahead.html", c)
 
 
@@ -130,11 +171,12 @@ def m2m_lookup(
 ):
     # remap the currently selected objects to {"id" : , "name" : }
     c: dict = parse_lookup_args(request, m, pk, attr)
+    related_model : models.Model = c["related_model"]
     # the ac will return an array of [{"id" : , "name" : }]
-    c["hx_swap_oob"] = True
     for result in c["results"]:
         result["__path__"] = c["make_url"]("core:lookup_toggle")
 
+    c["create_new"] = reverse("core:rest", kwargs={"m": related_model._meta.label})
     return render(request, "typeahead_results.html", c)
 
 
@@ -156,14 +198,16 @@ def lookup_toggle(
     except:
         raise Http404("incorrect post parameters")
 
-    c["hx_swap_oob"] = True
+    # c["hx_swap_oob"] = True
+    c["display_sel"] = True
     if toggle_obj["id"] in c["selected_ids"]:
         c["selected"] = [x for x in c["selected"] if x["id"] != toggle_obj["id"]]
+
         return api.add_header(
-            render(request, "typeahead_selected.html", c),
+            render(request, "typeahead.html", c),
             "HX-Trigger-After-Settle",
             f"refreshQResults{m.replace('.','')}{attr}",
         )
     else:
         c["selected"] = [*c["selected"], toggle_obj]
-        return render(request, "typeahead_selected.html", c)
+        return render(request, "typeahead.html", c)

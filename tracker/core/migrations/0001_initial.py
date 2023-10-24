@@ -128,7 +128,7 @@ class Migration(migrations.Migration):
             options={
                 "base_manager_name": "objects",
             },
-            bases=(core.models.Serializer, models.Model),
+            bases=( models.Model , ),
             managers=[
                 ("objects", core.models.GroupPrefetcherManager()),
             ],

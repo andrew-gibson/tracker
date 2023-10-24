@@ -9,18 +9,17 @@
 </select>
 <ul id="sel{{attr}}"
     {%if hx_swap_oob%}hx-swap-oob="true"{%endif%}
-     style="max-height: 300px; overflow-y: scroll"
-     class="list-group " 
-     >
+     style="max-height: 300px; overflow-y: scroll;"
+     class="list-group">
     {% for select in selected %}
-    <li class="list-group-item active border border-dark p-1">
-        <button type="button" class="btn btn-primary btn-sm" aria-label="Close"
+    <li class="list-group-item border-bottom d-flex justify-content-between" >
+        <span >{{select.name}}  </span>   
+        <a href="#" class="text-dark text-decoration-none"
                 hx-trigger="click"
                 hx-params="obj,q,id_{{attr}}"
                 hx-post="{{select.__path__}}"
                 hx-vals='{"obj" : {"id" : {{select.id}}, "name" : "{{select.name}}"}}'>x
-        </button>
-        <span class="m-2">{{select.name}}</span>
+        </a>
     </li>
     {% endfor %}
 </ul>
