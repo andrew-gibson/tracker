@@ -33,7 +33,7 @@ class Migration(migrations.Migration):
             options={
                 "abstract": False,
             },
-            bases=(models.Model, core.utils.belongs_to),
+            bases=(models.Model, core.autocomplete.belongs_to),
         ),
         migrations.CreateModel(
             name="EXCompetency",
@@ -86,7 +86,7 @@ class Migration(migrations.Migration):
             options={
                 "abstract": False,
             },
-            bases=(models.Model, core.utils.belongs_to),
+            bases=(models.Model, core.autocomplete.belongs_to),
         ),
         migrations.CreateModel(
             name="ProjectTeam",
@@ -108,7 +108,7 @@ class Migration(migrations.Migration):
                     ),
                 ),
             ],
-            bases=(models.Model, core.utils.belongs_to),
+            bases=(models.Model, core.autocomplete.belongs_to),
         ),
         migrations.CreateModel(
             name="Team",
@@ -135,7 +135,7 @@ class Migration(migrations.Migration):
             options={
                 "abstract": False,
             },
-            bases=(models.Model, core.utils.belongs_to),
+            bases=(models.Model, core.autocomplete.belongs_to),
         ),
         migrations.CreateModel(
             name="Theme",
@@ -162,7 +162,7 @@ class Migration(migrations.Migration):
             options={
                 "abstract": False,
             },
-            bases=(models.Model, core.utils.belongs_to),
+            bases=(models.Model, core.autocomplete.belongs_to),
         ),
         migrations.CreateModel(
             name="ThemeWork",
@@ -211,7 +211,7 @@ class Migration(migrations.Migration):
             options={
                 "abstract": False,
             },
-            bases=(models.Model, core.utils.belongs_to),
+            bases=(models.Model, core.autocomplete.belongs_to),
         ),
         migrations.CreateModel(
             name="Tag",
@@ -231,7 +231,7 @@ class Migration(migrations.Migration):
             options={
                 "abstract": False,
             },
-            bases=(models.Model, core.utils.belongs_to),
+            bases=(models.Model, core.autocomplete.belongs_to),
         ),
         migrations.AddField(
             model_name="projectteam",

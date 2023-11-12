@@ -69,9 +69,7 @@ def _logout(request):
 @api.get_post_delete_put(["m/<str:m>/", "m/<str:m>/<int:pk>/"])
 def rest(request, m="", pk=None):
     session, set_session = api.get_url_session(request)
-    model = get_model_or_404(m)
-    import pdb
-    pdb.set_trace()
+    model, *__ = get_model_or_404(m)
     if not model:
         return HttpResponseBadRequest()
     if request.method == "GET":
@@ -110,26 +108,27 @@ def parse_lookup_args(
     c["make_url"] = make_url
 
     if f"id_{attr}" in request.POST:
-        c["selected"]: list = [
-            {"__path__": request.path, **json.loads(x)}
-            for x in request.POST.getlist(f"id_{attr}")
-        ]
+        c["selected"]: list = request.POST.getlist(f"id_{attr}")
     else:
-        c["selected"] = [
+        c["selected"]: list = [
             {
                 "name": str(x),
                 "id": x.pk,
-                "__path__": c["make_url"]("core:lookup_toggle"),
             }
             for x in getattr(c["instance"], attr).all()
         ]
-    c["selected_ids"] = [x["id"] for x in c["selected"]]
+
     c["q"] = request.POST.get("q")
+
+    raw_q_results = c["related_model"].ac(request,c["q"]) if c["q"] else []
+
     c["results"] = (
-        c["related_model"].ac(request, c["q"], filter_qs=~Q(id__in=c["selected_ids"]))
+        c["related_model"].ac(request, c["q"], filter_qs=~Q(id__in=c["selected"]))
         if c["q"]
         else []
     )
+
+    c["already_selected"] = len(raw_q_results) and not len(c["results"])
     return c
 
 
@@ -142,18 +141,6 @@ def parse_lookup_args(
 def sel_setup(request, m: str = None, pk: int = None, attr: str = None):
     c: dict = parse_lookup_args(request, m, pk, attr)
     c["display_sel"] = True
-    return render(request, "typeahead.html", c)
-
-
-@api.get(
-    [
-        "lkp_setup/<str:m>/<int:pk>/<str:attr>/",
-        "lkp_setup/<str:m>/<str:attr>/",
-    ]
-)
-def lookup_setup(request, m: str = None, pk: int = None, attr: str = None):
-    c: dict = parse_lookup_args(request, m, pk, attr)
-    c["display_sel"] = False
     return render(request, "typeahead.html", c)
 
 
@@ -171,43 +158,7 @@ def m2m_lookup(
 ):
     # remap the currently selected objects to {"id" : , "name" : }
     c: dict = parse_lookup_args(request, m, pk, attr)
-    related_model : models.Model = c["related_model"]
+    related_model: models.Model = c["related_model"]
     # the ac will return an array of [{"id" : , "name" : }]
-    for result in c["results"]:
-        result["__path__"] = c["make_url"]("core:lookup_toggle")
-
     c["create_new"] = reverse("core:rest", kwargs={"m": related_model._meta.label})
     return render(request, "typeahead_results.html", c)
-
-
-@api.post(
-    [
-        "lkp_toggle/<str:m>/<int:pk>/<str:attr>/",
-        "lkp_toggle/<str:m>/<str:attr>/",
-    ]
-)
-def lookup_toggle(
-    request,
-    m: str = None,
-    pk: int = None,
-    attr: str = None,
-):
-    c: dict = parse_lookup_args(request, m, pk, attr)
-    try:
-        toggle_obj: dict = json.loads(request.POST.get("obj"))
-    except:
-        raise Http404("incorrect post parameters")
-
-    # c["hx_swap_oob"] = True
-    c["display_sel"] = True
-    if toggle_obj["id"] in c["selected_ids"]:
-        c["selected"] = [x for x in c["selected"] if x["id"] != toggle_obj["id"]]
-
-        return api.add_header(
-            render(request, "typeahead.html", c),
-            "HX-Trigger-After-Settle",
-            f"refreshQResults{m.replace('.','')}{attr}",
-        )
-    else:
-        c["selected"] = [*c["selected"], toggle_obj]
-        return render(request, "typeahead.html", c)

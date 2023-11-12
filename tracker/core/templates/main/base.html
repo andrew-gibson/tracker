@@ -47,18 +47,6 @@
   <script>
     const csrf_token =  '{{ csrf_token }}';
     const headers =   {  'X-CSRFToken' : csrf_token};
-    const GET = async (url, body) => {
-        return await fetch( url, {headers  , body : JSON.stringify(body)});
-    };
-    const PUT = async (url, body) => {
-        return await fetch( url, {method: "PUT", headers , body : JSON.stringify(body)});
-    };
-    const POST = async (url, body) => {
-        return await fetch( url, {method: "POST",headers , body : JSON.stringify(body)});
-    };
-    const DELETE = async (url, body) => {
-        return await fetch( url, {method: "DELETE",headers , body : JSON.stringify(body)});
-    };
     document.body.addEventListener('htmx:configRequest', (event) => {
       event.detail.headers['X-CSRFToken'] = csrf_token;
     });
@@ -68,6 +56,7 @@
         const data = [new ClipboardItem({ [type]: blob })];
         navigator.clipboard.write(data);
     };
+
     {% block scripts %}
 
 

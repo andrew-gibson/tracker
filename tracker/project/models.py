@@ -1,6 +1,7 @@
 import sys
 from django.apps import apps
-from core.utils import render, belongs_to, add_to_admin, classproperty, to_dict
+from core.utils import render,  add_to_admin, classproperty, to_dict
+from core.autocomplete import AutoComplete, belongs_to
 from django.db.models import (
     CASCADE,
     PROTECT,
@@ -21,12 +22,15 @@ from django.http import QueryDict
 from django.urls import reverse
 
 
+
 class RequestForm(ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        for field in self.fields.values():
+        for attr,field in self.fields.items():
+            setattr(field, "request", self.request)
             setattr(field.widget, "request", self.request)
             if hasattr(field.widget, "a_c"):
+                setattr(field.a_c, "request", self.request)
                 setattr(field.widget.a_c, "request", self.request)
 
 
@@ -47,7 +51,8 @@ class RESTModel(Model, belongs_to):
         Form = modelform_factory(
             cls,
             form=cls._Form,
-            fields=cls.form_fields,
+            fields=getattr(cls,"form_fields",cls._Form._meta.fields),
+            field_classes=getattr(cls, "field_classes", {}),
             widgets=getattr(cls, "form_widgets", {}),
         )
         Form.request = request
@@ -124,28 +129,15 @@ class RESTModel(Model, belongs_to):
         )
 
 
+
 class EXCompetency(Model):
     name = CharField(max_length=300, unique=True)
 
 
-class Tag(RESTModel):
+class Tag(RESTModel,AutoComplete("#", "ffbe0b")):
     form_fields = [
         "name",
     ]
-
-    text_search_trigger = "#"
-
-    @classmethod
-    def ac(cls, request, query="", variant=None, filter_qs=None):
-        if not isinstance(query, (tuple, list)):
-            query = [query]
-        q = Q()
-        for _ in query:
-            q.add(Q(name__icontains=_), Q.OR)
-        qs = cls.belongs_to_user(request).filter(q).distinct()
-        if filter_qs:
-            qs = qs.filter(filter_qs)
-        return [to_dict(x, field_list=["name", "id"]) for x in qs]
 
     name = CharField(max_length=100)
 
@@ -153,43 +145,25 @@ class Tag(RESTModel):
         return self.name
 
 
-def make_get_items(cls):
-    def get_items(self, search=None, values=None):
-        nonlocal cls
-        if isinstance(cls, str):
-            cls = apps.get_model(cls)
-        if search is not None:
-            items = [
-                {"label": str(x), "value": str(x.id)}
-                for x in cls.belongs_to_user(self.request)
-                if search == "" or str(search).upper() in f"{x}".upper()
-            ]
-            return items
-        if values is not None and len(values) != 0:
-            items = [
-                {"label": str(x), "value": str(x.id)}
-                for x in cls.belongs_to_user(self.request)
-                if str(x.id) in values
-            ]
-            return items
-
-        return []
-
-    return get_items
-
-
-class Team(RESTModel):
+class Team(RESTModel, AutoComplete("*","fb5607")):
     form_fields = ["name", "internal"]
 
-    name = CharField(max_length=255)
+    @classmethod
+    def belongs_to_user(cls, request):
+        q = Q(project__users=request.user, private=True) | Q(private=False)
+        return cls.objects.filter(q)
+
+    users = None
+    name = CharField(max_length=255,unique=True)
     projects = ManyToManyField("Project", through="ProjectTeam")
+    private =  BooleanField(default=False)
     internal = BooleanField(default=False)
 
     def __str__(self):
         return self.name
 
 
-class Contact(RESTModel):
+class Contact(RESTModel, AutoComplete("@","ff006e")):
     form_fields = ["name", "email"]
 
     name = CharField(max_length=255)
@@ -199,8 +173,19 @@ class Contact(RESTModel):
         return self.name
 
 
-class Project(RESTModel):
-    form_fields = ["name", "parent_project", "teams", "tags", "text"]
+class Project(RESTModel, AutoComplete("^", "8338ec")):
+
+
+    class _Form(RequestForm):
+
+        class Meta:
+            fields = ["name", "parent_project", "teams", "tags", "text"]
+
+        def __init__(self,*args,**kwargs):
+            super().__init__(*args, **kwargs)
+            self.fields["parent_project"].queryset = self.fields["parent_project"].queryset.exclude(pk=self.instance.pk)
+            self.fields["parent_project"].widget.attrs["class"] = "form-control"
+
 
     name = CharField(max_length=255)
     text = TextField()

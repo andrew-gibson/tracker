@@ -29,3 +29,7 @@ body {
   opacity: 0;
   transition: opacity 1s ease-out;
 }
+.fade-me-out.htmx-swapping.highlight-fade {
+  background: #dc3545;
+}
+

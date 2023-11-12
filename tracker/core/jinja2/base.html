@@ -45,18 +45,6 @@
   <script>
     const csrf_token =  '{{ csrf_token }}';
     const headers =   {  'X-CSRFToken' : csrf_token};
-    const GET = async (url, body) => {
-        return await fetch( url, {headers  , body : JSON.stringify(body)});
-    };
-    const PUT = async (url, body) => {
-        return await fetch( url, {method: "PUT", headers , body : JSON.stringify(body)});
-    };
-    const POST = async (url, body) => {
-        return await fetch( url, {method: "POST",headers , body : JSON.stringify(body)});
-    };
-    const DELETE = async (url, body) => {
-        return await fetch( url, {method: "DELETE",headers , body : JSON.stringify(body)});
-    };
     document.body.addEventListener('htmx:configRequest', (event) => {
       event.detail.headers['X-CSRFToken'] = csrf_token;
     });
@@ -76,6 +64,33 @@
             }
         });
     }
+    function htmlToElement(html) {
+        var template = document.createElement('template');
+        html = html.trim(); // Never return a text node of whitespace as the result
+        template.innerHTML = html;
+        return template.content.firstChild;
+    }
+
+    document.addEventListener('alpine:init', (attr,selected) => {
+        Alpine.data("m2m_typeahead", (attr, selected) => ({
+            attr : attr,
+            selected  : selected,
+            show_search  : false,
+            remove_selected : function(el, data){
+                this.selected = this.selected.filter(x=>x.id != data.id);
+            },
+            add_search_item : function(el, data) {
+                this.selected = [data, ...this.selected];
+            },
+            close_search : function(data){
+                 data.show_search = false; 
+                 htmx.find(`#typeaheadid_${attr}_q`).value = '';
+                 htmx.find(`#typeahead_${attr}_results_add_button`).innerHTML = ''
+                 htmx.find(`#typeahead_${attr}_results`).innerHTML = ''
+
+            }
+        }))
+    })
     {% block scripts %}
 
 

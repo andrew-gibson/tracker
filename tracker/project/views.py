@@ -6,10 +6,10 @@ from core.utils import (
     get_model_or_404,
     link_m2m_or_404,
     unlink_m2m_or_404,
-    get_related_model_or_404,
+    find_words_from_trigger,
 )
+from core.autocomplete import get_autocompletes
 from django.apps import apps
-from django.db.models import Q
 from django.http import (
     HttpResponse,
     HttpResponseBadRequest,
@@ -31,24 +31,26 @@ def main(request):
     project = Project.objects.first()
     project.tags.set(Tag.belongs_to_user(request).all())
     form = Project.form(request)(instance=project)
-    typeahead_url_kwargs = {
+    tags_typeahead = {
         "m": "project.Project",
         "attr": "tags",
     }
+    teams_typeahead = {
+        "m": "project.Project",
+        "attr": "teams",
+    }
     if project.pk:
-        typeahead_url_kwargs["pk"] = project.pk
+        tags_typeahead["pk"] = project.pk
+        teams_typeahead["pk"] = project.pk
     return render(
         request,
         "project/main.html",
         {
             "form": form,
-            "typeahead_url_kwargs": reverse(
-                "core:sel_setup", kwargs=typeahead_url_kwargs
-            ),
+            "tags_typeahead": reverse("core:sel_setup", kwargs=tags_typeahead),
+            "teams_typeahead": reverse("core:sel_setup", kwargs=teams_typeahead),
         },
     )
-
-
 
 
 @api.post_delete(
@@ -69,17 +71,28 @@ def m2m(request, m1, pk1, m2, pk2, attr=""):
     return HttpResponse("success")
 
 
-@api.post(["ac/<str:component_id>/<str:m>/"])
-def ac(request, component_id, m):
-    model = get_model_or_404(m, test=lambda m: hasattr(m, "text_search_trigger"))
-    trigger = model.text_search_trigger
-    text_input = request.POST[component_id]
-    query = [
-        x.replace(trigger, "")
-        for x in text_input.split(" ")
-        if x.startswith(trigger) and len(x) != 1
-    ]
-    results = model.ac(request, query) if len(query) else []
-    return render(request, f"{model._name}/ac_results.html", {"results": results})
+@api.post(["free_text_ac/<str:m>/<str:attr>/"])
+def free_text_ac(request, m, attr):
+    model = get_model_or_404(m)
+    text_input = request.POST.get(attr)
+    fields =  get_autocompletes(model)
+    results = {
+        f.name: {
+            "model": f.related_model,
+            "create_url" : "",
+            "name": f.name,
+            "search_terms": find_words_from_trigger(
+                text_input, f.related_model.text_search_trigger, many = f.many_to_many
+            ),
+        }
+        for f in fields
+    }
+    for name in results:
+        results[name]["results"] = [
+            [term, results[name]["model"].ac(request, term)]
+            for term in results[name]["search_terms"]
+        ]
 
+    print(results)
 
+    return render(request, f"free_text_ac.html", {"results": results})

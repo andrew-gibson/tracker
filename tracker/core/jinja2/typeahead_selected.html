@@ -1,25 +1,22 @@
-<select id="id_{{attr}}" 
-        name="id_{{attr}}" 
-        multiple
-        class="form-control d-none" 
-        {%if hx_swap_oob%}hx-swap-oob="true"{%endif%} >
-    {% for select in selected %}
-    <option selected value='{"id" : {{select.id}}, "name" : "{{select.name}}"}'>{{select.name}}</option>
-    {% endfor %}
-</select>
-<ul id="sel{{attr}}"
-    {%if hx_swap_oob%}hx-swap-oob="true"{%endif%}
-     style="max-height: 300px; overflow-y: scroll;"
-     class="list-group">
-    {% for select in selected %}
-    <li class="list-group-item border-bottom d-flex justify-content-between" >
-        <span >{{select.name}}  </span>   
-        <a href="#" class="text-dark text-decoration-none"
-                hx-trigger="click"
-                hx-params="obj,q,id_{{attr}}"
-                hx-post="{{select.__path__}}"
-                hx-vals='{"obj" : {"id" : {{select.id}}, "name" : "{{select.name}}"}}'>x
-        </a>
+<div  hx-swap-oob="afterbegin:#id_{{attr}}">
+    <option 
+        selected 
+        id="select{{attr}}{{add_obj.id}}" 
+        value='{{add_obj.id}}"}'>{{add_obj.name}}</option>
+</div>
+
+
+<div  hx-swap-oob="afterbegin:#id_{{attr}}_displayul">
+    <li class="list-group-item border-bottom " 
+        x-transition.duration.750ms
+        x-data="{show : true}"
+        x-show="show">
+        <div class="d-flex justify-content-between">
+            <span >{{add_obj.name}}  </span>   
+            <a href="#" class="text-dark text-decoration-none"
+                        x-on:click="show=false ; {{attr}}typeahead.remove_selected($el, {{add_obj}});" >
+                        x
+            </a>
+        </div>
     </li>
-    {% endfor %}
-</ul>
+</div>

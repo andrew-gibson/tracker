@@ -1,3 +1,4 @@
+import time
 import asyncio
 import base64
 import binascii
@@ -23,11 +24,24 @@ from django.http import Http404, HttpResponse, HttpResponseBadRequest
 from django.shortcuts import render as _render
 from django.shortcuts import resolve_url
 from django.template import engines
+from django.forms.models import ModelChoiceField
 from django.urls import path, re_path
 from django.utils.safestring import mark_safe
 from text.translate import gettext_lazy as _
 
 ALLOWED_TAGS = ["li", "ol", "ul", "p", "br", "span"]
+
+
+def find_words_from_trigger(text, trigger, many=True):
+    split_text = text.split(" ")
+    words = [
+        x.replace(trigger, "") + (" " if i < len(split_text) - 1 else "")
+        for i, x in enumerate(split_text)
+        if x.startswith(trigger) and len(x) != 1
+    ]
+    if not many and len(words):
+        return [words[-1]]
+    return words
 
 
 class AdminForm(forms.ModelForm):
@@ -70,15 +84,17 @@ class classproperty:
     def __get__(self, instance, owner):
         return self.fget(owner)
 
+
 def assert_or_404(condition):
     try:
         assert condition
     except:
         raise Http404("Incorrect request")
 
-def get_related_model_or_404(m,attr,test=lambda x: True):
+
+def get_related_model_or_404(m, attr, test=lambda x: True):
     try:
-        rel =  m._meta.get_field(attr)
+        rel = m._meta.get_field(attr)
         assert test(rel.related_model)
         return rel.related_model, rel
     except:
@@ -126,17 +142,12 @@ def get_model_or_404(s, test=lambda x: True):
                 "staticfiles",
             )
         )
-        model = apps.get_model(s)  
+        model = apps.get_model(s)
         assert test(model)
         return model
     except:
         raise Http404("No Model matches the given query")
 
-
-class belongs_to:
-    @classmethod
-    def belongs_to_user(cls, request):
-        return cls.objects
 
 
 def render(
@@ -431,7 +442,8 @@ class API:
                 @wraps(view)
                 def set_htmx(request, *args, **kwargs):
                     request.htmx = "Hx-Request" in request.headers
-                    return view(request, *args, **kwargs)
+                    resp = view(request, *args, **kwargs)
+                    return resp
 
                 wrapped_view = login_required(set_htmx)
                 if permissions:
@@ -497,12 +509,6 @@ class API:
         return _
 
 
-def add_global_context(request):
-    return {
-        "app_version": app_version,
-    }
-
-
 def group_by(iterable, key):
     groups = defaultdict(list)
     for item in iterable:
@@ -540,4 +546,3 @@ def to_dict(instance, field_list=None, exclude=None):
         else:
             data[name] = getattr(instance, name)
     return data
-

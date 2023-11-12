@@ -22,13 +22,17 @@ ALLOWED_HOSTS = ["0.0.0.0", "127.0.0.1"]
 AUTH_USER_MODEL = "core.User"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 INTERNAL_IPS = [
+    "127.0.0.1",
     "0.0.0.0",
 ]
 CSRF_TRUSTED_ORIGINS = ["https://app.simcoe.is"]
 SESSION_SAVE_EVERY_REQUEST = False  # When set to True, Django will save the session to the database on every single request.
 CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
 CRISPY_TEMPLATE_PACK = "bootstrap5"
-STATIC_ROOT = BASE_DIR / "static"
+_STATIC_ROOT = BASE_DIR / "static"
+STATICFILES_DIRS = [
+    _STATIC_ROOT,
+]
 STATIC_URL = "static/"
 TESTING = "pytest" in "".join(sys.argv)
 
@@ -54,8 +58,9 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "core",
     "project",
-    "debug_toolbar",
+    #"debug_toolbar",
 ]
+
 
 
 MIDDLEWARE = [
@@ -67,7 +72,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    "debug_toolbar.middleware.DebugToolbarMiddleware",
+    #"debug_toolbar.middleware.DebugToolbarMiddleware",
 ]
 
 ROOT_URLCONF = "tracker.urls"

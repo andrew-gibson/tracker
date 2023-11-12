@@ -1,26 +1,32 @@
-{% for result in results %}
-<li class="list-group-item border-bottom d-flex justify-content-between" >
-    <span >{{result.name}}</span> 
-    <a class="text-dark text-decoration-none"
-       href="#"
-       hx-trigger="click"
-       hx-swap="delete"
-       hx-params="obj,id_{{attr}}"
-       hx-post="{{result.__path__}}"
-       hx-vals='{"obj" : {"id" : {{result.id}}, "name" : "{{result.name}}"}}' >+</a> 
-</li>
-{% endfor %}
-
-
-
-{% if q and len(results) == 0 %}
-<div id="typeahead_{{attr}}_results_add_button" class="d-grid" hx-swap-oob="True">
-<button class="btn-primary btn" 
-        hx-post="{{create_new}}"
-        hx-params="name"
-        hx-vals='{"name" : "{{q}}"}'>
-    Add
- </button>
+<div id="typeahead_{{attr}}_results_add_button" 
+     class="d-grid" 
+     hx-swap-oob="True">
+    {% if q and len(results) == 0 and not already_selected%}
+    <button class="btn-primary btn" 
+            hx-post="{{create_new}}"
+            hx-params="name"
+            hx-vals='{"name" : "{{q}}"}'>
+        Add
+     </button>
+    {% endif %}
 </div>
-{% endif %}
+
+
+
+<ul class="list-group mt-1" id="typeahead_{{attr}}_results" hx-swap-oob="True">
+    {% for result in results %}
+    <li class="list-group-item border-bottom "
+        x-transition.duration.750ms
+        x-data="{show : true}"
+        x-show="show">
+            <div class="d-flex justify-content-between">
+                <span >{{result.name}}</span> 
+                <a class="text-dark text-decoration-none"
+                   href="#"
+                   x-on:click="show=false ; add_search_item($el, {{result}});" >+</a> 
+            </div>
+    </li>
+    {% endfor %}
+</ul>
+
 

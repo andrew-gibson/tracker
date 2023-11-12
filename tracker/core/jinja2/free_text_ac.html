@@ -1,0 +1,14 @@
+{%for relation in results.values() %}
+    {%if relation.results %}
+    <div x-data="{results : {{ relation.results|safe }},name : '{{relation.name.replace("_", " ").title() }}'  }" class='d-flex pt-1'>
+        <span class="fw-bold align-self-center pe-2" x-text="name + ':'"> </span>
+        <ul class="list-group list-group-horizontal">
+            <template x-for="grouping in results" :key="grouping.id">
+                <template x-for="match in grouping[1]">
+                    <li class="list-group-item" x-text="match.name" style="background-color: {{relation.model.trigger_color}}"></li>
+                </template>
+            </template>
+        </ul>
+    </div>
+    {%endif%}
+{%endfor%}
