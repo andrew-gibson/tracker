@@ -1,14 +1,26 @@
 {%for relation in results.values() %}
     {%if relation.results %}
-    <div x-data="{results : {{ relation.results|safe }},name : '{{relation.name.replace("_", " ").title() }}'  }" class='d-flex pt-1'>
-        <span class="fw-bold align-self-center pe-2" x-text="name + ':'"> </span>
+    <div x-data='{
+        results : {{ json.dumps(relation.results)|safe }},
+        name : "{{relation.name.replace("_", " ").title() }}"  ,
+        many_to_many : {{json.dumps(relation.many_to_many)}} }' 
+        class='d-flex mt-2'>
+        <span x-bind:class="'w-bold m-1 pe-2 align-self-center ' + (results[0][1].length > 1 && !many_to_many ? 'fbg-danger bg-opacity-25' : '')"
+              x-text="name + ':'" >
+        </span>
+        <div style='overflow-x: scroll, max-width: 100%'>
         <ul class="list-group list-group-horizontal">
-            <template x-for="grouping in results" :key="grouping.id">
+            <template x-for="grouping in results" >
                 <template x-for="match in grouping[1]">
-                    <li class="list-group-item" x-text="match.name" style="background-color: {{relation.model.trigger_color}}"></li>
+                    <li class="list-group-item d-flex"  style="background-color: {{relation.model.trigger_color}}">
+                        <span  x-text="match.name"></span>
+                        <span class="badge bg-success" x-show="match.new"> New</span> 
+                    </li>
                 </template>
             </template>
         </ul>
+        </div>
+
     </div>
     {%endif%}
 {%endfor%}

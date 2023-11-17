@@ -1,7 +1,7 @@
 import sys
 from django.apps import apps
 from core.utils import render,  add_to_admin, classproperty, to_dict
-from core.autocomplete import AutoComplete, belongs_to
+from core.autocomplete import AutoComplete, belongs_to, AutoCompleteNexus
 from django.db.models import (
     CASCADE,
     PROTECT,
@@ -173,8 +173,7 @@ class Contact(RESTModel, AutoComplete("@","ff006e")):
         return self.name
 
 
-class Project(RESTModel, AutoComplete("^", "8338ec")):
-
+class Project(RESTModel, AutoComplete("^", "8338ec"), AutoCompleteNexus):
 
     class _Form(RequestForm):
 
@@ -185,7 +184,6 @@ class Project(RESTModel, AutoComplete("^", "8338ec")):
             super().__init__(*args, **kwargs)
             self.fields["parent_project"].queryset = self.fields["parent_project"].queryset.exclude(pk=self.instance.pk)
             self.fields["parent_project"].widget.attrs["class"] = "form-control"
-
 
     name = CharField(max_length=255)
     text = TextField()

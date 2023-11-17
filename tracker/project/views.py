@@ -6,9 +6,8 @@ from core.utils import (
     get_model_or_404,
     link_m2m_or_404,
     unlink_m2m_or_404,
-    find_words_from_trigger,
 )
-from core.autocomplete import get_autocompletes
+from core.autocomplete import AutoCompleteNexus
 from django.apps import apps
 from django.http import (
     HttpResponse,
@@ -73,15 +72,15 @@ def m2m(request, m1, pk1, m2, pk2, attr=""):
 
 @api.post(["free_text_ac/<str:m>/<str:attr>/"])
 def free_text_ac(request, m, attr):
-    model = get_model_or_404(m)
+    model = get_model_or_404(m, test=lambda m : issubclass(m,(AutoCompleteNexus,)))
     text_input = request.POST.get(attr)
-    fields =  get_autocompletes(model)
+    fields =  model.get_autocompletes()
     results = {
         f.name: {
             "model": f.related_model,
-            "create_url" : "",
             "name": f.name,
-            "search_terms": find_words_from_trigger(
+            "many_to_many" :  f.many_to_many,
+            "search_terms": model.find_words_from_trigger(
                 text_input, f.related_model.text_search_trigger, many = f.many_to_many
             ),
         }
@@ -92,7 +91,5 @@ def free_text_ac(request, m, attr):
             [term, results[name]["model"].ac(request, term)]
             for term in results[name]["search_terms"]
         ]
-
-    print(results)
 
     return render(request, f"free_text_ac.html", {"results": results})
