@@ -93,6 +93,7 @@ def AutoComplete(trigger, hex_color, search_field="name"):
         {
             "text_search_trigger": trigger,
             "trigger_color": rgba,
+            "hex_trigger_color" : "#"+hex_color,
             "search_field": search_field,
         },
     )
