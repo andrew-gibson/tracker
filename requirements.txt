@@ -11,8 +11,10 @@ django-filter
 django-crispy-forms
 django-extensions
 django-js-asset
+django-readers
 django-mptt
 django-simple-history
+django-lifecycle
 whitenoise
 hiredis
 Jinja2
