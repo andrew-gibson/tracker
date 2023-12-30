@@ -1,9 +1,9 @@
-import time
 import asyncio
 import base64
 import binascii
 import json
 import os
+import time
 from collections import defaultdict
 from dataclasses import dataclass, field, make_dataclass
 from functools import wraps
@@ -20,28 +20,16 @@ from django.conf import settings
 from django.contrib import admin
 from django.contrib.auth import REDIRECT_FIELD_NAME
 from django.contrib.auth.decorators import login_required, permission_required
+from django.forms.models import ModelChoiceField
 from django.http import Http404, HttpResponse, HttpResponseBadRequest
 from django.shortcuts import render as _render
 from django.shortcuts import resolve_url
 from django.template import engines
-from django.forms.models import ModelChoiceField
 from django.urls import path, re_path
 from django.utils.safestring import mark_safe
 from text.translate import gettext_lazy as _
 
 ALLOWED_TAGS = ["li", "ol", "ul", "p", "br", "span"]
-
-
-def find_words_from_trigger(text, trigger, many=True):
-    split_text = text.split(" ")
-    words = [
-        x.replace(trigger, "") + (" " if i < len(split_text) - 1 else "")
-        for i, x in enumerate(split_text)
-        if x.startswith(trigger) and len(x) != 1
-    ]
-    if not many and len(words):
-        return [words[-1]]
-    return words
 
 
 class AdminForm(forms.ModelForm):
@@ -101,31 +89,39 @@ def get_related_model_or_404(m, attr, test=lambda x: True):
         raise Http404("No Model matches the given query")
 
 
-def link_m2m_or_404(o1, o2, attr=None):
+def find_linking_attr(o1, o2, attr=None):
     try:
-        if attr:
-            return getattr(o1, attr).add(o2)
-        else:
+        if not attr:
             relations = get_related_model_or_404(o1, o2)
             for m2m_rel in o1.__class__._meta.many_to_many:
                 if m2m_rel.related_model == o2.__class__:
-                    return getattr(o1, m2m_rel.name).add(o2)
+                    attr = rel.name
+        if not attr:
             raise Exception
+        rel = o1.__class__._meta.get_field(attr)
+        return attr, rel
     except:
         raise Http404("No Model matches the given query")
 
 
-def unlink_m2m_or_404(o1, o2, attr=None):
-    try:
-        if attr:
-            return getattr(o1, attr).remove(o2)
-        else:
-            for m2m_rel in o1.__class__._meta.many_to_many:
-                if m2m_rel.related_model == o2.__class__:
-                    return getattr(o1, m2m_rel.name).remove(o2)
-            raise Exception
-    except:
-        raise Http404("No Model matches the given query")
+def link_or_404(o1, o2, attr=None):
+    attr, rel = find_linking_attr(o1,o2,attr)
+    if rel.many_to_many or rel.one_to_many:
+        getattr(o1,attr).add(o2)
+    else:
+        setattr(o1,attr,o2)
+        o1.save()
+
+
+def unlink_or_404(o1, o2, attr=None):
+    attr,rel = find_linking_attr(o1,o2,attr)
+    if rel.many_to_many or rel.one_to_many:
+        getattr(o1,attr).remove(o2)
+    else:
+        setattr(o1,attr,None)
+        o1.save()
+
+
 
 
 def get_model_or_404(s, test=lambda x: True):
@@ -147,7 +143,6 @@ def get_model_or_404(s, test=lambda x: True):
         return model
     except:
         raise Http404("No Model matches the given query")
-
 
 
 def render(
@@ -429,23 +424,31 @@ class API:
             if require_login and asyncio.iscoroutinefunction(view):
 
                 @wraps(view)
-                async def set_htmx(request, *args, **kwargs):
+                async def set_from_headers(request, *args, **kwargs):
                     request.htmx = "Hx-Request" in request.headers
+                    request.json = (
+                        "json" in request.headers.get("Content-Type", "")
+                        or request.headers.get("json-response", "") == "true"
+                    )
                     return await view(request, *args, **kwargs)
 
-                wrapped_view = async_login_required(set_htmx)
+                wrapped_view = async_login_required(set_from_headers)
                 if permissions:
                     wrapped_view = async_permission_required(wrapped_view, permissions)
 
             elif require_login:
 
                 @wraps(view)
-                def set_htmx(request, *args, **kwargs):
+                def set_from_headers(request, *args, **kwargs):
                     request.htmx = "Hx-Request" in request.headers
+                    request.json = (
+                        "json" in request.headers.get("content-type", "")
+                        or request.headers.get("json-response", "") == "true"
+                    )
                     resp = view(request, *args, **kwargs)
                     return resp
 
-                wrapped_view = login_required(set_htmx)
+                wrapped_view = login_required(set_from_headers)
                 if permissions:
                     wrapped_view = permission_required(permissions)(wrapped_view)
 
@@ -527,22 +530,3 @@ def is_valid_employee_email(email: str):
     return email.endswith("@canada.ca") or email.endswith(".gc.ca")
 
 
-def to_dict(instance, field_list=None, exclude=None):
-    opts = instance._meta
-    data = {}
-    if not field_list:
-        fields_iter = [
-            f for f in (opts.concrete_fields + opts.related_objects + opts.many_to_many)
-        ]
-    else:
-        fields_iter = [opts.get_field(f) for f in field_list]
-    if exclude:
-        fields_iter = [f for f in fields_iter if f.name not in exclude]
-
-    for f in fields_iter:
-        name = f.get_accessor_name() if hasattr(f, "get_accessor_name") else f.name
-        if f.one_to_many or f.one_to_many or f.many_to_many:
-            data[name] = [x for x in getattr(instance, name).all()]
-        else:
-            data[name] = getattr(instance, name)
-    return data

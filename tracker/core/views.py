@@ -1,33 +1,32 @@
 import time
 import json
+import aiohttp
 
-from core.utils import (
+from .utils import (
     API,
     assert_or_404,
     get_model_or_404,
     get_related_model_or_404,
-    link_m2m_or_404,
+    link_or_404,
     render,
-    unlink_m2m_or_404,
+    unlink_or_404,
 )
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.db.models import Q
 from django.http import (
-    Http404,
     HttpResponse,
     HttpResponseBadRequest,
     JsonResponse,
-    QueryDict,
 )
-from django.shortcuts import get_object_or_404, redirect, render
+from django.shortcuts import get_object_or_404, aget_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils import safestring
 from django.views.decorators.csrf import ensure_csrf_cookie
-from django.views.decorators.http import require_http_methods
 from text.translate import gettext_lazy as _
 
 from . import models
-from .utils import API
+from .rest import AutoCompleteNexus
 
 api = API(namespace="core")
 
@@ -69,7 +68,7 @@ def _logout(request):
 @api.get_post_delete_put(["m/<str:m>/", "m/<str:m>/<int:pk>/"])
 def rest(request, m="", pk=None):
     session, set_session = api.get_url_session(request)
-    model, *__ = get_model_or_404(m)
+    model = get_model_or_404(m)
     if not model:
         return HttpResponseBadRequest()
     if request.method == "GET":
@@ -81,6 +80,132 @@ def rest(request, m="", pk=None):
     if request.method == "DELETE" and pk:
         return model.DELETE(request, pk)
     return HttpResponseBadRequest()
+
+
+@api.post(["free_text_ac/<str:m>/<str:attr>/"])
+def free_text_ac(request, m, attr):
+    model = get_model_or_404(m, test=lambda m: issubclass(m, (AutoCompleteNexus,)))
+    text_input = request.POST.get(attr)
+    fields = model.get_autocompletes()
+    results = {
+        f.name: {
+            "model": f.related_model,
+            "name": f.name,
+            "many_to_many": f.many_to_many,
+            "search_terms": model.find_words_from_trigger(
+                text_input, f.related_model.text_search_trigger, many=f.many_to_many
+            ),
+        }
+        for f in fields
+    }
+
+    for name in results:
+        results[name]["results"] = [
+            [term, results[name]["model"].ac(request, term)]
+            for term in results[name]["search_terms"]
+        ]
+    model.cls_text_scan(
+        text_input, results
+    )  # default is nothing happens, but classes can add extra scanning, for example: dates
+    return render(request, f"free_text_ac.html", {"results": results})
+
+
+@api.post_delete(
+    [
+        "m2m/<str:m1>/<int:pk1>/<str:m2>/<int:pk2>/",
+        "m2m/<str:m1>/<int:pk1>/<str:m2>/<int:pk2>/<str:attr>/",
+    ]
+)
+def toggle_link(request, m1, pk1, m2, pk2, attr=""):
+    model1 = get_model_or_404(m1)
+    model2 = get_model_or_404(m2)
+    obj1 = get_object_or_404(model1.belongs_to_user(request), pk=pk1)
+    obj2 = get_object_or_404(model2.belongs_to_user(request), pk=pk2)
+    if request.method == "POST":
+        link_or_404(obj1, obj2, attr)
+    if request.method == "DELETE":
+        unlink_or_404(obj1, obj2, attr)
+    projection = model1.readers[1]
+    return JsonResponse(projection(obj1))
+
+
+
+@api.post(
+    [
+        "m2m/<str:m1>/<int:pk1>/<str:m2>/",
+        "m2m/<str:m1>/<int:pk1>/<str:m2>/<str:attr>/",
+    ]
+)
+async def post_and_link(request, m1, pk1, m2, attr=""):
+    headers = {
+        "Json-Response" : "true",
+        "X-Csrftoken" : request.headers["X-Csrftoken"],
+        "Cookie" : request.headers["Cookie"],
+    }
+    create_url = f"http://{request.headers["Host"]}" + reverse("core:rest", kwargs={ "m" : m2 })
+    async with aiohttp.ClientSession(  headers=headers) as session:
+        async with session.post(create_url,data=request.POST) as r:
+            if r.ok:
+                resp_dict = await r.json()
+            else:
+                return HttpResponseBadRequest()
+
+        url_kwargs2 = {
+            "m1": m1,
+            "pk1": pk1,
+            "pk2" : resp_dict["id"],
+            "m2": m2,
+            "attr": attr,
+        }
+        link_url = f"http://{request.headers["Host"]}" + reverse( "core:toggle_link", kwargs=url_kwargs2)
+        async with session.post(link_url) as r:
+            if r.ok:
+                return JsonResponse(await r.json())
+            else:
+                return HttpResponseBadRequest()
+
+
+
+@api.post(["text_ac/<str:m>/<int:pk>/<str:attr>/"])
+def text_ac(request, m, pk, attr):
+    model = get_model_or_404(m, test=lambda m: issubclass(m, (AutoCompleteNexus,)))
+    obj = get_object_or_404(model.belongs_to_user(request), pk=pk)
+    q = list(request.POST.values())[0]
+    f = model._meta.get_field(attr)
+    related_model = f.related_model
+
+    def projection(d):
+        if d.get("new", False):
+            url = reverse(
+                "core:post_and_link",
+                kwargs={
+                    "m1": model._meta.label,
+                    "pk1": pk,
+                    "m2": related_model._meta.label,
+                    "attr": attr,
+                },
+            )
+        else:
+            url = reverse(
+                "core:toggle_link",
+                kwargs={
+                    "m1": model._meta.label,
+                    "pk1": pk,
+                    "m2": related_model._meta.label,
+                    "pk2": d["id"],
+                    "attr": attr,
+                },
+            )
+
+        return {**d, "url": url}
+
+    return JsonResponse(
+        {
+            "name": f.name,
+            "many_to_many": f.many_to_many,
+            "results": related_model.ac(request, q, optional_projection=projection),
+        }
+    )
 
 
 def parse_lookup_args(
@@ -120,7 +245,7 @@ def parse_lookup_args(
 
     c["q"] = request.POST.get("q")
 
-    raw_q_results = c["related_model"].ac(request,c["q"]) if c["q"] else []
+    raw_q_results = c["related_model"].ac(request, c["q"]) if c["q"] else []
 
     c["results"] = (
         c["related_model"].ac(request, c["q"], filter_qs=~Q(id__in=c["selected"]))
@@ -140,7 +265,6 @@ def parse_lookup_args(
 )
 def sel_setup(request, m: str = None, pk: int = None, attr: str = None):
     c: dict = parse_lookup_args(request, m, pk, attr)
-    c["display_sel"] = True
     return render(request, "typeahead.html", c)
 
 

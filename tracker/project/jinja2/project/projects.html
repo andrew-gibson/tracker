@@ -1,3 +1,212 @@
-{%  for project in projects %}
-<div> {{ project.name }} </div>
-{% endfor %}
+<ul class="list-group" x-data='{
+        projects :   {{ json.dumps(insts)|safe }},
+        search_results : {},
+
+        init () {
+            this.projects.forEach(x=>x.adding = {});
+        },
+
+        register (attr) {
+            this.search_results[attr] = {results: []}
+        },
+
+        update_store () { 
+          var _this = this;
+          GETjson("{{url("core:rest", kwargs={"m" : "project.Project" })}}").then(
+              json => this.projects = json.map(x=>{
+               x.adding = {}
+               return x;
+              })
+         );
+        },
+
+        edit_value (project,attr) {
+          this.projects.forEach(x=>x.adding[attr] = false);
+          for (i in this.projects){
+              for (key in this.projects[i].adding){
+                  this.projects[i].adding[key] = false;
+              }
+          }
+          project.adding[attr] = true;
+          el = htmx.find(`#new_${attr}_ref`+project.id);
+
+          // focus the input element
+          $nextTick( ()=> el.focus() );
+          // reset the input value
+          el.value = ""
+          // reset the results catalogue
+          this.search_results[attr] = {results: []};
+          // do a default search with empty value
+          this.search_attr(project,attr,el);
+        },
+
+        cancel_edit_value (project, attr){
+            project.adding[attr] = false;
+        },
+
+        search_attr ( project, attr, el){
+            const _this = this;
+            const url = `/core/text_ac/project.Project/${project.id}/${attr}/`;
+            POST(url, new FormData(el.form), json_response=true ).then(
+                resp => {
+                    resp.json().then( data => {
+                        const current_pks = project.tags.map(x=>x.id);
+                        for (var i in data["results"]){
+                          const datum =  data["results"][i]
+                          datum.selected =  current_pks.includes(datum.id)
+                        }
+                        _this.search_results[attr] = data 
+                    })
+                }
+            )
+        },
+
+        toggle_attr(project,attr,result){
+            const _this = this;
+            const el = htmx.find(`#new_${attr}_ref`+project.id);
+            if (result.selected){
+                DELETE(result.url).then(x=>_this.update_store())
+            } else {
+                POST(result.url, new FormData(el.form)).then(x=>_this.update_store())
+            }
+            _this.cancel_edit_value(project,attr)
+        }
+    }'>
+    <template x-for="project in projects">
+        <li class="list-group-item " >
+            <div class="row">
+                <div class="fw-bold col-6" x-html="project.name"> </div>
+                <div class="fw-bold col-6"> 
+
+                </div>
+            </div>
+            <div >
+                <div x-show="!project.adding.stream">
+                    <div style='overflow-x: scroll, max-width: 100%;font-size: 0.8em'
+                         class="justify-content-between align-items-center d-flex" >
+                        <span> Streams:</span>
+                        <ul class="list-group list-group-horizontal justify-content-between align-items-center d-flex" >
+                            <template x-for="stream in project.streams">
+                                <li class="list-group-item d-flex p-1 me-1 bg-opacity-10 border-1 w-100 fw-bold"  
+                                    style="background-color: rgba(163,206,241,0.3);
+                                           border-color: #a3cef1;">
+                                    <span x-html="stream.name"></span>
+                                </li>
+                            </template>
+                            <li class="list-group-item border-0">
+                                <button type="button" class="btn btn-dark" 
+                                        style="font-size: 0.8em;"
+                                        @click="edit_value(project, 'stream') "> 
+                                ⨁	
+                                </button>
+                            </li>
+
+                        </ul>
+                    </div>
+                </div>
+
+                <form x-show="project.adding.stream" 
+                      style="width: 100%;"
+                      method="post"
+                      hx-swap="none"
+                      hx-headers='{"json-response" : true}'
+                      hx-post="{{url("core:rest", kwargs={"m" : "project.Stream" })}}"
+                      @keyup.escape="cancel_edit_value(project,'stream')"
+                      :hx-vals='`{"project" :  ${project.id}  }`'
+                      @htmx:after-settle="'errors' in JSON.parse($event.detail.xhr.response) ? null :  update_store()">
+
+                    <div class="input-group input-group-sm d-flex align-items-center ">
+                      <span class="input-group-text" id="stream-name-label">Stream Name</span>
+                      <input type="text" class="form-control" aria-label="" aria-describedby="stream-name-label"
+                             name="name"
+                             :id="'new_stream_ref'+ project.id"
+                             @keyup.enter="cancel_edit_value(project,'stream')">
+                      <button type="button" class="btn-close ms-2" aria-label="Close" @click="cancel_edit_value(project, 'stream')"></button>
+                    </div>
+                </form>
+
+            </div>
+
+
+            
+            <div x-init="register('tags')">  
+                <div  x-show="!project.adding.tags" >
+                    <div style='overflow-x: scroll, max-width: 100%;font-size: 0.8em'
+                         class="justify-content-between d-flex">
+                        <span> Tags:</span>
+                        <ul class="list-group list-group-horizontal d-flex align-items-center" >
+                            <template x-for="tag in project.tags">
+                                <li class="list-group-item d-flex p-1 me-1 bg-opacity-10 border-1 w-100 fw-bold"  
+                                    style="background-color: {{models["project.Tag"].trigger_color}};
+                                                                                   border-color:{{models["project.Tag"].hex_trigger_color}};">
+                                    <span x-html="tag.name"></span>
+                                </li>
+                            </template>
+                            <li class="list-group-item border-0">
+                                <button type="button" class="btn btn-dark" 
+                                        style="font-size: 0.8em;"
+                                        @click="edit_value(project, 'tags') "> 
+                                ⨁	
+                                </button>
+                            </li>
+
+                        </ul>
+                    </div>
+                </div>
+
+                <form x-show="project.adding.tags"
+                      style="width: 100%;"
+                      method="post"
+                      :id="`tag-search-${project.id}`"
+                      @keyup.escape="cancel_edit_value(project, 'tags')"
+                      @htmx:after-settle="'errors' in JSON.parse($event.detail.xhr.response) ? null :  update_store()">
+
+                    <div class="input-group input-group-sm d-flex align-items-center ">
+                      <span class="input-group-text" id="stream-name-label">Tags</span>
+                      <input type="text" class="form-control" aria-label="" aria-describedby="stream-name-label"
+                           autocomplete="off" 
+                             name="name"
+                             :id="'new_tags_ref'+ project.id"
+                             @keyup.debounce="search_attr(project, 'tags', $el)"
+                             @keyup.enter="cancel_add_tream(project, 'tags')">
+                      <button type="button" class="btn-close ms-2" aria-label="Close" @click="cancel_edit_value(project, 'tags')"></button>
+                    </div>
+                    <div :id="`project${project.id}tags.ac_list`" x-show="search_results.tags.results.length" style='overflow-x: scroll; max-width: 100%;'>
+                        <ul class="list-group list-group-horizontal pt-2" >
+                        <template x-for="result in search_results.tags.results">
+                            <li class="list-group-item d-flex p-1 me-1" >
+                                <span :style="result.selected ? 'border: 2px solid {{models["project.Tag"].hex_trigger_color}};' : ''" > 
+                                <button class="btn"
+                                         style="background-color: {{models["project.Tag"].trigger_color}};" 
+                                         @click.prevent="toggle_attr(project, 'tags', result )">
+                                    <span x-html="result.repr"></span>
+                                    <span class="badge bg-success ms-1" x-show="result.new"> New</span> 
+                                </button>
+                                <span>
+                            </li>
+                        </template>
+                        </ul>
+                    </div>
+                </form>
+
+
+            </div>
+
+            <div x-show="project.teams.length > 0">
+                <div style='overflow-x: scroll, max-width: 100%;font-size: 0.8em'
+                     class="justify-content-between d-flex">
+                    <span> Teams:</span>
+                    <ul class="list-group list-group-horizontal" >
+                        <template x-for="tag in project.teams">
+                            <li class="list-group-item d-flex p-1 me-1 bg-opacity-10 border-1 w-100 fw-bold"  
+                                style="background-color: {{models["project.Team"].trigger_color}};
+                                                                                border-color:{{models["project.Team"].hex_trigger_color}};">
+                                <span x-html="tag.name"></span>
+                            </li>
+                        </template>
+                    </ul>
+                </div>
+            </div>
+        </li>
+    </template>
+</ul>

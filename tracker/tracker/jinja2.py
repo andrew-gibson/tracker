@@ -3,7 +3,6 @@ import string
 import json
 from urllib import parse
 
-from core.utils import to_dict
 from crispy_forms.utils import render_crispy_form
 from django.templatetags.static import static
 from django.urls import reverse
@@ -48,7 +47,6 @@ def environment(**options):
             "url": reverse,
             "random_id": random_id,
             "crispy": crispy,
-            "to_dict": to_dict,
             "len" : len,
             "url_translate": url_translate,
             "_": _,
@@ -58,3 +56,5 @@ def environment(**options):
         }
     )
     return env
+
+

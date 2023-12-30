@@ -1,57 +1,52 @@
 {% extends "base.html" %}
 
+
+{% block header_menu %}
+
+
+{% endblock %}
+
+
 {% block content%}
-<form method="post">
-  <div class="mb-3">
-    <label for="{{ form.name.id_for_label }}" class="form-label">Name</label>
-    <p class="fw-light fs-6 text-secondary">
-        {{form.instance.__class__.describe_links()}}
-    </p>
-    <input class="form-control" 
-           x-init="$nextTick( ()=> $el.focus() )"
-           id="{{form.name.id_for_label }}" 
-           name="{{form.name.id_for_label }}"
-           hx-trigger="keyup changed"
-           autocomplete="off" 
-           hx-target="#{{form.name.id_for_label }}ac_list"
-           hx-params="{{form.name.id_for_label }}"
-           hx-post="{{url("project:free_text_ac", kwargs={"attr" :form.name.id_for_label, "m" : "project.Project" })}}"/>
-    <div id="{{form.name.id_for_label }}ac_list"></div>
-  </div>
 
-  <div class="mb-3">
-    <label for="{{ form.parent_project.id_for_label }}" class="form-label">Parent Project</label>
-    {{form.parent_project}}
-  </div>
-
-  <div class="mb-3">
-    <label for="{{ form.text.id_for_label }}" class="form-label">Descripton</label>
-    <textarea class="form-control" 
-           id="{{form.text.id_for_label }}" 
-           name="{{form.text.id_for_label }}"
-           autocomplete="off" > </textarea>
-  </div>
-
-
-  <div class="mb-3 row">
-      <div class="col-6">
-        <label for="{{ form.tags.id_for_label }}" class="form-label">Tag</label>
-        <div hx-trigger="load"
-             id="typeahead{{form.tags.id_for_label}}"
-             hx-get="{{tags_typeahead}}">
+<div class="row">
+    <div class="col-8 border-end border-dark">
+        <form method="post">
+            <label for="{{ project_form.name.id_for_label }}" class="form-label d-none">Name</label>
+            <input class="form-control" 
+                   placeholder="{{project_form.instance.__class__.describe_links()}}"
+                   x-init="$nextTick( ()=> $el.focus() )"
+                   id="{{project_form.name.id_for_label }}" 
+                   name="{{project_form.name.id_for_label }}"
+                   hx-trigger="keyup changed"
+                   autocomplete="off" 
+                   hx-target="#{{project_form.name.id_for_label }}ac_list"
+                   hx-params="{{project_form.name.id_for_label }}"
+                   hx-post="{{url("core:free_text_ac", kwargs={"attr" :project_form.name.id_for_label, "m" : "project.Project" })}}"/>
+            <div id="{{project_form.name.id_for_label }}ac_list"></div>
+        </form>
+        <div hx-trigger="load" hx-get="{{url("core:rest", kwargs={"m" : "project.Project" })}}">
         </div>
-      </div>
-      <div class="col-6">
-        <label for="{{ form.teams.id_for_label }}" class="form-label">Teams</label>
-        <div hx-trigger="load"
-             id="typeahead{{form.teams.id_for_label}}"
-             hx-get="{{teams_typeahead}}">
-        </div>
-      </div>
 
-  </div>
+    </div>
+    <div class="col-4">
+        <form method="post">
+            <label for="{{ stream_work_form.name.id_for_label }}" class="form-label d-none">Name</label>
+            <input class="form-control" 
+                   placeholder="{{stream_work_form.instance.__class__.describe_links()}}"
+                   id="{{stream_work_form.name.id_for_label }}" 
+                   name="{{stream_work_form.name.id_for_label }}"
+                   hx-trigger="keyup changed"
+                   autocomplete="off" 
+                   hx-target="#{{stream_work_form.name.id_for_label }}ac_list"
+                   hx-params="{{stream_work_form.name.id_for_label }}"
+                   hx-post="{{url("core:free_text_ac", kwargs={"attr" :stream_work_form.name.id_for_label, "m" : "project.StreamWork" })}}"/>
+            <div id="{{stream_work_form.name.id_for_label }}ac_list"></div>
+        </form>
 
-  <button type="submit" class="btn btn-primary">Submit</button>
-</form>
+
+    </div>
+</div>
+
 {%endblock%}
 

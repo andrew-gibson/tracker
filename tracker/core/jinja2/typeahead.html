@@ -23,7 +23,7 @@
                         <span>  </span>   
                         <a href="#" class="text-dark text-decoration-none"
                                 x-ref="add_new_from_q"
-                                x-on:click="show_search=true; $nextTick(() =>  $refs.input_q.focus())" >+
+                                @click="show_search=true; $nextTick(() =>  $refs.input_q.focus())" >+
                         </a>
 
                     </li>
@@ -36,7 +36,7 @@
                             <div class="d-flex justify-content-between">
                             <span x-text="sel.name"></span>   
                             <a href="#" class="text-dark text-decoration-none"
-                                    x-on:click="show=false ; remove_selected($el, sel);" >
+                                    @click="show=false ; remove_selected($el, sel);" >
                                     x
                             </a>
                             </div>
@@ -52,7 +52,7 @@
                 <div class='d-flex justify-content-between'>
                     <button type="button" 
                             class="btn btn-secondary"
-                             x-on:click="close_search($data); $nextTick(() =>  $refs.add_new_from_q.focus())" > 
+                            @click="close_search($data); $nextTick(() =>  $refs.add_new_from_q.focus())" > 
                             X</button>
                     <input class="form-control border-dark" 
                            x-ref="input_q"

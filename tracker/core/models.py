@@ -4,8 +4,8 @@ from django.db.models import (CASCADE, PROTECT, SET_NULL, BigAutoField,
                               Prefetch, TextField)
 
 from text.translate import gettext_lazy as _
-from .autocomplete import belongs_to
-from core.utils import  add_to_admin
+from .rest import belongs_to
+from core.utils import  add_to_admin 
 
 
 

@@ -9,14 +9,15 @@
         <span x-bind:class="'m-1 pe-2 align-self-center  text-secondary ' + (results[0][1].length > 1 && !many_to_many ? 'fbg-danger bg-opacity-25' : '')"
               x-text="name + ':'" >
         </span>
-        <div style='overflow-x: scroll, max-width: 100%'>
+        <div style='overflow-x: scroll; max-width: 100%;'>
         <ul class="list-group list-group-horizontal" >
             <template x-for="grouping in results" >
                 <template x-for="match in grouping[1]">
                     <li class="list-group-item d-flex p-1 me-1 bg-opacity-10 border-1 w-100 fw-bold"  
+                        tabindex="0"
                         style="background-color: {{relation.model.trigger_color}};
                                border-color:{{relation.model.hex_trigger_color}};">
-                        <span  x-text="match.name"></span>
+                        <span  x-text="match.repr"></span>
                         <span class="badge bg-success ms-1" x-show="match.new"> New</span> 
                     </li>
                 </template>

@@ -1,7 +1,11 @@
+from itertools import product
+import re
+import dateparser
 import sys
 from django.apps import apps
-from core.utils import render,  add_to_admin, classproperty, to_dict
-from core.autocomplete import AutoComplete, belongs_to, AutoCompleteNexus
+from core.utils import render, add_to_admin, classproperty
+from core.rest import RESTModel, RequestForm, AutoCompleteNexus, AutoCompleteREST
+from django_lifecycle import hook, AFTER_CREATE
 from django.db.models import (
     CASCADE,
     PROTECT,
@@ -17,135 +21,35 @@ from django.db.models import (
     TextField,
     Q,
 )
-from django.forms import ModelForm, modelform_factory
 from django.http import QueryDict
 from django.urls import reverse
-
-
-
-class RequestForm(ModelForm):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        for attr,field in self.fields.items():
-            setattr(field, "request", self.request)
-            setattr(field.widget, "request", self.request)
-            if hasattr(field.widget, "a_c"):
-                setattr(field.a_c, "request", self.request)
-                setattr(field.widget.a_c, "request", self.request)
-
-
-class RESTModel(Model, belongs_to):
-    class Meta:
-        abstract = True
-
-    users = ManyToManyField("core.User")
-
-    @classproperty
-    def _name(cls):
-        return f"{cls.__name__.lower()}"
-
-    _Form = RequestForm
-
-    @classmethod
-    def form(cls, request):
-        Form = modelform_factory(
-            cls,
-            form=cls._Form,
-            fields=getattr(cls,"form_fields",cls._Form._meta.fields),
-            field_classes=getattr(cls, "field_classes", {}),
-            widgets=getattr(cls, "form_widgets", {}),
-        )
-        Form.request = request
-        return Form
-
-    @classmethod
-    def POST(cls, request):
-        form = cls.form(request)(request.POST)
-        context = {"form": form}
-        if form.is_valid():
-            inst = form.save()
-            context["inst"] = inst
-            # by default associate objects with their creator
-            if getattr(inst, "users", False):
-                inst.users.add(request.user)
-        else:
-            context["inst"] = form.instance
-        return render(
-            request,
-            f"{cls._name}/{cls._name}.html",
-            context,
-        )
-
-    @classmethod
-    def PUT(cls, request, pk):
-        inst = cls.belongs_to_user(request).get(pk=pk)
-        put = QueryDict(request.PUT)
-        form = cls.form(request)(put, instance=inst)
-        context = {"form": form}
-        if form.is_valid():
-            inst = form.save()
-            context["inst"] = inst
-        return render(
-            request,
-            f"{cls._name}/{cls._name}.html",
-            context,
-        )
-
-    @classmethod
-    def GET(cls, request, pk=None):
-        if pk:
-            inst = cls.belongs_to_user(request).get(pk=pk)
-            form = cls.form(request)(instance=inst)
-            return render(
-                request,
-                f"{cls._name}/{cls._name}.html",
-                {"inst": inst, "form": form},
-            )
-        else:
-            return render(
-                request,
-                f"{cls._name}/{cls._name}s.html",
-                {"insts": [p for p in cls.belongs_to_user(request)]},
-            )
-
-    @classmethod
-    def DELETE(cls, request, pk):
-        qs = cls.belongs_to_user(request).filter(pk=pk)
-        if qs.count() == 1:
-            qs.delete()
-        return render(
-            request,
-            f"{cls._name}/{cls._name}s.html",
-            {f"{cls._name}": [p for p in cls.belongs_to_user(request)]},
-        )
-
-    @classmethod
-    def belongs_to_user(cls, request):
-        return cls.objects.filter(users=request.user)
-
-    def get_absolute_url(self):
-        return reverse(
-            "project:project", kwarg={"modelname": self._name(), "pk": self.pk}
-        )
-
+from .producers import name_repr, qs
 
 
 class EXCompetency(Model):
     name = CharField(max_length=300, unique=True)
 
 
-class Tag(RESTModel,AutoComplete("#", "ffbe0b")):
+class Tag(AutoCompleteREST, trigger="#", hex_color="ffbe0b"):
+    rest_spec = ["name", "id", name_repr]
     form_fields = [
         "name",
     ]
 
     name = CharField(max_length=100)
 
-    def __str__(self):
-        return self.name
+
+class Contact(AutoCompleteREST, trigger="@", hex_color="ff006e"):
+    rest_spec = ["name", "email", "id", name_repr]
+
+    form_fields = ["name", "email"]
+
+    name = CharField(max_length=255)
+    email = EmailField()
 
 
-class Team(RESTModel, AutoComplete("*","fb5607")):
+class Team(AutoCompleteREST, trigger="*", hex_color="fb5607"):
+    rest_spec = ["name", "internal", "id", name_repr]
     form_fields = ["name", "internal"]
 
     @classmethod
@@ -154,36 +58,38 @@ class Team(RESTModel, AutoComplete("*","fb5607")):
         return cls.objects.filter(q)
 
     users = None
-    name = CharField(max_length=255,unique=True)
+    name = CharField(max_length=255, unique=True)
     projects = ManyToManyField("Project", through="ProjectTeam")
-    private =  BooleanField(default=False)
+    private = BooleanField(default=False)
     internal = BooleanField(default=False)
 
-    def __str__(self):
-        return self.name
 
-
-class Contact(RESTModel, AutoComplete("@","ff006e")):
-    form_fields = ["name", "email"]
-
-    name = CharField(max_length=255)
-    email = EmailField()
-
-    def __str__(self):
-        return self.name
-
-
-class Project(RESTModel, AutoComplete("^", "8338ec"), AutoCompleteNexus):
+class Project(AutoCompleteNexus, AutoCompleteREST, trigger="^", hex_color="8338ec"):
+    rest_spec = [
+        "name",
+        "text",
+        "id",
+        name_repr,
+        {"streams": ["name", "id"]},
+        {"point_of_contact": ["name", "id"]},
+        {"teams": ["name", "id"]},
+        {"tags": ["name", "id"]},
+    ]
 
     class _Form(RequestForm):
-
         class Meta:
             fields = ["name", "parent_project", "teams", "tags", "text"]
 
-        def __init__(self,*args,**kwargs):
+        def __init__(self, *args, **kwargs):
             super().__init__(*args, **kwargs)
-            self.fields["parent_project"].queryset = self.fields["parent_project"].queryset.exclude(pk=self.instance.pk)
+            self.fields["parent_project"].queryset = self.fields[
+                "parent_project"
+            ].queryset.exclude(pk=self.instance.pk)
             self.fields["parent_project"].widget.attrs["class"] = "form-control"
+
+    @classmethod
+    def get_autocompletes(cls):
+        return [x for x in super().get_autocompletes() if x.related_model != Stream]
 
     name = CharField(max_length=255)
     text = TextField()
@@ -198,11 +104,26 @@ class Project(RESTModel, AutoComplete("^", "8338ec"), AutoCompleteNexus):
     teams = ManyToManyField("Team", through="ProjectTeam")
     tags = ManyToManyField("Tag")
 
-    def __str__(self):
-        return self.name
+    @hook(AFTER_CREATE)
+    def add_default_stream(self):
+        self.streams.create(name="main")
 
 
-class Theme(RESTModel):
+class Stream(RESTModel):
+    class Meta:
+        unique_together = ("name", "project")
+
+    rest_spec = [
+        "name",
+        {
+            "repr": (
+                qs.include_fields("name", "work_items"),
+                lambda obj: f"{obj.name} ({obj.work_items.count()})",
+            ),
+        },
+        {"project": ["id"]},
+    ]
+
     form_fields = [
         "name",
         "project",
@@ -212,14 +133,23 @@ class Theme(RESTModel):
     def belongs_to_user(cls, request):
         return cls.objects.filter(project__users=request.user)
 
+    @classmethod
+    def ac_query(request, query):
+        if query == "":
+            q = Q()
+        else:
+            q = Q(name__icontains=query) | Q(project__name__icontains=query)
+
+        return cls.belongs_to_user(request).filter(q).distinct()
+
     users = None
-    project = ForeignKey(Project, on_delete=CASCADE, related_name="themes")
+    project = ForeignKey(Project, on_delete=CASCADE, related_name="streams")
     name = CharField(max_length=300)
 
 
-class ThemeWork(RESTModel):
+class StreamWork(RESTModel, AutoCompleteNexus):
     form_fields = [
-        "theme",
+        "stream",
         "target_date",
         "name",
         "text",
@@ -230,10 +160,68 @@ class ThemeWork(RESTModel):
 
     @classmethod
     def belongs_to_user(cls, request):
-        return cls.objects.filter(theme__project__users=request.user)
+        return cls.objects.filter(stream__project__users=request.user)
+
+    @classmethod
+    def cls_text_scan(cls, text_input, results):
+        # chops up text_input and looks for combinations which get recognized as dates
+
+        # get rid of any extra spaces and then split  by spaces into tokens
+        split_text_input = re.subn(" +", " ", text_input)[0].strip().split(" ")
+        l = len(split_text_input)
+
+        # chop up the text into buncles of dates
+        parsed_dates = [
+            x
+            for x in [
+                [
+                    x,  # the range number e.g. [2, 5]
+                    split_text_input[x[0] : x[1] + 1],  # the fragments of text
+                    dateparser.parse(
+                        " ".join(split_text_input[x[0] : x[1] + 1]), languages=["en"]
+                    ),  # parse the test
+                ]
+                for x in filter(
+                    lambda x: x[0] <= x[1], product(range(l), range(l))
+                )  # use product/filter to create a list of all possible ranges of text
+            ]
+            if x[2]
+        ]
+
+        # bail if nothing was found
+        if len(parsed_dates) == 0:
+            return
+
+        # grab the last instance of the date
+        date = max(parsed_dates, key=lambda x: x[0][1] + len(x[1]))
+
+        # add the extra dictionary to results
+        results["targt_date"] = {
+            "model": {
+                "hex_trigger_color": "90e0ef",
+                "trigger_color": "rgb(144,224,239)",
+            },
+            "name": "Due Date",
+            "many_to_many": False,
+            "search_terms": date[1],
+            "results": [
+                [
+                    date[1],
+                    [
+                        {
+                            "id": date[2].timestamp(),
+                            "repr": date[2].strftime("%a, %d %b %G"),
+                        }
+                    ],
+                ]
+            ],
+        }
 
     users = None
-    theme = ForeignKey(Theme, on_delete=CASCADE, related_name="work_details")
+    project = ForeignKey(
+        Project, on_delete=CASCADE, null=True, related_name="work_items"
+    )
+    stream = ForeignKey(Stream, on_delete=PROTECT, null=True, related_name="work_items")
     target_date = DateTimeField()
     name = CharField(max_length=255)
     text = TextField()
@@ -242,6 +230,7 @@ class ThemeWork(RESTModel):
     addstamp = DateTimeField(auto_now_add=True)
     editstamp = DateTimeField(auto_now=True)
     competency = ForeignKey(EXCompetency, on_delete=PROTECT, null=True, blank=True)
+    done = BooleanField(db_default=False)
 
     def __str__(self):
         return self.name
