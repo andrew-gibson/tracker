@@ -11,6 +11,7 @@ from .utils import classproperty, render
 
 
 class belongs_to:
+
     @classmethod
     def belongs_to_user(cls, request):
         return cls.objects
@@ -27,7 +28,7 @@ class RequestForm(ModelForm):
                 setattr(field.widget.a_c, "request", self.request)
 
 
-class RESTModel(LifecycleModelMixin, Model, belongs_to):
+class RESTModel(LifecycleModelMixin, Model):
     class Meta:
         abstract = True
 
@@ -212,16 +213,17 @@ class AutoCompleteREST(RESTModel):
         cls, trigger=None, hex_color="", search_field="name", **kwargs
     ):
         super().__init_subclass__(**kwargs)
-        rgba = f"rgba{tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4)) + (0.3,)}"
-        cls.text_search_trigger = trigger
-        cls.trigger_color = rgba
-        cls.hex_trigger_color = "#" + hex_color
-        cls.search_field = search_field
-        if cls.text_search_trigger in triggers:
-            raise Exception(
-                f"{cls} is trying to register {cls.text_search_trigger} as a trigger, it has already been assigned"
-            )
-        triggers.add(cls.text_search_trigger)
+        if hex_color:
+            rgba = f"rgba{tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4)) + (0.3,)}"
+            cls.text_search_trigger = trigger
+            cls.trigger_color = rgba
+            cls.hex_trigger_color = "#" + hex_color
+            cls.search_field = search_field
+            if cls.text_search_trigger in triggers:
+                raise Exception(
+                    f"{cls} is trying to register {cls.text_search_trigger} as a trigger, it has already been assigned"
+                )
+            triggers.add(cls.text_search_trigger)
 
     def get_autocomplete_triggers(cls):
         """return the instrcutions for self.search_field"""

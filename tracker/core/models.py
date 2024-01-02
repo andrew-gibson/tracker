@@ -43,11 +43,15 @@ class GroupPrefetcherManager(UserManager):
 
 
 @add_to_admin
-class User(belongs_to, AbstractUser):
+class User(AbstractUser):
 
 
     login_redirect = CharField(max_length=100, default="project:main")
     objects = GroupPrefetcherManager()
+
+    @classmethod
+    def belongs_to_user(cls, request):
+        return cls.objects
 
     class Meta:
         base_manager_name = "objects"

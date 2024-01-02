@@ -82,13 +82,14 @@ def rest(request, m="", pk=None):
     return HttpResponseBadRequest()
 
 
-@api.post(["free_text_ac/<str:m>/<str:attr>/"])
-def free_text_ac(request, m, attr):
+@api.post(["parse_for_links/<str:m>/<str:attr>/"])
+def parse_for_links(request, m, attr):
     model = get_model_or_404(m, test=lambda m: issubclass(m, (AutoCompleteNexus,)))
-    text_input = request.POST.get(attr)
+    remainder = text_input = request.POST.get("payload")
     fields = model.get_autocompletes()
     results = {
         f.name: {
+            "trigger": f.related_model.text_search_trigger,
             "model": f.related_model,
             "name": f.name,
             "many_to_many": f.many_to_many,
@@ -104,10 +105,34 @@ def free_text_ac(request, m, attr):
             [term, results[name]["model"].ac(request, term)]
             for term in results[name]["search_terms"]
         ]
+
     model.cls_text_scan(
         text_input, results
     )  # default is nothing happens, but classes can add extra scanning, for example: dates
-    return render(request, f"free_text_ac.html", {"results": results})
+
+    for name in results:
+        for parsed in results[name]["search_terms"]:
+            remainder = remainder.replace(parsed, "")
+        remainder = remainder.replace(results[name]["trigger"], "")
+
+    print(results)
+
+    return render(
+        request,
+        f"show_parsed_links.html",
+        {"results": results, "remainder": remainder, "attr": attr,"anything_removed" : remainder != text_input },
+    )
+
+
+@api.post_get(["create_from_parsed/<str:m>/<str:attr>/"])
+def create_from_parsed(request, m, attr):
+    model = get_model_or_404(m, test=lambda m: issubclass(m, (AutoCompleteNexus,)))
+    if request.method == "POST":
+        text_input = request.POST.get("payload")
+
+    return render(
+        request, f"parse_for_links.html", {"attr": attr, "m": m, "model": model}
+    )
 
 
 @api.post_delete(
@@ -129,7 +154,6 @@ def toggle_link(request, m1, pk1, m2, pk2, attr=""):
     return JsonResponse(projection(obj1))
 
 
-
 @api.post(
     [
         "m2m/<str:m1>/<int:pk1>/<str:m2>/",
@@ -138,13 +162,15 @@ def toggle_link(request, m1, pk1, m2, pk2, attr=""):
 )
 async def post_and_link(request, m1, pk1, m2, attr=""):
     headers = {
-        "Json-Response" : "true",
-        "X-Csrftoken" : request.headers["X-Csrftoken"],
-        "Cookie" : request.headers["Cookie"],
+        "Json-Response": "true",
+        "X-Csrftoken": request.headers["X-Csrftoken"],
+        "Cookie": request.headers["Cookie"],
     }
-    create_url = f"http://{request.headers["Host"]}" + reverse("core:rest", kwargs={ "m" : m2 })
-    async with aiohttp.ClientSession(  headers=headers) as session:
-        async with session.post(create_url,data=request.POST) as r:
+    create_url = (
+        "http://" + request.headers["Host"] + reverse("core:rest", kwargs={"m": m2})
+    )
+    async with aiohttp.ClientSession(headers=headers) as session:
+        async with session.post(create_url, data=request.POST) as r:
             if r.ok:
                 resp_dict = await r.json()
             else:
@@ -153,17 +179,20 @@ async def post_and_link(request, m1, pk1, m2, attr=""):
         url_kwargs2 = {
             "m1": m1,
             "pk1": pk1,
-            "pk2" : resp_dict["id"],
+            "pk2": resp_dict["id"],
             "m2": m2,
             "attr": attr,
         }
-        link_url = f"http://{request.headers["Host"]}" + reverse( "core:toggle_link", kwargs=url_kwargs2)
+        link_url = (
+            "http://"
+            + request.headers["Host"]
+            + reverse("core:toggle_link", kwargs=url_kwargs2)
+        )
         async with session.post(link_url) as r:
             if r.ok:
                 return JsonResponse(await r.json())
             else:
                 return HttpResponseBadRequest()
-
 
 
 @api.post(["text_ac/<str:m>/<int:pk>/<str:attr>/"])

@@ -18,6 +18,7 @@ from django.urls import reverse
 from text.translate import gettext_lazy as _
 
 from .models import Contact, Project, Tag, Team, Stream, StreamWork, Model
+from core.rest import RESTModel
 
 api = API(namespace="project", session={})
 '''
@@ -45,8 +46,16 @@ def main(request):
         {
             "project_form": Project.form(request)(),
             "stream_work_form"  :  StreamWork.form(request)() ,
-            "projects" : Project.objects.all(),
+            "Project" : Project,
+            "StreamWork" : StreamWork,
         },
     )
 
+@api.get("projects/")
+def projects(request):
+    return render(
+        request,
+        "project/projects.html",
+        {"models" : RESTModel.rest_models },
+    )
 

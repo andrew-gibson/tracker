@@ -23,7 +23,7 @@ from django.db.models import (
 )
 from django.http import QueryDict
 from django.urls import reverse
-from .producers import name_repr, qs
+from .producers import name_repr, qs, stream_repr
 
 
 class EXCompetency(Model):
@@ -40,12 +40,11 @@ class Tag(AutoCompleteREST, trigger="#", hex_color="ffbe0b"):
 
 
 class Contact(AutoCompleteREST, trigger="@", hex_color="ff006e"):
-    rest_spec = ["name", "email", "id", name_repr]
-
+    rest_spec = [ "email", "id", name_repr]
     form_fields = ["name", "email"]
 
     name = CharField(max_length=255)
-    email = EmailField()
+    email = EmailField(null=True, blank=True)
 
 
 class Team(AutoCompleteREST, trigger="*", hex_color="fb5607"):
@@ -55,12 +54,12 @@ class Team(AutoCompleteREST, trigger="*", hex_color="fb5607"):
     @classmethod
     def belongs_to_user(cls, request):
         q = Q(project__users=request.user, private=True) | Q(private=False)
-        return cls.objects.filter(q)
+        return cls.objects.filter(q).distinct()
 
     users = None
     name = CharField(max_length=255, unique=True)
     projects = ManyToManyField("Project", through="ProjectTeam")
-    private = BooleanField(default=False)
+    private = BooleanField(db_default=True)
     internal = BooleanField(default=False)
 
 
@@ -70,10 +69,10 @@ class Project(AutoCompleteNexus, AutoCompleteREST, trigger="^", hex_color="8338e
         "text",
         "id",
         name_repr,
-        {"streams": ["name", "id"]},
-        {"point_of_contact": ["name", "id"]},
-        {"teams": ["name", "id"]},
-        {"tags": ["name", "id"]},
+        {"streams": [stream_repr, "id"]},
+        {"point_of_contact": [name_repr, "id"]},
+        {"teams": [name_repr, "id"]},
+        {"tags": [name_repr, "id"]},
     ]
 
     class _Form(RequestForm):
@@ -114,13 +113,8 @@ class Stream(RESTModel):
         unique_together = ("name", "project")
 
     rest_spec = [
+        stream_repr,
         "name",
-        {
-            "repr": (
-                qs.include_fields("name", "work_items"),
-                lambda obj: f"{obj.name} ({obj.work_items.count()})",
-            ),
-        },
         {"project": ["id"]},
     ]
 

@@ -1,3 +1,21 @@
+<div>
+{%if anything_removed %}
+
+    <div class='d-flex pt-2 bg-secondary bg-opacity-10 justify-content-between'
+         style='font-size: 0.8em'>
+        <span class="m-1 pe-2 align-self-center  text-secondary" >
+            {{attr.title()}}
+        </span>
+        <ul class="list-group list-group-horizontal" >
+            <li class="list-group-item d-flex p-1 me-1 bg-opacity-10 border-1 w-100 fw-bold"  
+                tabindex="0" >
+                {{ remainder }}
+            </li>
+        </ul>
+    </div>
+
+{%endif%}
+
 {%for relation in results.values() %}
     {%if relation.results %}
     <div x-data='{
@@ -24,7 +42,7 @@
             </template>
         </ul>
         </div>
-
     </div>
     {%endif%}
 {%endfor%}
+</div>

@@ -1,51 +1,20 @@
 {% extends "base.html" %}
 
-
-{% block header_menu %}
-
-
-{% endblock %}
-
-
 {% block content%}
 
-<div class="row">
-    <div class="col-8 border-end border-dark">
-        <form method="post">
-            <label for="{{ project_form.name.id_for_label }}" class="form-label d-none">Name</label>
-            <input class="form-control" 
-                   placeholder="{{project_form.instance.__class__.describe_links()}}"
-                   x-init="$nextTick( ()=> $el.focus() )"
-                   id="{{project_form.name.id_for_label }}" 
-                   name="{{project_form.name.id_for_label }}"
-                   hx-trigger="keyup changed"
-                   autocomplete="off" 
-                   hx-target="#{{project_form.name.id_for_label }}ac_list"
-                   hx-params="{{project_form.name.id_for_label }}"
-                   hx-post="{{url("core:free_text_ac", kwargs={"attr" :project_form.name.id_for_label, "m" : "project.Project" })}}"/>
-            <div id="{{project_form.name.id_for_label }}ac_list"></div>
-        </form>
-        <div hx-trigger="load" hx-get="{{url("core:rest", kwargs={"m" : "project.Project" })}}">
-        </div>
+<p style="font-size: 0.8em" class="text-secondary mb-0">
+    {{Project.describe_links()}}
+</p>
+<div hx-trigger="load"
+     hx-get="{{url("core:create_from_parsed", kwargs={"attr" :"name", "m" : "project.Project"})}}">
+</div>
+<script>
+    {# have to include the project store JS before the alpine compnent can be loaded #}
+    {% include "project/alpine_fragments/edit_project_attr_data_store.js"  %}
+</script>
 
-    </div>
-    <div class="col-4">
-        <form method="post">
-            <label for="{{ stream_work_form.name.id_for_label }}" class="form-label d-none">Name</label>
-            <input class="form-control" 
-                   placeholder="{{stream_work_form.instance.__class__.describe_links()}}"
-                   id="{{stream_work_form.name.id_for_label }}" 
-                   name="{{stream_work_form.name.id_for_label }}"
-                   hx-trigger="keyup changed"
-                   autocomplete="off" 
-                   hx-target="#{{stream_work_form.name.id_for_label }}ac_list"
-                   hx-params="{{stream_work_form.name.id_for_label }}"
-                   hx-post="{{url("core:free_text_ac", kwargs={"attr" :stream_work_form.name.id_for_label, "m" : "project.StreamWork" })}}"/>
-            <div id="{{stream_work_form.name.id_for_label }}ac_list"></div>
-        </form>
-
-
-    </div>
+<div hx-trigger="load" 
+     hx-get="{{url("project:projects")}}">
 </div>
 
 {%endblock%}
