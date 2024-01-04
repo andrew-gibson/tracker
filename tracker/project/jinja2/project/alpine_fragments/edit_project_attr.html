@@ -9,14 +9,14 @@
 
 #}
 
-<div x-init="register(project,'{{attr}}')" class="mb-1">  
+<div  class="mb-1" >  
     {#  display mode #}
-    <div  x-show="!project.adding.{{attr}}" >
+    <div  x-show="!($store.projects.active_edit == project.id +'{{attr}}')" >
         <div style='overflow-x: scroll, max-width: 100%;font-size: 0.8em'
              class="justify-content-between d-flex align-items-center">
                 <button type="button" class="btn btn-link mb-1" 
                         style="font-size: 0.8em;"
-                        @click="edit_value(project, '{{attr}}') ">  {# move into edit mode #}
+                        @click="edit_value('{{attr}}') ">  {# move into edit mode #}
                  {{title}}:
                 </button>
 
@@ -34,11 +34,11 @@
     </div>
 
     {# edit mode #}
-    <form x-show="project.adding.{{attr}}"
+    <form x-show="$store.projects.active_edit == project.id +'{{attr}}'"
           style="width: 100%;"
           class="border p-2"
           method="post"
-          @keyup.escape="cancel_edit_value(project, '{{attr}}')"   {# cancel out if ESC pressed #}>
+          @keyup.escape="cancel_edit_value( '{{attr}}')"   {# cancel out if ESC pressed #}>
 
         <div class="input-group input-group-sm d-flex align-items-center ">
           <span class="input-group-text"
@@ -58,19 +58,19 @@
                   class="btn-close ms-2  p-2" 
                   style="opacity: 0.3;"
                   aria-label="Close" 
-                  @click="cancel_edit_value(project, '{{attr}}')">  {# cancel out if button pressed #}
+                  @click="cancel_edit_value( '{{attr}}')">  {# cancel out if button pressed #}
           </button>
         </div>
-        <div x-show="search_results.{{attr}}.results.length" 
+        <div x-show="$store.projects.search_results.results.length" 
              style='overflow-x: scroll; max-width: 100%;padding-bottom: 10px;'>
             <ul class="list-group list-group-horizontal pt-2 " 
                 style="font-size: 0.8em;">
-            <template x-for="result in search_results.{{attr}}.results">
+            <template x-for="result in $store.projects.search_results.results">
                 <li class="list-group-item d-flex p-1 me-1 border-0" >
                     <span :style="result.selected ? 'border: 1px solid {{model.hex_trigger_color}};' : ''" > 
                     <button class="btn p-1"
                              style="background-color: {{model.trigger_color}};font-size:0.8rem;" 
-                             @click.prevent="toggle_attr(project, '{{attr}}', result )">
+                             @click.prevent="toggle_attr( '{{attr}}', result )">
                         <span x-html="result.repr"></span>
                         <span class="badge bg-success ms-1" x-show="result.new"> New</span> 
                     </button>

@@ -5,17 +5,28 @@
 <p style="font-size: 0.8em" class="text-secondary mb-0">
     {{Project.describe_links()}}
 </p>
+
 <div hx-trigger="load"
      hx-get="{{url("core:create_from_parsed", kwargs={"attr" :"name", "m" : "project.Project"})}}">
 </div>
+
+<div hx-trigger="load" 
+     hx-get="{{url("core:rest", kwargs={"m":"project.Project"})}}">
+</div>
 <script>
+     document.addEventListener('alpine:init', () => {
+        Alpine.store('projects', {
+            active_edit : "",
+            search_results : {results : []},
+            set_search_results (new_results = {results : []}) {
+                this.search_results = new_results;
+            }
+        });
+    });
     {# have to include the project store JS before the alpine compnent can be loaded #}
     {% include "project/alpine_fragments/edit_project_attr_data_store.js"  %}
 </script>
 
-<div hx-trigger="load" 
-     hx-get="{{url("project:projects")}}">
-</div>
 
 {%endblock%}
 

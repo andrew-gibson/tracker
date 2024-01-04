@@ -115,7 +115,6 @@ def parse_for_links(request, m, attr):
             remainder = remainder.replace(parsed, "")
         remainder = remainder.replace(results[name]["trigger"], "")
 
-    print(results)
 
     return render(
         request,

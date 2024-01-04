@@ -51,11 +51,4 @@ def main(request):
         },
     )
 
-@api.get("projects/")
-def projects(request):
-    return render(
-        request,
-        "project/projects.html",
-        {"models" : RESTModel.rest_models },
-    )
 
