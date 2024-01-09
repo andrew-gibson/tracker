@@ -5,7 +5,13 @@ import sys
 from django.apps import apps
 from core.utils import render, add_to_admin, classproperty
 from core.rest import RESTModel, RequestForm, AutoCompleteNexus, AutoCompleteREST
-from django_lifecycle import hook, AFTER_CREATE
+from django_lifecycle import (
+    hook,
+    AFTER_CREATE,
+    BEFORE_DELETE,
+    BEFORE_CREATE,
+    BEFORE_UPDATE,
+)
 from django.db.models import (
     CASCADE,
     PROTECT,
@@ -40,7 +46,7 @@ class Tag(AutoCompleteREST, trigger="#", hex_color="ffbe0b"):
 
 
 class Contact(AutoCompleteREST, trigger="@", hex_color="ff006e"):
-    rest_spec = [ "email", "id", name_repr]
+    rest_spec = ["email", "id", name_repr]
     form_fields = ["name", "email"]
 
     name = CharField(max_length=255)
@@ -87,8 +93,8 @@ class Project(AutoCompleteNexus, AutoCompleteREST, trigger="^", hex_color="8338e
             self.fields["parent_project"].widget.attrs["class"] = "form-control"
 
     @classmethod
-    def get_autocompletes(cls):
-        return [x for x in super().get_autocompletes() if x.related_model != Stream]
+    def get_autocompletes(cls,excludes=None):
+        return [x for x in super().get_autocompletes(excludes) if x.related_model != Stream]
 
     name = CharField(max_length=255)
     text = TextField()
@@ -105,10 +111,11 @@ class Project(AutoCompleteNexus, AutoCompleteREST, trigger="^", hex_color="8338e
 
     @hook(AFTER_CREATE)
     def add_default_stream(self):
-        self.streams.create(name="main")
+        self.streams.create(name="unassigned")
 
 
-class Stream(RESTModel):
+class Stream(AutoCompleteREST, trigger="~", hex_color="036666"):
+
     class Meta:
         unique_together = ("name", "project")
 
@@ -123,12 +130,22 @@ class Stream(RESTModel):
         "project",
     ]
 
+    @hook(BEFORE_DELETE)
+    def cant_delete_only_stream(self):
+        if self.name == "unassigned":
+            raise Exception("Can't delete 'unassigned' Stream from project")
+
+    @hook(BEFORE_UPDATE)
+    def cant_rename_unassigned(self):
+        if self.name == "unassigned":
+            raise Exception("Can't rename 'unassigned'")
+
     @classmethod
     def belongs_to_user(cls, request):
         return cls.objects.filter(project__users=request.user)
 
     @classmethod
-    def ac_query(request, query):
+    def ac_query(cls,request, query):
         if query == "":
             q = Q()
         else:
@@ -211,12 +228,20 @@ class StreamWork(RESTModel, AutoCompleteNexus):
             ],
         }
 
+    @hook(BEFORE_CREATE)
+    def assigned_to_unassigned(self):
+        if not self.stream:
+            self.stream = self.project.streams.get(name="unassigned")
+
     users = None
     project = ForeignKey(
-        Project, on_delete=CASCADE, null=True, related_name="work_items"
+        Project, on_delete=CASCADE, related_name="work_items"
     )
-    stream = ForeignKey(Stream, on_delete=PROTECT, null=True, related_name="work_items")
-    target_date = DateTimeField()
+    stream = ForeignKey(
+        Stream, on_delete=PROTECT, blank=True, null=True, related_name="work_items"
+    )
+    start_date = DateField(auto_now_add=True, blank=True)
+    target_date =DateField(blank=True)
     name = CharField(max_length=255)
     text = TextField()
     lead = ForeignKey(Contact, on_delete=SET_NULL, null=True)
@@ -224,7 +249,7 @@ class StreamWork(RESTModel, AutoCompleteNexus):
     addstamp = DateTimeField(auto_now_add=True)
     editstamp = DateTimeField(auto_now=True)
     competency = ForeignKey(EXCompetency, on_delete=PROTECT, null=True, blank=True)
-    done = BooleanField(db_default=False)
+    done = BooleanField(db_default=False, blank=True)
 
     def __str__(self):
         return self.name

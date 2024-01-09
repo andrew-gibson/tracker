@@ -11,7 +11,6 @@ from .utils import classproperty, render
 
 
 class belongs_to:
-
     @classmethod
     def belongs_to_user(cls, request):
         return cls.objects
@@ -46,11 +45,7 @@ class RESTModel(LifecycleModelMixin, Model):
 
     @classproperty
     def rest_models(cls):
-        return {
-            k._meta.label: k
-            for k in apps.get_models()
-            if issubclass(k, RESTModel)
-        }
+        return {k._meta.label: k for k in apps.get_models() if issubclass(k, RESTModel)}
 
     @classmethod
     def form(cls, request):
@@ -117,7 +112,12 @@ class RESTModel(LifecycleModelMixin, Model):
             return render(
                 request,
                 f"{cls._name}/{cls._name}.html",
-                {"inst": projection(inst), "form": form, "models": cls.rest_models},
+                {
+                    "inst": projection(inst),
+                    "form": form,
+                    "models": cls.rest_models,
+                    "standalone": not request.htmx,
+                },
             )
         else:
             insts = [projection(p) for p in prepare_qs(cls.belongs_to_user(request))]
@@ -129,6 +129,7 @@ class RESTModel(LifecycleModelMixin, Model):
                 {
                     "insts": insts,
                     "models": cls.rest_models,
+                    "standalone": not request.htmx,
                 },
             )
 
@@ -182,21 +183,23 @@ class AutoCompleteNexus:
         return results
 
     @classmethod
-    def get_autocompletes(cls):
+    def get_autocompletes(cls, excludes=None):
+        excludes = [] if not excludes else excludes
         return [
             f
             for f in cls._meta.get_fields()
             if f.related_model
             and isinstance(f, (Field,))
             and hasattr(f.related_model, "text_search_trigger")
+            and f.name not in excludes
         ]
 
     @classmethod
-    def describe_links(cls):
+    def describe_links(cls, excludes=None):
         autocompletes = ", ".join(
             [
                 f"'{x.related_model.text_search_trigger}' for {x.related_model._meta.verbose_name}"
-                for x in cls.get_autocompletes()
+                for x in cls.get_autocompletes(excludes=excludes)
             ]
         )
         return f"Type: {autocompletes}"
@@ -258,6 +261,7 @@ class AutoCompleteREST(RESTModel):
 
         if filter_qs:
             qs = qs.filter(filter_qs)
+            print(qs)
 
         if query == "" and cutoff:
             qs = qs[:10]

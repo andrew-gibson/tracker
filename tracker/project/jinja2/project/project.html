@@ -1,3 +1,43 @@
-{% extends "base.html" %}
+{% if  standalone %} {% extends "base.html" %} {% endif -%}
+
+{% block content%}
+
+<div id="smart_input" hx-swap-oob="true" >
+
+</div>
+
+<div id="project_content" hx-swap-oob="true" class="row">
+    {% with project=inst %}
+        {%with add_title_links=False  %}
+           {% include "project/project_summary.html"  %}
+        {%endwith%}
+    {%endwith%}
+    <div class="col-7">
+        <p style="font-size: 0.8em" class="text-secondary mb-0">
+            {{models["project.StreamWork"].describe_links(excludes="project")}}
+        </p>
+        {%with params=add_json_params({"filters" : { "stream" : {  "project_id" :inst.id }},"exclude" : ["project"]}),
+               url =  url("core:create_from_parsed", kwargs={"attr" :"name", "m" : "project.StreamWork"})
+        %}
+        <div hx-trigger="load"
+             hx-get="{{url}}{{params}}">
+        </div>
+        {%endwith%}
+    </div>
+    <script>
+         document.addEventListener('alpine:init', () => {
+            Alpine.store('projects', {
+                active_edit : "",
+                search_results : {results : []},
+                set_search_results (new_results = {results : []}) {
+                    this.search_results = new_results;
+                }
+            });
+        });
+        {# have to include the project store JS before the alpine compnent can be loaded #}
+        {% include "project/alpine_fragments/edit_project_attr_data_store.js"  %}
+    </script>
+</div>
 
 
+{%endblock%}

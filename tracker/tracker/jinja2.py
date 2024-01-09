@@ -39,6 +39,10 @@ def url_session(view_name, session=None, kwargs=None):
     return "?".join(url, parse.urlencode(session))
 
 
+def add_json_params(d):
+    return "?" + parse.urlencode({key: json.dumps(d[key]) for key in d})
+
+
 def environment(**options):
     env = Environment(**options)
     env.globals.update(
@@ -47,14 +51,13 @@ def environment(**options):
             "url": reverse,
             "random_id": random_id,
             "crispy": crispy,
-            "len" : len,
+            "len": len,
             "url_translate": url_translate,
             "_": _,
             "getattr": getattr,
             "print": print,
-            "json" : json,
+            "json": json,
+            "add_json_params": add_json_params,
         }
     )
     return env
-
-

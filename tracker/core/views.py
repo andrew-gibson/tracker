@@ -82,11 +82,34 @@ def rest(request, m="", pk=None):
     return HttpResponseBadRequest()
 
 
+@api.post_get(
+    [
+        "create_from_parsed/<str:m>/<str:attr>/",
+    ]
+)
+def create_from_parsed(request, m, attr, suppress_links=""):
+    if request.method == "POST":
+        model = get_model_or_404(m, test=lambda m: issubclass(m, (AutoCompleteNexus,)))
+        text_input = request.POST.get("payload")
+
+    return render(
+        request,
+        f"parse_for_links.html",
+        {"attr": attr, "m": m, "params": request.GET.urlencode()},
+    )
+
+
 @api.post(["parse_for_links/<str:m>/<str:attr>/"])
 def parse_for_links(request, m, attr):
-    model = get_model_or_404(m, test=lambda m: issubclass(m, (AutoCompleteNexus,)))
+    try:
+        filters = json.loads(request.GET.get("filters", "{}"))
+        exclude = json.loads(request.GET.get("exclude", "[]"))
+    except:
+        return HttpResponseBadRequest("incorrectly formatted GET params")
+
+    model = get_model_or_404(m, test=lambda m: issubclass(m, AutoCompleteNexus))
     remainder = text_input = request.POST.get("payload")
-    fields = model.get_autocompletes()
+    fields = model.get_autocompletes(exclude)
     results = {
         f.name: {
             "trigger": f.related_model.text_search_trigger,
@@ -101,8 +124,9 @@ def parse_for_links(request, m, attr):
     }
 
     for name in results:
+        filter_qs =  Q(**filters.get(name,{}))
         results[name]["results"] = [
-            [term, results[name]["model"].ac(request, term)]
+            [term, results[name]["model"].ac(request, term, filter_qs=filter_qs)]
             for term in results[name]["search_terms"]
         ]
 
@@ -115,22 +139,15 @@ def parse_for_links(request, m, attr):
             remainder = remainder.replace(parsed, "")
         remainder = remainder.replace(results[name]["trigger"], "")
 
-
     return render(
         request,
         f"show_parsed_links.html",
-        {"results": results, "remainder": remainder, "attr": attr,"anything_removed" : remainder != text_input },
-    )
-
-
-@api.post_get(["create_from_parsed/<str:m>/<str:attr>/"])
-def create_from_parsed(request, m, attr):
-    model = get_model_or_404(m, test=lambda m: issubclass(m, (AutoCompleteNexus,)))
-    if request.method == "POST":
-        text_input = request.POST.get("payload")
-
-    return render(
-        request, f"parse_for_links.html", {"attr": attr, "m": m, "model": model}
+        {
+            "results": results,
+            "remainder": remainder,
+            "attr": attr,
+            "anything_removed": remainder != text_input,
+        },
     )
 
 

@@ -8,7 +8,10 @@
              autocomplete="off" 
              hx-trigger="keyup changed delay:0.5s"
              hx-target="#parsed_new_{{m.replace(".","_")}}"
-             hx-post="{{url("core:parse_for_links", kwargs={"attr" : attr, "m" : m})}}"/>
+             {% with url = url("core:parse_for_links", kwargs={"attr" : attr, "m" : m})%}
+             hx-post="{{url}}?{{params}}"
+             {% endwith %}
+             />
       <div id="parsed_new_{{m.replace(".","_")}}">
       </div>
 </form>

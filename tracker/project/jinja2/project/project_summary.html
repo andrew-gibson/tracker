@@ -1,17 +1,22 @@
-<div class="col-4 border" x-data="projects_store(
+<div class="col-4 border" 
+     x-data="projects_store(
     {{project|safe}}, 
     '{{url('core:rest', kwargs={'pk' :project.id, 'm' : 'project.Project'})}}',
     '{{url('core:text_ac', kwargs={'pk' :project.id,'attr' : "__replace__", 'm' : 'project.Project'})}}',
     )">
-        <button type="button" class="btn btn-link pb-1 ps-0"    
+        <button type="button" 
+                class="btn btn-link pb-1 ps-0"    
                 x-html="project.name"
-                @click="edit_value(project, 'stream') "> 
+                {% if add_title_links %}
+                hx-push-url="true"
+                hx-get="{{url('core:rest', kwargs={'pk' :project.id, 'm' : 'project.Project'})}}"
+                {% endif  %} > 
         </button>
         <div class="text-dark text-opacity-75 lh-1 mb-2 " 
              style="font-size: 0.8em;"
              x-html="project.text">
         </div>
-    <div  class="mb-1">
+    <div  x-cloak class="mb-1">
         <div x-show="!($store.projects.active_edit == project.id +'summary')">
             <div style='overflow-x: scroll, max-width: 100%;font-size: 0.8em'
                  class="justify-content-between align-items-center d-flex" >

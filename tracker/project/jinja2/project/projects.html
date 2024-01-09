@@ -1,5 +1,7 @@
 <div class="row mt-2" >
     {% for project in insts  %}
-       {% include "project/project_summary.html"  %}
+        {%with add_title_links=True  %}
+           {% include "project/project_summary.html"  %}
+        {% endwith  %}
     {%endfor%}
 </div>
