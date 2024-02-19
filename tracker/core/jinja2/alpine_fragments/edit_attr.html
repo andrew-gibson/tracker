@@ -1,0 +1,49 @@
+{#
+ expects to be passed in:
+   store_name : the principle model name
+   attr: of the related model 
+   title: the title to display to the user
+   fields : dictionary of the fields
+#}
+<div class="mb-1" >  
+    {#  display mode #}
+    <div>
+        <div style='max-width: 100%;font-size: 0.8em'
+             class="justify-content-between d-flex align-items-center"
+             @change="edit_value('{{attr}}',$event.target)" >
+            <button type="button" 
+                    class="btn btn-link mb-1" 
+                    style="font-size: 0.8em;"
+                    @click="edit_value('{{attr}}') ">  {# move into edit mode #}
+                    {{title}}:
+            </button>
+
+            {%if fields[attr] == 'DateField'%}
+            <div class="align-items-center">
+                <input type="date"
+                       class="form-control"
+                       name="{{attr}}"
+                       x-model="model.{{attr}}"></input>
+            </div>
+            {%elif fields[attr] == 'BooleanField'%}
+                <div class="form-check form-switch">
+                <input type="checkbox"
+                       role="switch"
+                       style="font-size: 1.5em"
+                       class="form-check-input"
+                       name="{{attr}}"
+                       x-model="model.{{attr}}"></input>
+                </div>
+
+            {%elif fields[attr] == 'TextField'%}
+                <div class="align-items-center"  style="width: 75%">
+                <textarea type="date"
+                          class="form-control"
+                          name="{{attr}}"
+                          x-model="model.{{attr}}"></textarea>
+                </div>
+            {%endif%}
+        </div>
+    </div>
+    {# edit mode #}
+</div>

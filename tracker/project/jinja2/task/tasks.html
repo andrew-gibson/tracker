@@ -1,0 +1,10 @@
+{%if inst%}
+<div {{ rest_refresh("project.Task",{"filters":{"stream" : inst.id}}) }}>
+{%else%}
+<div {{ rest_refresh("project.Task") }}>
+{%endif%}
+{% for task in insts %}
+   {% include "task/task_summary.html"  %}
+{%endfor%}
+</div>
+

@@ -1,32 +1,30 @@
 {#
  expects to be passed in:
-   attr: the model attribute linking to the lookup table
-   model: the model representing the lookup table 
-          has to: 
-          * be a lookup table with an attribute called name
-          * inherit from AutoCompleteREST
+   store_name : the principle model name
+   attr: of the related model 
    title: the title to display to the user
-
+   border_color: the color of the choice buttons border
+   background_color : the color of the choice buttons background
 #}
 
 <div x-cloak  class="mb-1" >  
     {#  display mode #}
-    <div  x-show="!($store.projects.active_edit == project.id +'{{attr}}')" >
+    <div  x-show="!($store.{{store_name}}.active_edit == model.id +'{{attr}}')" >
         <div style='overflow-x: scroll, max-width: 100%;font-size: 0.8em'
              class="justify-content-between d-flex align-items-center">
                 <button type="button" class="btn btn-link mb-1" 
                         style="font-size: 0.8em;"
-                        @click="edit_value('{{attr}}') ">  {# move into edit mode #}
+                        @click="edit_fk_value('{{attr}}') ">  {# move into edit mode #}
                  {{title}}:
                 </button>
 
             <ul class="list-group list-group-horizontal d-flex align-items-center" 
                 style='overflow-x: scroll; max-width: 80%;'>
-                <template x-for="item in (Array.isArray(project.{{attr}}) ? project.{{attr}} : project.{{attr}} ? [project.{{attr}} ] : [] )">   {# loop over all currently selected items to display them #} 
+                <template x-for="item in (Array.isArray(model.{{attr}}) ? model.{{attr}} : model.{{attr}} ? [model.{{attr}} ] : [] )">   {# loop over all currently selected items to display them #} 
                     <li class="list-group-item d-flex p-1 me-1 bg-opacity-10 border-1 w-100 fw-bold"  
-                        style="background-color: {{model.trigger_color}};
-                               border-color:{{model.hex_trigger_color}};">
-                        <span x-html="item.repr"></span>
+                        style="background-color: {{background_color}};
+                               border-color:{{border_color}};">
+                        <span x-html="item.name"></span>
                     </li>
                 </template>
             </ul>
@@ -34,44 +32,44 @@
     </div>
 
     {# edit mode #}
-    <form x-show="$store.projects.active_edit == project.id +'{{attr}}'"
+    <div x-show="$store.{{store_name}}.active_edit == model.id +'{{attr}}'"
           style="width: 100%;"
           class="border p-2"
           method="post"
-          @keyup.escape="cancel_edit_value( '{{attr}}')"   {# cancel out if ESC pressed #}>
+          @keyup.escape="cancel_edit_fk_value( '{{attr}}')"> {# cancel out if ESC pressed #}
 
         <div class="input-group input-group-sm d-flex align-items-center ">
           <span class="input-group-text"
-                 :id="'{{attr}}_input'+ project.id+'-label'">
+                 :id="'{{attr}}_input'+ model.id+'-label'">
                  {{title}}
           </span>
           <input type="text" 
                  class="form-control" 
                  aria-label="" 
-                 :aria-describedby="'{{attr}}_input'+ project.id+'-label'"
+                 :aria-describedby="'{{attr}}_input'+ model.id+'-label'"
                  autocomplete="off" 
                  name="name"
-                 :id="'{{attr}}_input'+ project.id"
-                 @keyup.debounce="search_attr(project, '{{attr}}', $el)" {# debounce for better user UX, otherwise on every keyup search the database #}
+                 :id="'{{attr}}_input'+ model.id"
+                 @keyup.debounce="search_fk_attr(model, '{{attr}}', $el)" {# debounce for better user UX, otherwise on every keyup search the database #}
                  @keyup.enter.prevent="()=>{}">  {# capture and ignore user pressing ENTER, this is just a filter input #}
           <button type="button" 
                   class="btn-close ms-2  p-2" 
                   style="opacity: 0.3;"
                   aria-label="Close" 
-                  @click="cancel_edit_value( '{{attr}}')">  {# cancel out if button pressed #}
+                  @click="cancel_edit_fk_value( '{{attr}}')">  {# cancel out if button pressed #}
           </button>
         </div>
-        <div x-show="$store.projects.search_results.results.length" 
+        <div x-show="$store.{{store_name}}.search_results.results.length" 
              style='overflow-x: scroll; max-width: 100%;padding-bottom: 10px;'>
             <ul class="list-group list-group-horizontal pt-2 " 
                 style="font-size: 0.8em;">
-            <template x-for="result in $store.projects.search_results.results">
-                <li class="list-group-item d-flex p-1 me-1 border-0" >
-                    <span :style="result.selected ? 'border: 1px solid {{model.hex_trigger_color}};' : ''" > 
+                <template x-for="result in $store.{{store_name}}.search_results.results">
+                <li class="list-group-item d-flex p-1 me-1 border-0  align-items-stretch" >
+                    <span :style="result.selected ? 'border: 1px solid {{border_color}};' : ''" > 
                     <button class="btn p-1"
-                             style="background-color: {{model.trigger_color}};font-size:0.8rem;" 
-                             @click.prevent="toggle_attr( '{{attr}}', result )">
-                        <span x-html="result.repr"></span>
+                             style="background-color: {{background_color}};font-size:0.8rem;height: 100%;" 
+                             @click.prevent="toggle_fk_attr( '{{attr}}', result )">
+                        <span x-html="result.name"></span>
                         <span class="badge bg-success ms-1" x-show="result.new"> New</span> 
                     </button>
                     <span>
@@ -79,6 +77,6 @@
             </template>
             </ul>
         </div>
-    </form>
+    </div>
 </div>
 

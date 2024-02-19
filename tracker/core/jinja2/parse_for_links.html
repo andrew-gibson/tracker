@@ -1,18 +1,19 @@
 <form method="post" 
-      hx-post="{{url("core:create_from_parsed", kwargs={"attr" :"name", "m" : m})}}">
+      hx-post="{{url("core:create_from_parsed", kwargs={"attr" :"name", "m" : m})}}?{{params}}">
       <label for="project_name" 
              class="form-label d-none">{{ attr.replace("_"," ").title() }} 
       </label>
       <input class="form-control" 
              name="payload"
              autocomplete="off" 
+             id="{{model._meta.model_name}}{{attr}}"
              hx-trigger="keyup changed delay:0.5s"
-             hx-target="#parsed_new_{{m.replace(".","_")}}"
+             hx-target="#{{model._meta.model_name}}{{attr}}parsed"
              {% with url = url("core:parse_for_links", kwargs={"attr" : attr, "m" : m})%}
              hx-post="{{url}}?{{params}}"
              {% endwith %}
              />
-      <div id="parsed_new_{{m.replace(".","_")}}">
+      <div id="{{model._meta.model_name}}{{attr}}parsed">
       </div>
 </form>
 

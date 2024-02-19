@@ -6,38 +6,64 @@
 
 </div>
 
-<div id="project_content" hx-swap-oob="true" class="row">
-    {% with project=inst %}
-        {%with add_title_links=False  %}
-           {% include "project/project_summary.html"  %}
-        {%endwith%}
-    {%endwith%}
-    <div class="col-7">
-        <p style="font-size: 0.8em" class="text-secondary mb-0">
-            {{models["project.StreamWork"].describe_links(excludes="project")}}
-        </p>
-        {%with params=add_json_params({"filters" : { "stream" : {  "project_id" :inst.id }},"exclude" : ["project"]}),
-               url =  url("core:create_from_parsed", kwargs={"attr" :"name", "m" : "project.StreamWork"})
-        %}
-        <div hx-trigger="load"
-             hx-get="{{url}}{{params}}">
+{% with project=inst %}
+<div id="project_content" hx-swap-oob="true"
+    <div class="row">
+            {%with add_title_links=False  %}
+               {% include "project/project_summary.html"  %}
+            {%endwith%}
+        <div class="col-8" 
+             x-data="{show : false}">
+            <button class="btn btn-link" 
+                    x-show="!show"
+                    @click="show=true;
+                             $nextTick(()=>htmx.find('#taskname').focus());
+                            htmx.find('#taskname').value='';
+                            htmx.find('#tasknameparsed').innerHTML='';">
+               + Add Task
+            </button>
+            <div x-show="show" x-data>
+                {%with params=add_json_params({"ac_filters" :  { "stream" : { "project_id" :inst.id }},
+                                               "attach_to": {"attr" : "project", "pk" : inst.id},
+                                               "exclude" :  ["project"]}),
+                       _url =  url("core:create_from_parsed", kwargs={"attr" :"name", "m" : "project.Task"})
+                %}
+                    <p style="font-size: 0.8em" class="text-secondary mb-0">
+                        {{models["project.Task"].describe_links(excludes="project")}}
+                    </p>
+                    <div class='d-flex align-items-center'>
+                        <div hx-trigger="load"
+                             style="width: 90%;"
+                             @keyup.esc="show=false"
+                             hx-get="{{_url}}{{params}}">
+                        </div>
+                        <button type="button" 
+                                  class="btn-close ms-2  p-2" 
+                                  style="opacity: 0.3;"
+                                  aria-label="Close" 
+                                  x-show="show"
+                                  @click="show=false;">  {# cancel out if button pressed #}
+                        </button>
+                    </div>
+                {%endwith%}
+            </div>
         </div>
-        {%endwith%}
+        <script>
+            {# have to include the project store JS before the alpine compnent can be loaded #}
+            {%with model=models["project.Project"]%}
+                {% include "alpine_fragments/model_data_store.js"  %}
+            {%endwith%}
+        </script>
     </div>
     <script>
-         document.addEventListener('alpine:init', () => {
-            Alpine.store('projects', {
-                active_edit : "",
-                search_results : {results : []},
-                set_search_results (new_results = {results : []}) {
-                    this.search_results = new_results;
-                }
-            });
-        });
         {# have to include the project store JS before the alpine compnent can be loaded #}
-        {% include "project/alpine_fragments/edit_project_attr_data_store.js"  %}
+        {%with model=models["project.Task"]%}
+            {% include "alpine_fragments/model_data_store.js"  %}
+        {%endwith%}
     </script>
-</div>
+    {% with insts=project.streams %}
+       {% include "stream/streams.html"  %}
+    {%endwith %}
 
-
+{%endwith%}
 {%endblock%}

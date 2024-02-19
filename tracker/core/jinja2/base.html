@@ -41,17 +41,26 @@
     document.body.addEventListener('htmx:configRequest', (event) => {
       event.detail.headers['X-CSRFToken'] = csrf_token;
     });
-    const GET = async (url) => {
-        return await fetch( url, {headers});
+    const GET = async (url, json_response = false,) => {
+        return await fetch( url, {headers : {'json-response' : json_response.toString(),...headers}});
     };
-    const GETjson =  async (url) => {
+    const GETjson =  async (url,json_response = true) => {
         return await (await GET(url)).json();
     };               
-    const PUT = async (url, body) => {
-        return await fetch( url, {method: "PUT", headers , body : JSON.stringify(body)});
+    const PUT = async (url, body, json_response = false, ) => {
+        const headers = {
+            'X-CSRFToken' : csrf_token, 
+            'json-response' : json_response.toString(),
+            'Content-Type': 'application/x-www-form-urlencoded'
+        };
+        return await fetch( url, {method: "PUT",headers, body});
     };
-    const POST = async (url, body, json_response = false) => {
-        const headers = {'X-CSRFToken' : csrf_token, 'json-response' : json_response.toString()}
+    const POST = async (url, body, json_response = false, ) => {
+        const headers = {
+            'X-CSRFToken' : csrf_token, 
+            'json-response' : json_response.toString(),
+            'Content-Type': 'application/x-www-form-urlencoded'
+        };
         return await fetch( url, {method: "POST",headers, body});
     };
     const DELETE = async (url) => {

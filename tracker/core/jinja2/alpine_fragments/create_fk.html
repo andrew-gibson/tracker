@@ -1,0 +1,54 @@
+{#
+ expects to be passed in:
+   store_name : the principle model name
+   attr: of the related model 
+   title: the title to display to the user
+   border_color: the color of the choice buttons border
+   background_color : the color of the choice buttons background
+#}
+<div  x-cloak class="mb-1">
+    <div x-show="!($store.{{store_name}}.active_edit == model.id +'streams')">
+        <div style='overflow-x: scroll, max-width: 100%;font-size: 0.8em'
+             class="justify-content-between align-items-center d-flex" >
+            <button type="button" class="btn btn-link mb-1"    
+                    style="font-size: 0.8em;"
+                    @click="edit_fk_value( 'streams') "> 
+            Streams:
+            </button>
+            <ul class="list-group list-group-horizontal justify-content-between align-items-center d-flex" >
+                <template x-for="stream in model.streams">
+                    <li class="list-group-item d-flex p-1 me-1 bg-opacity-10 border-1 w-100 fw-bold"  
+                        style="background-color: {{background_color}};
+                                   border-color: {{border_color}};">
+                        <span x-html="stream.name" class="text-nowrap"></span>
+                    </li>
+                </template>
+            </ul>
+        </div>
+    </div>
+
+    <form x-show="$store.{{store_name}}.active_edit == model.id +'streams'" 
+          style="width: 100%;"
+          method="post"
+          hx-swap="none"
+          hx-headers='{"json-response" : true}'
+          hx-post="{{url("core:rest", kwargs={"m" : "project.Stream" })}}"
+          hx-vals='{"project" :  {{project.id}} }'
+          @keyup.escape="cancel_edit_fk_value('stream')"
+          @htmx:after-settle="'errors' in JSON.parse($event.detail.xhr.response) ? null :  update_model()">
+
+        <div class="input-group input-group-sm d-flex align-items-center ">
+          <span class="input-group-text" 
+                id="stream-name-label">Stream Name
+          </span>
+          <input type="text" 
+                 class="form-control" 
+                 aria-label="" 
+                 aria-describedby="stream-name-label"
+                 name="name"
+                 id="streams_input{{project.id}}"
+                 @keyup.enter="cancel_edit_fk_value('stream')">
+          <button type="button" class="btn-close ms-2" aria-label="Close" @click="cancel_edit_fk_value( 'stream')"></button>
+        </div>
+    </form>
+</div>

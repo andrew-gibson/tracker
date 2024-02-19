@@ -17,7 +17,7 @@ from django.shortcuts import get_object_or_404
 from django.urls import reverse
 from text.translate import gettext_lazy as _
 
-from .models import Contact, Project, Tag, Team, Stream, StreamWork, Model
+from .models import Contact, Project, Tag, Team, Stream, Task, Model
 from core.rest import RESTModel
 
 api = API(namespace="project", session={})
@@ -45,9 +45,9 @@ def main(request):
         "project/main.html",
         {
             "project_form": Project.form(request)(),
-            "stream_work_form"  :  StreamWork.form(request)() ,
+            "task_form"  :  Task.form(request)() ,
             "Project" : Project,
-            "StreamWork" : StreamWork,
+            "Task" : Task,
         },
     )
 

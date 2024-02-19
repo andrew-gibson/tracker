@@ -1,1 +1,11 @@
-<div> inst.name </div>
+<div class="row" 
+    {{ rest_pk_refresh("project.Stream",inst.id) }} >
+    <div class="col-12 text-secondary">
+        {{inst.name}}
+    </div>
+    {% with insts = inst.tasks %}
+        {% include "task/tasks.html" %}
+    {%endwith%}
+</div>
+
+

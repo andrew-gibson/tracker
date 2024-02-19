@@ -1,0 +1,43 @@
+{%with store_name="task", fields=models["project.Task"].form_fields_map%}
+<div class="col-4 border" 
+     x-data='task(
+    {{dumps(task)}}, 
+    "{{url("core:rest", kwargs={"pk" : task.id, "m" : "project.Task"})}}",
+    "{{url("core:text_ac", kwargs={"pk" : task.id,"attr" : "__replace__", "m" : "project.Task"})}}",
+    )'>
+        <button type="button" 
+                class="btn btn-link pb-1 ps-0"    
+                x-html="model.name">
+        </button>
+    {%with attr = "text", title = "Notes" %}
+        {% include "alpine_fragments/edit_attr.html"  %}
+    {%endwith%}
+    {%with attr = "start_date", title = "Start Date" %}
+        {% include "alpine_fragments/edit_attr.html"  %}
+    {%endwith%}
+    {% with store_name="task", 
+            background_color=models["project.Contact"].trigger_color,
+            border_color=models["project.Contact"].hex_trigger_color,
+            attr = "lead", 
+            title = "Contact" %}
+        {% include "alpine_fragments/edit_fk.html"  %}
+    {%endwith%}
+    {% with background_color=models["project.Team"].trigger_color,
+            border_color=models["project.Team"].hex_trigger_color,
+            attr = "teams", 
+            title = "Teams" %}
+        {% include "alpine_fragments/edit_fk.html"  %}
+    {%endwith%}
+    {% with  background_color=models["project.EXCompetency"].trigger_color,
+            border_color=models["project.EXCompetency"].hex_trigger_color,
+            attr = "competency", 
+            title = "Competency" %}
+        {% include "alpine_fragments/edit_fk.html"  %}
+    {%endwith%}
+    {%with attr = "done", title = "Done" %}
+        {% include "alpine_fragments/edit_attr.html"  %}
+    {%endwith%}
+
+</div>
+{%endwith%}
+

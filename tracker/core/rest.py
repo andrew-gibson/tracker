@@ -1,13 +1,14 @@
+import json
 import re
 
 from django.apps import apps
 from django.db.models import Field, ManyToManyField, Model, Q
 from django.forms import ModelForm, modelform_factory
-from django.http import JsonResponse
+from django.http import JsonResponse, Http404, QueryDict
 from django_lifecycle import LifecycleModelMixin
 from django_readers import specs
-
-from .utils import classproperty, render
+from django.shortcuts import get_object_or_404
+from .utils import classproperty, render, flatten, get_related_model_or_404
 
 
 class belongs_to:
@@ -33,15 +34,38 @@ class RESTModel(LifecycleModelMixin, Model):
 
     users = ManyToManyField("core.User")
 
+
     @classproperty
     def readers(cls):
         return specs.process(cls.rest_spec)
+
+    @classmethod
+    def get_projection_by_pk(cls, request, pk):
+        prepare_qs, projection = cls.readers
+        try:
+            return [
+                (x, projection(x))
+                for x in prepare_qs(cls.belongs_to_user(request).filter(pk=pk))
+            ][0]
+        except:
+            raise Http404("No Model matches the given query")
 
     @classproperty
     def _name(cls):
         return f"{cls.__name__.lower()}"
 
     _Form = RequestForm
+
+    @classproperty
+    def form_fields_map(cls):
+        if hasattr(cls,"form_fields"):
+            f = cls.form_fields
+        elif hasattr(cls,"_Form"):
+            f = cls._Form._meta.fields
+        else:
+            return {}
+
+        return {x : cls._meta.get_field(x).__class__.__name__  for x in f}
 
     @classproperty
     def rest_models(cls):
@@ -68,8 +92,7 @@ class RESTModel(LifecycleModelMixin, Model):
             inst = form.save()
             context["inst"] = projection(inst)
             # by default associate objects with their creator
-            if getattr(inst, "users", False):
-                inst.users.add(request.user)
+            inst.add_user(request.user)
             if request.json:
                 return JsonResponse(context["inst"])
         else:
@@ -86,15 +109,20 @@ class RESTModel(LifecycleModelMixin, Model):
     @classmethod
     def PUT(cls, request, pk):
         prepare_qs, projection = cls.readers
-        inst = cls.belongs_to_user(request).get(pk=pk)
-        put = QueryDict(request.PUT)
+        inst, inst_dict = cls.get_projection_by_pk(request, pk)
+        put = QueryDict(request.body)
         form = cls.form(request)(put, instance=inst)
         context = {"form": form, "models": cls.rest_models}
         if form.is_valid():
-            inst = form.save()
-            context["inst"] = projection(inst)
+            form.save()
+            obj, context["inst"] = cls.get_projection_by_pk(request, pk)
             if request.json:
                 return JsonResponse(context["inst"])
+        else:
+            context["inst"] = form.instance
+            if request.json:
+                return JsonResponse({"errors": form.errors})
+
         return render(
             request,
             f"{cls._name}/{cls._name}.html",
@@ -105,15 +133,15 @@ class RESTModel(LifecycleModelMixin, Model):
     def GET(cls, request, pk=None):
         prepare_qs, projection = cls.readers
         if pk:
-            inst = cls.belongs_to_user(request).get(pk=pk)
+            inst, inst_dict = cls.get_projection_by_pk(request, pk)
             if request.json:
-                return JsonResponse(projection(inst))
+                return JsonResponse(inst_dict)
             form = cls.form(request)(instance=inst)
             return render(
                 request,
                 f"{cls._name}/{cls._name}.html",
                 {
-                    "inst": projection(inst),
+                    "inst": inst_dict,
                     "form": form,
                     "models": cls.rest_models,
                     "standalone": not request.htmx,
@@ -135,9 +163,9 @@ class RESTModel(LifecycleModelMixin, Model):
 
     @classmethod
     def DELETE(cls, request, pk):
-        qs = cls.belongs_to_user(request).filter(pk=pk)
+        inst, inst_dict = cls.get_projection_by_pk(request, pk)
         if qs.count() == 1:
-            qs.delete()
+            inst.delete()
         return render(
             request,
             f"{cls._name}/{cls._name}s.html",
@@ -152,8 +180,20 @@ class RESTModel(LifecycleModelMixin, Model):
 
     @classmethod
     def belongs_to_user(cls, request):
-        qs = cls.objects.filter(users=request.user)
+        try:
+            filters = json.loads(request.GET.get("filters", "{}"))
+            # remove any possible filter terms which might try to alter the
+            # users filter condition
+            filters = {k: v for k in filters if "users" not in k}
+        except:
+            raise Http404("incorrectly formatted GET params")
+
+        qs = cls.objects.filter(users=request.user).filter(Q(**filters))
         return cls.filter(qs, request)
+
+    def add_user(self, user):
+        if getattr(self, "users", False):
+            inst.users.add(request.user)
 
     def get_absolute_url(self):
         return reverse(
@@ -204,6 +244,122 @@ class AutoCompleteNexus:
         )
         return f"Type: {autocompletes}"
 
+    @classmethod
+    def parse_text(cls, request):
+        try:
+            ac_filters = json.loads(request.GET.get("ac_filters", "[]"))
+            exclude = json.loads(request.GET.get("exclude", "[]"))
+        except:
+            raise Http404("incorrectly formatted GET params")
+            return HttpResponseBadRequest("incorrectly formatted GET params")
+
+        remainder = text_input = request.POST.get("payload")
+        fields = cls.get_autocompletes(exclude)
+        results = {
+            f.name: {
+                "trigger": f.related_model.text_search_trigger,
+                "model": f.related_model,
+                "name": f.name,
+                "many_to_many": f.many_to_many,
+                "search_terms": cls.find_words_from_trigger(
+                    text_input, f.related_model.text_search_trigger, many=f.many_to_many
+                ),
+            }
+            for f in fields
+        }
+
+        for name in results:
+            filter_qs = Q(**ac_filters.get(name, {}))
+            results[name]["results"] = [
+                [term, results[name]["model"].ac(request, term, filter_qs=filter_qs)]
+                for term in results[name]["search_terms"]
+            ]
+
+        cls.cls_text_scan(
+            text_input, results
+        )  # default is nothing happens, but classes can add extra scanning, for example: dates
+
+        for name in results:
+            for parsed in results[name]["search_terms"]:
+                remainder = remainder.replace(parsed, "")
+            remainder = remainder.replace(results[name]["trigger"], "")
+
+        return {
+            "results": results,
+            "remainder": remainder,
+            "anything_removed": remainder != text_input,
+        }
+
+    @classmethod
+    def save_from_parse(cls, request, results, attr, attr_val):
+        obj = cls(**{attr: attr_val})
+
+        if "attach_to" in request.GET:
+            instructions = json.loads(request.GET["attach_to"])
+            atachee_model = get_related_model_or_404(cls, instructions["attr"])[0]
+            atachee = get_object_or_404(
+                atachee_model.belongs_to_user(request), pk=instructions["pk"]
+            )
+            setattr(obj, instructions["attr"], atachee)
+
+        obj.save()
+        obj.add_user(request.user)
+
+        for rel_name in results:
+            x = results[rel_name]
+
+            """
+             x has format of:
+             {'trigger': '@',
+             'model': <some lookup model>,
+             'name': 'attrbute name',
+             "attr_only" : boolean,
+             'many_to_many': boolean,
+             'search_terms': ['matthew'],     <-- when many to many there will be multiple search terms
+             'results': [
+                 ['search_term', [{ 'id': 2, 'name': 'screen name', 'new' : True}]]
+                ]
+             }
+
+            """
+
+            if x["results"]:
+                if x.get("attr_only", False):
+                    setattr(obj, rel_name, x[0][0]["val"])
+
+                else:
+                    flattened_results = list(flatten(y[1] for y in x["results"]))
+                    new_ones = [y for y in flattened_results if "new" in y]
+                    existing_ids = [
+                        y["id"] for y in flattened_results if "new" not in y
+                    ]
+                    new_objs = [
+                        x["model"].objects.create(
+                            **{
+                                k: v
+                                for k, v in new_one.items()
+                                if k not in ["name", "id", "new"]
+                            }
+                        )
+                        for new_one in new_ones
+                    ]
+                    [x.add_user(request.user) for x in new_objs]
+
+                    existing_objs = (
+                        x["model"].belongs_to_user(request).filter(id__in=existing_ids)
+                    )
+
+                    if x["many_to_many"]:
+                        for results in x["results"]:
+                            getattr(obj, rel_name).add(*new_objs)
+                            getattr(obj, rel_name).add(*existing_objs)
+                    else:
+                        if new_ones:
+                            setattr(obj, rel_name, new_ones[0])
+                        else:
+                            setattr(obj, rel_name, existing_objs[0])
+        return obj
+
 
 triggers = set()
 
@@ -233,7 +389,7 @@ class AutoCompleteREST(RESTModel):
 
     @classmethod
     def ac_query(cls, request, query):
-        f = f"{cls.search_field}"
+        f = cls.search_field
 
         if query == "":
             q = Q()
@@ -261,7 +417,6 @@ class AutoCompleteREST(RESTModel):
 
         if filter_qs:
             qs = qs.filter(filter_qs)
-            print(qs)
 
         if query == "" and cutoff:
             qs = qs[:10]
@@ -274,11 +429,11 @@ class AutoCompleteREST(RESTModel):
         if (
             (len(results) == 0 and query.endswith(" ") or not query.endswith(" "))
             and query.strip() != ""
-            and not any(query.lower() == x["repr"].lower() for x in results)
+            and not any(query.lower() == x["name"].lower() for x in results)
         ):
             # not ending in space -- always create fake new one unless it
             # duplicates i.e. cursor was right at the end of the word
-            new_el = {"repr": query, "id": -1, "new": True}
+            new_el = {"name": query, "id": -1, "new": True, f: query}
 
             if optional_projection:
                 new_el = optional_projection(new_el)

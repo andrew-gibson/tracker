@@ -1,6 +1,5 @@
 import time
 import json
-import aiohttp
 
 from .utils import (
     API,
@@ -10,6 +9,7 @@ from .utils import (
     link_or_404,
     render,
     unlink_or_404,
+    refetch,
 )
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
@@ -26,6 +26,7 @@ from django.views.decorators.csrf import ensure_csrf_cookie
 from text.translate import gettext_lazy as _
 
 from . import models
+from tracker import jinja2
 from .rest import AutoCompleteNexus
 
 api = API(namespace="core")
@@ -69,17 +70,20 @@ def _logout(request):
 def rest(request, m="", pk=None):
     session, set_session = api.get_url_session(request)
     model = get_model_or_404(m)
+    event = ["HX-Trigger", jinja2.make_signal_from_model(m, pk)]
     if not model:
         return HttpResponseBadRequest()
-    if request.method == "GET":
-        return model.GET(request, pk)
-    if request.method == "POST" and not pk:
-        return model.POST(request)
-    if request.method == "PUT" and pk:
-        return model.PUT(request, pk)
-    if request.method == "DELETE" and pk:
-        return model.DELETE(request, pk)
-    return HttpResponseBadRequest()
+    match [request.method, pk]:
+        case ["GET", _]:
+            return model.GET(request, pk)
+        case ["POST", None]:
+            return api.add_header(model.POST(request), *event)
+        case ["PUT", int()]:
+            return api.add_header(model.PUT(request, pk), *event)
+        case ["DELETE", int()]:
+            return api.add_header(model.DELETE(request, pk), *event)
+        case _:
+            return HttpResponseBadRequest()
 
 
 @api.post_get(
@@ -88,66 +92,38 @@ def rest(request, m="", pk=None):
     ]
 )
 def create_from_parsed(request, m, attr, suppress_links=""):
+    model = get_model_or_404(m, test=lambda m: issubclass(m, AutoCompleteNexus))
     if request.method == "POST":
-        model = get_model_or_404(m, test=lambda m: issubclass(m, (AutoCompleteNexus,)))
-        text_input = request.POST.get("payload")
-
+        parse_payload = model.parse_text(request)
+        obj = model.save_from_parse(
+            request, parse_payload["results"], attr, parse_payload["remainder"]
+        )
+        event = ["HX-Trigger", jinja2.make_signal_from_model(m)]
+        return api.add_header(
+            render(
+                request,
+                f"parse_for_links.html",
+                {
+                    "attr": attr,
+                    "m": m,
+                    "params": request.GET.urlencode(),
+                    "model": model,
+                },
+            ),
+            *event,
+        )
     return render(
         request,
         f"parse_for_links.html",
-        {"attr": attr, "m": m, "params": request.GET.urlencode()},
+        {"attr": attr, "m": m, "params": request.GET.urlencode(), "model": model},
     )
 
 
 @api.post(["parse_for_links/<str:m>/<str:attr>/"])
 def parse_for_links(request, m, attr):
-    try:
-        filters = json.loads(request.GET.get("filters", "{}"))
-        exclude = json.loads(request.GET.get("exclude", "[]"))
-    except:
-        return HttpResponseBadRequest("incorrectly formatted GET params")
-
     model = get_model_or_404(m, test=lambda m: issubclass(m, AutoCompleteNexus))
-    remainder = text_input = request.POST.get("payload")
-    fields = model.get_autocompletes(exclude)
-    results = {
-        f.name: {
-            "trigger": f.related_model.text_search_trigger,
-            "model": f.related_model,
-            "name": f.name,
-            "many_to_many": f.many_to_many,
-            "search_terms": model.find_words_from_trigger(
-                text_input, f.related_model.text_search_trigger, many=f.many_to_many
-            ),
-        }
-        for f in fields
-    }
-
-    for name in results:
-        filter_qs =  Q(**filters.get(name,{}))
-        results[name]["results"] = [
-            [term, results[name]["model"].ac(request, term, filter_qs=filter_qs)]
-            for term in results[name]["search_terms"]
-        ]
-
-    model.cls_text_scan(
-        text_input, results
-    )  # default is nothing happens, but classes can add extra scanning, for example: dates
-
-    for name in results:
-        for parsed in results[name]["search_terms"]:
-            remainder = remainder.replace(parsed, "")
-        remainder = remainder.replace(results[name]["trigger"], "")
-
     return render(
-        request,
-        f"show_parsed_links.html",
-        {
-            "results": results,
-            "remainder": remainder,
-            "attr": attr,
-            "anything_removed": remainder != text_input,
-        },
+        request, f"show_parsed_links.html", {"attr": attr, **model.parse_text(request)}
     )
 
 
@@ -160,8 +136,8 @@ def parse_for_links(request, m, attr):
 def toggle_link(request, m1, pk1, m2, pk2, attr=""):
     model1 = get_model_or_404(m1)
     model2 = get_model_or_404(m2)
-    obj1 = get_object_or_404(model1.belongs_to_user(request), pk=pk1)
-    obj2 = get_object_or_404(model2.belongs_to_user(request), pk=pk2)
+    obj1, _ = model1.get_projection_by_pk(request, pk1)
+    obj2, _ = model2.get_projection_by_pk(request, pk2)
     if request.method == "POST":
         link_or_404(obj1, obj2, attr)
     if request.method == "DELETE":
@@ -177,45 +153,47 @@ def toggle_link(request, m1, pk1, m2, pk2, attr=""):
     ]
 )
 async def post_and_link(request, m1, pk1, m2, attr=""):
-    headers = {
-        "Json-Response": "true",
-        "X-Csrftoken": request.headers["X-Csrftoken"],
-        "Cookie": request.headers["Cookie"],
-    }
-    create_url = (
-        "http://" + request.headers["Host"] + reverse("core:rest", kwargs={"m": m2})
+    # create the new m2
+    resp = await refetch(
+        request,
+        url_name="core:rest",
+        url_kwargs={"m": m2},
+        method="POST",
+        payload=request.POST,
     )
-    async with aiohttp.ClientSession(headers=headers) as session:
-        async with session.post(create_url, data=request.POST) as r:
-            if r.ok:
-                resp_dict = await r.json()
-            else:
-                return HttpResponseBadRequest()
+    if r.ok:
+        resp_dict = await resp.json()
+    else:
+        return HttpResponseBadRequest()
 
-        url_kwargs2 = {
+    # now link the new lookup to m1
+    reap2 = await refetch(
+        request,
+        url_name="core:toggle_link",
+        url_kwargs={
             "m1": m1,
             "pk1": pk1,
             "pk2": resp_dict["id"],
             "m2": m2,
             "attr": attr,
-        }
-        link_url = (
-            "http://"
-            + request.headers["Host"]
-            + reverse("core:toggle_link", kwargs=url_kwargs2)
-        )
-        async with session.post(link_url) as r:
-            if r.ok:
-                return JsonResponse(await r.json())
-            else:
-                return HttpResponseBadRequest()
+        },
+        method="POST",
+    )
+    if resp2.ok:
+        return JsonResponse(await resp2.json())
+    else:
+        return HttpResponseBadRequest()
 
 
-@api.post(["text_ac/<str:m>/<int:pk>/<str:attr>/"])
+@api.GET(["text_ac/<str:m>/<int:pk>/<str:attr>/"])
 def text_ac(request, m, pk, attr):
+    try:
+        filters = json.loads(request.GET.get("filters", "{}"))
+        q = request.GET.get("q")
+    except:
+        return HttpResponseBadRequest("incorrectly formatted GET params")
     model = get_model_or_404(m, test=lambda m: issubclass(m, (AutoCompleteNexus,)))
     obj = get_object_or_404(model.belongs_to_user(request), pk=pk)
-    q = list(request.POST.values())[0]
     f = model._meta.get_field(attr)
     related_model = f.related_model
 
@@ -248,7 +226,9 @@ def text_ac(request, m, pk, attr):
         {
             "name": f.name,
             "many_to_many": f.many_to_many,
-            "results": related_model.ac(request, q, optional_projection=projection),
+            "results": related_model.ac(
+                request, q, optional_projection=projection, filter_qs=Q(**filters)
+            ),
         }
     )
 

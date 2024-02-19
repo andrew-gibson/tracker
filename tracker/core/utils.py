@@ -1,3 +1,4 @@
+import aiohttp
 import asyncio
 import base64
 import binascii
@@ -25,7 +26,7 @@ from django.http import Http404, HttpResponse, HttpResponseBadRequest
 from django.shortcuts import render as _render
 from django.shortcuts import resolve_url
 from django.template import engines
-from django.urls import path, re_path
+from django.urls import path, re_path, reverse
 from django.utils.safestring import mark_safe
 from text.translate import gettext_lazy as _
 
@@ -66,11 +67,28 @@ def add_to_admin(cls):
 
 
 class classproperty:
+    """
+    allows for a property to be a deined on a class
+    """
+
     def __init__(self, func):
         self.fget = func
 
     def __get__(self, instance, owner):
         return self.fget(owner)
+
+
+def flatten(lst):
+    """
+    flattens a list:
+    nested_list = [[1, 2, [3, 4]], [5, 6], 7]
+    flat_list = list(flatten(nested_list))
+    """
+    for item in lst:
+        if isinstance(item, list):
+            yield from flatten(item)
+        else:
+            yield item
 
 
 def assert_or_404(condition):
@@ -80,6 +98,32 @@ def assert_or_404(condition):
         raise Http404("Incorrect request")
 
 
+async def refetch(request, url="", url_name="", url_kwargs=None, method="GET", payload=None):
+    headers = {
+        "Json-Response": "true",
+        "X-Csrftoken": request.headers["X-Csrftoken"],
+        "Cookie": request.headers["Cookie"],
+    }
+    url = (
+        "http://" + request.headers["Host"] + reverse(url_name, kwargs=url_kwargs)
+    )
+
+    async with aiohttp.ClientSession(headers=headers) as session:
+        match method:
+            case "POST":
+                async with session.post(url, data=request.POST) as r:
+                    if r.ok:
+                        return r
+                    else:
+                        return HttpResponseBadRequest()
+            case "PUT":
+                pass
+            case "GET":
+                pass
+            case "DELETE":
+                pass
+
+
 def get_related_model_or_404(m, attr, test=lambda x: True):
     try:
         rel = m._meta.get_field(attr)
@@ -87,6 +131,7 @@ def get_related_model_or_404(m, attr, test=lambda x: True):
         return rel.related_model, rel
     except:
         raise Http404("No Model matches the given query")
+
 
 
 def find_linking_attr(o1, o2, attr=None):
@@ -105,23 +150,21 @@ def find_linking_attr(o1, o2, attr=None):
 
 
 def link_or_404(o1, o2, attr=None):
-    attr, rel = find_linking_attr(o1,o2,attr)
+    attr, rel = find_linking_attr(o1, o2, attr)
     if rel.many_to_many or rel.one_to_many:
-        getattr(o1,attr).add(o2)
+        getattr(o1, attr).add(o2)
     else:
-        setattr(o1,attr,o2)
+        setattr(o1, attr, o2)
         o1.save()
 
 
 def unlink_or_404(o1, o2, attr=None):
-    attr,rel = find_linking_attr(o1,o2,attr)
+    attr, rel = find_linking_attr(o1, o2, attr)
     if rel.many_to_many or rel.one_to_many:
-        getattr(o1,attr).remove(o2)
+        getattr(o1, attr).remove(o2)
     else:
-        setattr(o1,attr,None)
+        setattr(o1, attr, None)
         o1.save()
-
-
 
 
 def get_model_or_404(s, test=lambda x: True):
@@ -528,5 +571,3 @@ def is_valid_employee_email(email: str):
     assumes email is already validated by django
     """
     return email.endswith("@canada.ca") or email.endswith(".gc.ca")
-
-

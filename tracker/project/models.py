@@ -1,17 +1,13 @@
-from itertools import product
 import re
-import dateparser
 import sys
+import uuid
+from datetime import date
+from itertools import product
+
+import dateparser
+from core.rest import AutoCompleteNexus, AutoCompleteREST, RequestForm, RESTModel
+from core.utils import add_to_admin, classproperty, render
 from django.apps import apps
-from core.utils import render, add_to_admin, classproperty
-from core.rest import RESTModel, RequestForm, AutoCompleteNexus, AutoCompleteREST
-from django_lifecycle import (
-    hook,
-    AFTER_CREATE,
-    BEFORE_DELETE,
-    BEFORE_CREATE,
-    BEFORE_UPDATE,
-)
 from django.db.models import (
     CASCADE,
     PROTECT,
@@ -24,29 +20,41 @@ from django.db.models import (
     ForeignKey,
     ManyToManyField,
     Model,
-    TextField,
     Q,
+    TextField,
 )
 from django.http import QueryDict
 from django.urls import reverse
-from .producers import name_repr, qs, stream_repr
+from django_lifecycle import (
+    AFTER_CREATE,
+    BEFORE_CREATE,
+    BEFORE_DELETE,
+    BEFORE_UPDATE,
+    hook,
+)
+
+from . import producers
 
 
-class EXCompetency(Model):
+class EXCompetency(AutoCompleteREST, trigger="`", hex_color="2c6e49"):
+    rest_spec = producers.basic_rest_spec
+    users = None
     name = CharField(max_length=300, unique=True)
+    form_fields = [ "name" ]
+
+    @classmethod
+    def belongs_to_user(cls, request):
+        return cls.objects.all()
 
 
 class Tag(AutoCompleteREST, trigger="#", hex_color="ffbe0b"):
-    rest_spec = ["name", "id", name_repr]
-    form_fields = [
-        "name",
-    ]
-
+    rest_spec = producers.basic_rest_spec
+    form_fields = [ "name" ]
     name = CharField(max_length=100)
 
 
 class Contact(AutoCompleteREST, trigger="@", hex_color="ff006e"):
-    rest_spec = ["email", "id", name_repr]
+    rest_spec = producers.basic_rest_spec
     form_fields = ["name", "email"]
 
     name = CharField(max_length=255)
@@ -54,7 +62,7 @@ class Contact(AutoCompleteREST, trigger="@", hex_color="ff006e"):
 
 
 class Team(AutoCompleteREST, trigger="*", hex_color="fb5607"):
-    rest_spec = ["name", "internal", "id", name_repr]
+    rest_spec = producers.basic_rest_spec
     form_fields = ["name", "internal"]
 
     @classmethod
@@ -70,20 +78,17 @@ class Team(AutoCompleteREST, trigger="*", hex_color="fb5607"):
 
 
 class Project(AutoCompleteNexus, AutoCompleteREST, trigger="^", hex_color="8338ec"):
-    rest_spec = [
-        "name",
-        "text",
-        "id",
-        name_repr,
-        {"streams": [stream_repr, "id"]},
-        {"point_of_contact": [name_repr, "id"]},
-        {"teams": [name_repr, "id"]},
-        {"tags": [name_repr, "id"]},
-    ]
+    rest_spec = producers.project_rest_spec
 
     class _Form(RequestForm):
         class Meta:
-            fields = ["name", "parent_project", "teams", "tags", "text"]
+            fields = [
+                "name",
+                "parent_project",
+                "teams",
+                "tags",
+                "text",
+            ]
 
         def __init__(self, *args, **kwargs):
             super().__init__(*args, **kwargs)
@@ -93,8 +98,10 @@ class Project(AutoCompleteNexus, AutoCompleteREST, trigger="^", hex_color="8338e
             self.fields["parent_project"].widget.attrs["class"] = "form-control"
 
     @classmethod
-    def get_autocompletes(cls,excludes=None):
-        return [x for x in super().get_autocompletes(excludes) if x.related_model != Stream]
+    def get_autocompletes(cls, excludes=None):
+        return [
+            x for x in super().get_autocompletes(excludes) if x.related_model != Stream
+        ]
 
     name = CharField(max_length=255)
     text = TextField()
@@ -111,19 +118,14 @@ class Project(AutoCompleteNexus, AutoCompleteREST, trigger="^", hex_color="8338e
 
     @hook(AFTER_CREATE)
     def add_default_stream(self):
-        self.streams.create(name="unassigned")
+        self.streams.create(name="Unassigned", project_default=True)
 
 
 class Stream(AutoCompleteREST, trigger="~", hex_color="036666"):
+    rest_spec = producers.stream_rest_spec
 
     class Meta:
         unique_together = ("name", "project")
-
-    rest_spec = [
-        stream_repr,
-        "name",
-        {"project": ["id"]},
-    ]
 
     form_fields = [
         "name",
@@ -132,12 +134,12 @@ class Stream(AutoCompleteREST, trigger="~", hex_color="036666"):
 
     @hook(BEFORE_DELETE)
     def cant_delete_only_stream(self):
-        if self.name == "unassigned":
+        if self.project_default:
             raise Exception("Can't delete 'unassigned' Stream from project")
 
     @hook(BEFORE_UPDATE)
     def cant_rename_unassigned(self):
-        if self.name == "unassigned":
+        if self.project_default:
             raise Exception("Can't rename 'unassigned'")
 
     @classmethod
@@ -145,9 +147,11 @@ class Stream(AutoCompleteREST, trigger="~", hex_color="036666"):
         return cls.objects.filter(project__users=request.user)
 
     @classmethod
-    def ac_query(cls,request, query):
+    def ac_query(cls, request, query):
         if query == "":
             q = Q()
+        elif query.endswith(" "):
+            q = Q(**{"name__iexact": query.strip()})
         else:
             q = Q(name__icontains=query) | Q(project__name__icontains=query)
 
@@ -155,18 +159,23 @@ class Stream(AutoCompleteREST, trigger="~", hex_color="036666"):
 
     users = None
     project = ForeignKey(Project, on_delete=CASCADE, related_name="streams")
+    project_default = BooleanField(default=False)
     name = CharField(max_length=300)
 
 
-class StreamWork(RESTModel, AutoCompleteNexus):
+class Task(RESTModel, AutoCompleteNexus):
+    rest_spec = producers.task_rest_spec
+
     form_fields = [
         "stream",
+        "start_date",
         "target_date",
         "name",
         "text",
         "lead",
         "teams",
         "competency",
+        "done",
     ]
 
     @classmethod
@@ -208,10 +217,12 @@ class StreamWork(RESTModel, AutoCompleteNexus):
 
         # add the extra dictionary to results
         results["targt_date"] = {
+            "trigger": uuid.uuid4().hex,
             "model": {
                 "hex_trigger_color": "90e0ef",
                 "trigger_color": "rgb(144,224,239)",
             },
+            "attr_only": True,
             "name": "Due Date",
             "many_to_many": False,
             "search_terms": date[1],
@@ -221,7 +232,8 @@ class StreamWork(RESTModel, AutoCompleteNexus):
                     [
                         {
                             "id": date[2].timestamp(),
-                            "repr": date[2].strftime("%a, %d %b %G"),
+                            "name": date[2].strftime("%a, %d %b %G"),
+                            "val": date[2],
                         }
                     ],
                 ]
@@ -229,22 +241,20 @@ class StreamWork(RESTModel, AutoCompleteNexus):
         }
 
     @hook(BEFORE_CREATE)
-    def assigned_to_unassigned(self):
+    def assign_to_unassigned(self):
         if not self.stream:
-            self.stream = self.project.streams.get(name="unassigned")
+            self.stream = self.project.streams.get(project_default=True)
 
     users = None
-    project = ForeignKey(
-        Project, on_delete=CASCADE, related_name="work_items"
-    )
+    project = ForeignKey(Project, on_delete=CASCADE, related_name="tasks")
     stream = ForeignKey(
-        Stream, on_delete=PROTECT, blank=True, null=True, related_name="work_items"
+        Stream, on_delete=PROTECT, blank=True, null=True, related_name="tasks"
     )
-    start_date = DateField(auto_now_add=True, blank=True)
-    target_date =DateField(blank=True)
+    start_date = DateField(default=date.today, blank=True, null=True)
+    target_date = DateField(blank=True, null=True)
     name = CharField(max_length=255)
-    text = TextField()
-    lead = ForeignKey(Contact, on_delete=SET_NULL, null=True)
+    text = TextField(blank=True)
+    lead = ForeignKey(Contact, on_delete=SET_NULL, null=True, blank=True)
     teams = ManyToManyField(Team, blank=True)
     addstamp = DateTimeField(auto_now_add=True)
     editstamp = DateTimeField(auto_now=True)
