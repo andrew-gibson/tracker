@@ -4,13 +4,13 @@
              class="form-label d-none">{{ attr.replace("_"," ").title() }} 
       </label>
       <input class="form-control" 
-             name="payload"
+             name="q"
              autocomplete="off" 
              id="{{model._meta.model_name}}{{attr}}"
              hx-trigger="keyup changed delay:0.5s"
              hx-target="#{{model._meta.model_name}}{{attr}}parsed"
              {% with url = url("core:parse_for_links", kwargs={"attr" : attr, "m" : m})%}
-             hx-post="{{url}}?{{params}}"
+             hx-get="{{url}}?{{params}}"
              {% endwith %}
              />
       <div id="{{model._meta.model_name}}{{attr}}parsed">

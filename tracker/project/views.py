@@ -21,22 +21,7 @@ from .models import Contact, Project, Tag, Team, Stream, Task, Model
 from core.rest import RESTModel
 
 api = API(namespace="project", session={})
-'''
-    tags_typeahead = {
-        "m": "project.Project",
-        "attr": "tags",
-    }
-    teams_typeahead = {
-        "m": "project.Project",
-        "attr": "teams",
-    }
-    if project.pk:
-        tags_typeahead["pk"] = project.pk
-        teams_typeahead["pk"] = project.pk
 
-    "tags_typeahead": reverse("core:sel_setup", kwargs=tags_typeahead),
-    "teams_typeahead": reverse("core:sel_setup", kwargs=teams_typeahead),
-'''
 
 @api.get("main/")
 def main(request):

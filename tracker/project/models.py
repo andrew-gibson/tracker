@@ -67,8 +67,9 @@ class Team(AutoCompleteREST, trigger="*", hex_color="fb5607"):
 
     @classmethod
     def belongs_to_user(cls, request):
+        filters = cls.get_filters(request)
         q = Q(project__users=request.user, private=True) | Q(private=False)
-        return cls.objects.filter(q).distinct()
+        return cls.objects.filter(q).filter(filters).distinct()
 
     users = None
     name = CharField(max_length=255, unique=True)
@@ -85,8 +86,6 @@ class Project(AutoCompleteNexus, AutoCompleteREST, trigger="^", hex_color="8338e
             fields = [
                 "name",
                 "parent_project",
-                "teams",
-                "tags",
                 "text",
             ]
 
@@ -104,7 +103,7 @@ class Project(AutoCompleteNexus, AutoCompleteREST, trigger="^", hex_color="8338e
         ]
 
     name = CharField(max_length=255)
-    text = TextField()
+    text = TextField(blank=True)
     parent_project = ForeignKey(
         "self",
         on_delete=SET_NULL,
@@ -144,7 +143,8 @@ class Stream(AutoCompleteREST, trigger="~", hex_color="036666"):
 
     @classmethod
     def belongs_to_user(cls, request):
-        return cls.objects.filter(project__users=request.user)
+        filters = cls.get_filters(request)
+        return cls.objects.filter(project__users=request.user).filter(filters)   
 
     @classmethod
     def ac_query(cls, request, query):
@@ -172,15 +172,13 @@ class Task(RESTModel, AutoCompleteNexus):
         "target_date",
         "name",
         "text",
-        "lead",
-        "teams",
-        "competency",
         "done",
     ]
 
     @classmethod
     def belongs_to_user(cls, request):
-        return cls.objects.filter(stream__project__users=request.user)
+        filters = cls.get_filters(request)
+        return cls.objects.filter(stream__project__users=request.user).filter(filters)
 
     @classmethod
     def cls_text_scan(cls, text_input, results):
@@ -268,7 +266,8 @@ class Task(RESTModel, AutoCompleteNexus):
 class ProjectTeam(RESTModel):
     @classmethod
     def belongs_to_user(cls, request):
-        return cls.objects.filter(project__users=request.user)
+        filters = cls.get_filters(request)
+        return cls.objects.filter(project__users=request.user).filter(filters)
 
     users = None
     project = ForeignKey("Project", on_delete=CASCADE)

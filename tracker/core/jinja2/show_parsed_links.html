@@ -19,9 +19,9 @@
 {%for relation in results.values() %}
     {%if relation.results %}
     <div x-data='{
-        results : {{ json.dumps(relation.results)|safe }},
+        results : {{ dumps(relation.results) }},
         name : "{{relation.name.replace("_", " ").title() }}"  ,
-        many_to_many : {{json.dumps(relation.many_to_many)}} }' 
+        many_to_many : {{dumps(relation.many_to_many)}} }' 
          class='d-flex pt-2 bg-secondary bg-opacity-10 justify-content-between {%if loop.last%}pb-2{%endif%}'
          style='font-size: 0.8em' >
         <span x-bind:class="'m-1 pe-2 align-self-center  text-secondary ' + (results[0][1].length > 1 && !many_to_many ? 'fbg-danger bg-opacity-25' : '')"

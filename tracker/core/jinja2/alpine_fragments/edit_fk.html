@@ -13,13 +13,12 @@
         <div style='overflow-x: scroll, max-width: 100%;font-size: 0.8em'
              class="justify-content-between d-flex align-items-center">
                 <button type="button" class="btn btn-link mb-1" 
-                        style="font-size: 0.8em;"
                         @click="edit_fk_value('{{attr}}') ">  {# move into edit mode #}
                  {{title}}:
                 </button>
 
             <ul class="list-group list-group-horizontal d-flex align-items-center" 
-                style='overflow-x: scroll; max-width: 80%;'>
+                style='overflow-x: scroll; max-width: 80%;scrollbar-width:none'>
                 <template x-for="item in (Array.isArray(model.{{attr}}) ? model.{{attr}} : model.{{attr}} ? [model.{{attr}} ] : [] )">   {# loop over all currently selected items to display them #} 
                     <li class="list-group-item d-flex p-1 me-1 bg-opacity-10 border-1 w-100 fw-bold"  
                         style="background-color: {{background_color}};
@@ -50,7 +49,7 @@
                  autocomplete="off" 
                  name="name"
                  :id="'{{attr}}_input'+ model.id"
-                 @keyup.debounce="search_fk_attr(model, '{{attr}}', $el)" {# debounce for better user UX, otherwise on every keyup search the database #}
+                 @keyup.debounce="search_fk_attr('{{attr}}', $el)" {# debounce for better user UX, otherwise on every keyup search the database #}
                  @keyup.enter.prevent="()=>{}">  {# capture and ignore user pressing ENTER, this is just a filter input #}
           <button type="button" 
                   class="btn-close ms-2  p-2" 
@@ -67,7 +66,7 @@
                 <li class="list-group-item d-flex p-1 me-1 border-0  align-items-stretch" >
                     <span :style="result.selected ? 'border: 1px solid {{border_color}};' : ''" > 
                     <button class="btn p-1"
-                             style="background-color: {{background_color}};font-size:0.8rem;height: 100%;" 
+                             style="background-color: {{background_color}};height: 100%;" 
                              @click.prevent="toggle_fk_attr( '{{attr}}', result )">
                         <span x-html="result.name"></span>
                         <span class="badge bg-success ms-1" x-show="result.new"> New</span> 

@@ -1,7 +1,6 @@
 isort
 black
 ipython
-jupyterlab
 pip-autoremove
 pytest-django
 Faker

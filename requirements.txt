@@ -1,5 +1,6 @@
 aioredis
 black
+bleach
 celery
 channels
 channels-redis
@@ -18,6 +19,7 @@ django-lifecycle
 whitenoise
 hiredis
 Jinja2
+mistune
 #lxml
 pipdeptree
 psycopg

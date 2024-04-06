@@ -1,6 +1,5 @@
 import aiohttp
 import asyncio
-import base64
 import binascii
 import json
 import os
@@ -29,6 +28,7 @@ from django.template import engines
 from django.urls import path, re_path, reverse
 from django.utils.safestring import mark_safe
 from text.translate import gettext_lazy as _
+from tracker.jinja2 import encode_get_param, decode_get_params
 
 ALLOWED_TAGS = ["li", "ol", "ul", "p", "br", "span"]
 
@@ -98,15 +98,15 @@ def assert_or_404(condition):
         raise Http404("Incorrect request")
 
 
-async def refetch(request, url="", url_name="", url_kwargs=None, method="GET", payload=None):
+async def refetch(
+    request, url="", url_name="", url_kwargs=None, method="GET", payload=None
+):
     headers = {
         "Json-Response": "true",
         "X-Csrftoken": request.headers["X-Csrftoken"],
         "Cookie": request.headers["Cookie"],
     }
-    url = (
-        "http://" + request.headers["Host"] + reverse(url_name, kwargs=url_kwargs)
-    )
+    url = "http://" + request.headers["Host"] + reverse(url_name, kwargs=url_kwargs)
 
     async with aiohttp.ClientSession(headers=headers) as session:
         match method:
@@ -131,7 +131,6 @@ def get_related_model_or_404(m, attr, test=lambda x: True):
         return rel.related_model, rel
     except:
         raise Http404("No Model matches the given query")
-
 
 
 def find_linking_attr(o1, o2, attr=None):
@@ -324,6 +323,7 @@ def async_login_required(
     return actual_decorator
 
 
+
 @dataclass
 class API:
     urlpatterns: list = field(default_factory=list)
@@ -341,11 +341,11 @@ class API:
 
     def encode_session(self, session_dict):
         jsonb = json.dumps(session_dict).encode("utf-8")
-        b64_jsonb = base64.urlsafe_b64encode(jsonb)
-        return b64_jsonb.decode()
+        return base64.urlsafe_b64encode(jsonb)
 
-    def build_session_url(self, url, session_dict):
+    def build_session_url(self, request, session_dict):
         s_b64_jsonb = self.encode_session(session_dict)
+        encode_get_param(request.GET, "s", session_dict)
         return "?".join([url, s_b64_jsonb])
 
     def current_url(self, request):
@@ -353,11 +353,8 @@ class API:
             request.headers.get("HX-Current-URL", request.build_absolute_uri())
         )
 
-    def load_session_data(self, query):
-        try:
-            return json.loads(base64.urlsafe_b64decode(query.encode("utf-8")).decode())
-        except binascii.Error:
-            return self.session
+    def load_session_data(self, request):
+        return decode_get_params(request.GET).get("s",self.session)
 
     def parse_referer(self, request):
         return parse.urlsplit(request.headers.get("Referer", ""))
@@ -365,13 +362,13 @@ class API:
     def get_url_session(self, request):
         # works in conjunction with htmx
         # use base64 and json to store session info in the url
-        urlsplit = self.current_url(request)
-        if not urlsplit.query:
+        
+        if len(request.GET.keys()) == 0:
             # make copy of session dict so it can be modified
             session = json.loads(json.dumps(self.session))
         else:
             try:
-                session = self.load_session_data(urlsplit.query)
+                session = self.load_session_data(request)
             except:
                 print(f"session parsing error - {urlsplit.query}")
                 session = self.session
@@ -380,7 +377,7 @@ class API:
             return self.add_header(
                 response,
                 "hx-push",
-                self.build_session_url(urlsplit.path, session),
+                self.build_session_url(request, session),
             )
 
         return session, set_session

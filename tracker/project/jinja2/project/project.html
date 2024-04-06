@@ -1,13 +1,27 @@
-{% if  standalone %} {% extends "base.html" %} {% endif -%}
+{% if  standalone %} {% extends "base.html" %} 
+    {% block scripts%}
+    document.addEventListener('alpine:init', () => {
+        setup_rest_model_store("project",{{dumps(models["project.Project"].form_fields_map)|safe}});
+        setup_rest_model_store("task",{{dumps(models["project.Task"].form_fields_map)|safe}});
+    });
+    {%endblock%}
+{% endif %}
 
-{% block content%}
+{% block content %}
 
 <div id="smart_input" hx-swap-oob="true" >
 
 </div>
 
-{% with project=inst %}
-<div id="project_content" hx-swap-oob="true"
+<div id="main-content" hx-swap-oob="true">
+    {% with project=inst %}
+    {% if  not standalone %}  
+    <script async>
+        setup_rest_model_store("project",{{dumps(models["project.Project"].form_fields_map)|safe}});
+        setup_rest_model_store("task",{{dumps(models["project.Task"].form_fields_map)|safe}});
+    </script>
+    {% endif %}
+
     <div class="row">
             {%with add_title_links=False  %}
                {% include "project/project_summary.html"  %}
@@ -17,15 +31,16 @@
             <button class="btn btn-link" 
                     x-show="!show"
                     @click="show=true;
-                             $nextTick(()=>htmx.find('#taskname').focus());
+                            $nextTick(()=>htmx.find('#taskname').focus());
                             htmx.find('#taskname').value='';
                             htmx.find('#tasknameparsed').innerHTML='';">
                + Add Task
             </button>
             <div x-show="show" x-data>
-                {%with params=add_json_params({"ac_filters" :  { "stream" : { "project_id" :inst.id }},
-                                               "attach_to": {"attr" : "project", "pk" : inst.id},
-                                               "exclude" :  ["project"]}),
+                {%with params=add_encode_parameter("f",{"ac_filters" :  { "stream" : { "project_id" :inst.id }},
+                                                   "attach_to": {"attr" : "project", "pk" : inst.id},
+                                                   "trigger" : make_signal_from_model("project.Task"),
+                                                   "exclude" :  ["project"]}),
                        _url =  url("core:create_from_parsed", kwargs={"attr" :"name", "m" : "project.Task"})
                 %}
                     <p style="font-size: 0.8em" class="text-secondary mb-0">
@@ -35,7 +50,7 @@
                         <div hx-trigger="load"
                              style="width: 90%;"
                              @keyup.esc="show=false"
-                             hx-get="{{_url}}{{params}}">
+                             hx-get="{{_url}}?{{params}}">
                         </div>
                         <button type="button" 
                                   class="btn-close ms-2  p-2" 
@@ -48,22 +63,9 @@
                 {%endwith%}
             </div>
         </div>
-        <script>
-            {# have to include the project store JS before the alpine compnent can be loaded #}
-            {%with model=models["project.Project"]%}
-                {% include "alpine_fragments/model_data_store.js"  %}
-            {%endwith%}
-        </script>
     </div>
-    <script>
-        {# have to include the project store JS before the alpine compnent can be loaded #}
-        {%with model=models["project.Task"]%}
-            {% include "alpine_fragments/model_data_store.js"  %}
-        {%endwith%}
-    </script>
     {% with insts=project.streams %}
        {% include "stream/streams.html"  %}
     {%endwith %}
-
-{%endwith%}
+    {%endwith%}
 {%endblock%}

@@ -1,4 +1,5 @@
 import time
+import dateparser
 import json
 
 from .utils import (
@@ -70,12 +71,15 @@ def _logout(request):
 def rest(request, m="", pk=None):
     session, set_session = api.get_url_session(request)
     model = get_model_or_404(m)
-    event = ["HX-Trigger", jinja2.make_signal_from_model(m, pk)]
+    event = [
+        "HX-Trigger",
+        jinja2.decode_get_params(request.GET).get("f", {}).get("trigger"),
+    ]
     if not model:
         return HttpResponseBadRequest()
     match [request.method, pk]:
         case ["GET", _]:
-            return model.GET(request, pk)
+            return api.add_header(model.GET(request, pk), *event)
         case ["POST", None]:
             return api.add_header(model.POST(request), *event)
         case ["PUT", int()]:
@@ -86,40 +90,41 @@ def rest(request, m="", pk=None):
             return HttpResponseBadRequest()
 
 
-@api.post_get(
-    [
-        "create_from_parsed/<str:m>/<str:attr>/",
-    ]
-)
+@api.get(["make_data_store/<str:m>/", "make_data_store/<str:m>/<int:pk>/"])
+def make_data_store(request, m="", pk=None):
+    return render(
+        request,
+        "alpine_fragments/model_data_store.js",
+        {"model": get_model_or_404(m), "m": m, "pk": pk},
+    )
+
+
+@api.post_get("create_from_parsed/<str:m>/<str:attr>/")
 def create_from_parsed(request, m, attr, suppress_links=""):
     model = get_model_or_404(m, test=lambda m: issubclass(m, AutoCompleteNexus))
+    ctx = {"attr": attr, "m": m, "params": request.GET.urlencode(), "model": model}
     if request.method == "POST":
         parse_payload = model.parse_text(request)
         obj = model.save_from_parse(
             request, parse_payload["results"], attr, parse_payload["remainder"]
         )
-        event = ["HX-Trigger", jinja2.make_signal_from_model(m)]
         return api.add_header(
             render(
                 request,
                 f"parse_for_links.html",
-                {
-                    "attr": attr,
-                    "m": m,
-                    "params": request.GET.urlencode(),
-                    "model": model,
-                },
+                ctx,
             ),
-            *event,
+            "HX-Trigger",
+            jinja2.make_signal_from_model(m),
         )
     return render(
         request,
-        f"parse_for_links.html",
-        {"attr": attr, "m": m, "params": request.GET.urlencode(), "model": model},
+        "parse_for_links.html",
+        ctx,
     )
 
 
-@api.post(["parse_for_links/<str:m>/<str:attr>/"])
+@api.get("parse_for_links/<str:m>/<str:attr>/")
 def parse_for_links(request, m, attr):
     model = get_model_or_404(m, test=lambda m: issubclass(m, AutoCompleteNexus))
     return render(
@@ -233,81 +238,10 @@ def text_ac(request, m, pk, attr):
     )
 
 
-def parse_lookup_args(
-    request,
-    m: str = None,
-    pk: int = None,
-    attr: str = None,
-) -> dict:
-    c: dict = {
-        "attr": attr,
-        "m": m,
-        "model": get_model_or_404(m, test=lambda m: hasattr(m, attr)),
-    }
-    if pk:
-        c["pk"] = pk
-    c["related_model"], c["rel"] = get_related_model_or_404(
-        c["model"], attr, test=lambda m: hasattr(m, "ac")
-    )
-    c["instance"] = get_object_or_404(c["model"], pk=pk) if pk else None
-
-    def make_url(view_name):
-        kwargs = {k: c[k] for k in ["pk", "m", "attr"] if k in c}
-        return reverse(view_name, kwargs=kwargs)
-
-    c["make_url"] = make_url
-
-    if f"id_{attr}" in request.POST:
-        c["selected"]: list = request.POST.getlist(f"id_{attr}")
+@api.GET(["dateparse/"])
+def dateparse(request):
+    date = dateparser.parse(request.GET.get("q"))
+    if date:
+        return HttpResponse(date.date().isoformat())
     else:
-        c["selected"]: list = [
-            {
-                "name": str(x),
-                "id": x.pk,
-            }
-            for x in getattr(c["instance"], attr).all()
-        ]
-
-    c["q"] = request.POST.get("q")
-
-    raw_q_results = c["related_model"].ac(request, c["q"]) if c["q"] else []
-
-    c["results"] = (
-        c["related_model"].ac(request, c["q"], filter_qs=~Q(id__in=c["selected"]))
-        if c["q"]
-        else []
-    )
-
-    c["already_selected"] = len(raw_q_results) and not len(c["results"])
-    return c
-
-
-@api.get(
-    [
-        "sel_setup/<str:m>/<int:pk>/<str:attr>/",
-        "sel_setup/<str:m>/<str:attr>/",
-    ]
-)
-def sel_setup(request, m: str = None, pk: int = None, attr: str = None):
-    c: dict = parse_lookup_args(request, m, pk, attr)
-    return render(request, "typeahead.html", c)
-
-
-@api.get_post(
-    [
-        "lkp/<str:m>/<int:pk>/<str:attr>/",
-        "lkp/<str:m>/<str:attr>/",
-    ]
-)
-def m2m_lookup(
-    request,
-    m: str = None,
-    pk: int = None,
-    attr: str = None,
-):
-    # remap the currently selected objects to {"id" : , "name" : }
-    c: dict = parse_lookup_args(request, m, pk, attr)
-    related_model: models.Model = c["related_model"]
-    # the ac will return an array of [{"id" : , "name" : }]
-    c["create_new"] = reverse("core:rest", kwargs={"m": related_model._meta.label})
-    return render(request, "typeahead_results.html", c)
+        return HttpResponse("")

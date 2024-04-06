@@ -9,6 +9,7 @@ from django_lifecycle import LifecycleModelMixin
 from django_readers import specs
 from django.shortcuts import get_object_or_404
 from .utils import classproperty, render, flatten, get_related_model_or_404
+from tracker.jinja2 import add_encode_parameter, decode_get_params
 
 
 class belongs_to:
@@ -164,8 +165,7 @@ class RESTModel(LifecycleModelMixin, Model):
     @classmethod
     def DELETE(cls, request, pk):
         inst, inst_dict = cls.get_projection_by_pk(request, pk)
-        if qs.count() == 1:
-            inst.delete()
+        inst.delete()
         return render(
             request,
             f"{cls._name}/{cls._name}s.html",
@@ -179,16 +179,20 @@ class RESTModel(LifecycleModelMixin, Model):
         return qs
 
     @classmethod
-    def belongs_to_user(cls, request):
+    def get_filters(cls,request):
         try:
-            filters = json.loads(request.GET.get("filters", "{}"))
+            filters = decode_get_params(request.GET).get("f",{}).get("filters",{})
             # remove any possible filter terms which might try to alter the
             # users filter condition
-            filters = {k: v for k in filters if "users" not in k}
+            return Q(**{k: v for k,v in filters.items() if "users" not in k})
         except:
             raise Http404("incorrectly formatted GET params")
 
-        qs = cls.objects.filter(users=request.user).filter(Q(**filters))
+
+    @classmethod
+    def belongs_to_user(cls, request):
+        filters = cls.get_filters(request)
+        qs = cls.objects.filter(users=request.user).filter(filters)
         return cls.filter(qs, request)
 
     def add_user(self, user):
@@ -246,14 +250,15 @@ class AutoCompleteNexus:
 
     @classmethod
     def parse_text(cls, request):
-        try:
-            ac_filters = json.loads(request.GET.get("ac_filters", "[]"))
-            exclude = json.loads(request.GET.get("exclude", "[]"))
-        except:
-            raise Http404("incorrectly formatted GET params")
-            return HttpResponseBadRequest("incorrectly formatted GET params")
+        f =  decode_get_params(request.GET).get("f",{})
+        ac_filters = f.get("ac_filters", {})
+        exclude = f.get("exclude", [])
 
-        remainder = text_input = request.POST.get("payload")
+        if request.method == "POST":
+            remainder = text_input = request.POST.get("q")
+        else:
+            remainder = text_input = request.GET.get("q","")
+
         fields = cls.get_autocompletes(exclude)
         results = {
             f.name: {
@@ -292,10 +297,11 @@ class AutoCompleteNexus:
 
     @classmethod
     def save_from_parse(cls, request, results, attr, attr_val):
+        f =  decode_get_params(request.GET).get("f",{})
         obj = cls(**{attr: attr_val})
 
-        if "attach_to" in request.GET:
-            instructions = json.loads(request.GET["attach_to"])
+        if "attach_to" in f:
+            instructions = f.get("attach_to")
             atachee_model = get_related_model_or_404(cls, instructions["attr"])[0]
             atachee = get_object_or_404(
                 atachee_model.belongs_to_user(request), pk=instructions["pk"]
@@ -325,7 +331,7 @@ class AutoCompleteNexus:
 
             if x["results"]:
                 if x.get("attr_only", False):
-                    setattr(obj, rel_name, x[0][0]["val"])
+                    setattr(obj, rel_name, x["results"][0][1][0]["val"])
 
                 else:
                     flattened_results = list(flatten(y[1] for y in x["results"]))
@@ -358,6 +364,7 @@ class AutoCompleteNexus:
                             setattr(obj, rel_name, new_ones[0])
                         else:
                             setattr(obj, rel_name, existing_objs[0])
+        obj.save()
         return obj
 
 

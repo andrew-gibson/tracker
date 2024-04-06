@@ -7,7 +7,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <!-- <script src="https://unpkg.com/htmx.org"></script>       --> 
     <script src="{{ static('htmx.min.js') }}"></script>      
-    <script src="https://unpkg.com/alpinejs" defer></script> 
     <script src="https://unpkg.com/htmx.org/dist/ext/ws.js" defer></script> 
     <script src="{{static('d3.min.js')}}">   </script>
     <script src="{{static('bootstrap-5.1.3-dist/js/bootstrap.bundle.min.js')}}">   </script>
@@ -28,14 +27,15 @@
       <a href="{{ url("core:_logout")}}" class="btn link-light btn-link">{{ _("logout") }}</a>
     </div>
   </nav>
-  <main class="container-fluid" hs-history-elt>
+  <main class="container-fluid" hx-history-elt id="main-content">
       <!--<div hx-ext="ws" ws-connect="/ws/rss/" > -->
+
     <div id="modal-container" ></div>
         {% block content %}{% endblock %}
     </div>
   </main>
   <div id="ws-scripts"> </div>
-  <script>
+  <script id="scripts">
     const csrf_token =  '{{ csrf_token }}';
     const headers =   {  'X-CSRFToken' : csrf_token,  'Content-Type': 'application/json' };
     document.body.addEventListener('htmx:configRequest', (event) => {
@@ -74,7 +74,183 @@
         navigator.clipboard.write(data);
     };
 
+    const setup_rest_model_store = (model_name, fields)=> {
+
+            const isarray = Array.isArray;
+
+            Alpine.store(model_name, {
+                active_edit : "",
+                search_results : {results : []},
+                set_search_results (new_results = {results : []}) {
+                    this.search_results = new_results;
+                }
+            });
+
+            Alpine.data(model_name, (model,update_url, search_url) => ({
+                model,
+                fields,
+                cancel_values : {},
+
+                input_type(attr){
+                    sql_type = this.fields[attr];
+                    input_type = this.input_lookup[sql_type]
+                
+                },
+
+                update_model () { 
+                    var _this = this;
+                    GETjson(update_url).then( json => _this.imodel= json);
+                },
+
+                send_model () {
+                    const _this = this;
+                    const send_data = {};
+                    for (var x in this.fields){
+                        if (["ManyToOneRel", "ManyToManyField"].includes(this.fields[x]) ){
+                            val =  (this.model[x] || []).map(x=>x.id);
+                            if (val.length) {
+                              send_data[x] = val;
+                            }
+                        }  else if (this.fields[x] == "ForeignKey" ){
+                           val = (this.model[x] || {}).id || "";
+                            if (val){
+                              send_data[x] = val;
+                            }
+                        } else {
+                           send_data[x] = this.model[x] || "";
+                        }
+                    }
+                    PUT(update_url, 
+                        new URLSearchParams(send_data).toString(), 
+                        json_response=true ).then(
+                            resp => {
+                                resp.json().then( data => {
+                                   _this.model = data;
+                                });
+                            }
+                        );
+                },
+
+                async get_el (id) {
+                    while (!htmx.find(id)){
+                        await setTimeout(()=>null, 100);
+                    }
+                    return htmx.find(id);
+                },
+
+                 async dateparse  (input, attr, id) {
+                    const resp = await GET(`{{url("core:dateparse")}}?q=${input.value}`)
+                    const text = await resp.text();
+                    const style = {};
+                    if (text) {
+                        this.model[attr] = text;
+                        input.style["border"] = "2px solid green";
+                    } else {
+                        input.style["border"] = "2px solid red";
+                    }
+                 },
+
+                async edit_value (attr,id) {
+                    this.$store[model_name].active_edit = this.model.id + attr;
+                    this.cancel_values[attr] = this.model[attr];
+                    if (["DateField", "DateTimeField"].includes(this.fields[attr])) {
+                        const input = (await this.get_el(id))
+                        input.value = "";
+                        input.style["border"] = "";
+                    }
+                },
+
+                cancel_edit_value ( attr){
+                    this.$store[model_name].active_edit = "";
+                    this.model[attr] = this.cancel_values[attr];
+                },
+
+                end_edit_value (attr) {
+                    this.send_model();
+                    this.$store[model_name].active_edit = "";
+                    this.cancel_values[attr] = "";
+                },
+
+                edit_fk_value (attr) {
+                    this.$store[model_name].active_edit = this.model.id + attr;
+                    this.$store[model_name].set_search_results();
+                    // get ref to input element, can't use alpine refs for dynamically created elements
+                    const el = htmx.find(`#${attr}_input${this.model.id}`);
+                    // focus the input element
+                    this.$nextTick( ()=> el.focus() );
+                    // reset the input value
+                    el.value = ""
+                    // do a default search with empty value
+                    this.search_fk_attr(attr,el);
+                },
+
+                cancel_edit_fk_value ( attr){
+                    this.$store[model_name].active_edit = "";
+                    this.$store[model_name].set_search_results();
+                },
+
+                search_fk_attr ( attr, el){
+                    const _this = this;
+                    let current_pks;
+                    if (isarray(this.model[attr])) {
+                        current_pks = this.model[attr].map(x=>x.id);
+                    } else {
+                        current_pks = this.model[attr] ?  [this.model[attr].id] : [];
+                    }
+                    const url = search_url.replace("__replace__",attr) + "?" + new URLSearchParams({q:el.value})
+
+                    GET(url,  json_response=true ).then(
+                        resp => {
+                            resp.json().then( data => {
+                                for (var i in data["results"]){
+                                    const datum =  data["results"][i]
+                                    datum.selected =  current_pks.includes(datum.id)
+                                }
+                                _this.$store[model_name].set_search_results( data );
+                            })
+                        }
+                    )
+                },
+
+                attr_as_array(attr){
+                    console.log(this.model[attr])
+                    if (isarray(this.model[attr])){
+                        return this.model[attr];
+                    }
+                    else if (this.moddel[attr]){
+                        return [this.model[attr]];
+                    }
+                    else {
+                        return [];
+                    }
+                },
+
+                toggle_fk_attr(attr,result){
+                    const _this = this;
+                    const el = htmx.find(`#${attr}_input${this.model.id}`);
+                    if (result.selected){
+                        if (result.id && isarray(this.model[attr])) {
+                            this.model[attr] = this.model[attr].filter(x=> x.id != result.id);
+                        } else if (result.id){
+                            this.model[attr] = undefined;
+                        }
+                        DELETE(result.url).then(x=>_this.update_model());
+                    } else {
+                        if (isarray(this.model[attr])) {
+                            this.model[attr] = [...this.model[attr], result];
+                        } else {
+                            this.model[attr] =  result;
+                        }
+                        POST(result.url, {}).then(x=>_this.update_model());
+                    }
+                    _this.cancel_edit_fk_value(attr);
+                }
+            }));
+
+        };
+       {% block scripts %}{% endblock %}
   </script>
+  
 </body>
 </html>
 

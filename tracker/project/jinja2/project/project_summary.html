@@ -1,47 +1,56 @@
+{%with store_name="project", fields=models["project.Project"].form_fields_map%}
 <div class="col-4 border" 
      x-data='project(
     {{dumps(project)|safe}}, 
     "{{url("core:rest", kwargs={"pk" :project.id, "m" : "project.Project"})}}",
     "{{url("core:text_ac", kwargs={"pk" :project.id,"attr" : "__replace__", "m" : "project.Project"})}}",
     )'>
+    {% if add_title_links %}
         <button type="button" 
                 class="btn btn-link pb-1 ps-0"    
                 x-html="model.name"
-                {% if add_title_links %}
                 hx-push-url="true"
-                hx-get="{{url('core:rest', kwargs={'pk' :project.id, 'm' : 'project.Project'})}}"
-                {% endif  %} > 
+                hx-swap="outerHTML"
+                hx-get="{{url('core:make_data_store', kwargs={'pk' :project.id, 'm' : 'project.Project'})}}">
         </button>
         <div class="text-dark text-opacity-75 lh-1 mb-2 " 
              style="font-size: 0.8em;"
              x-html="model.text">
         </div>
-    {% with store_name="project", 
-            background_color="rgba(163,206,241,0.3)",
+    {% else %}
+        {%with attr = "name", title = "Name" %}
+            {% include "alpine_fragments/edit_attr.html"  %}
+        {%endwith%}
+        {%with attr = "text", title = "Text" %}
+            {% include "alpine_fragments/edit_attr.html"  %}
+        {%endwith%}
+    {% endif  %}
+    {% with background_color="rgba(163,206,241,0.3)",
             border_color="#a3cef1",
+            hx_post = url("core:rest", kwargs={"m" : "project.Stream" }),
+            hx_vals ={"project" :  project.id },
             attr = "streams", 
             title = "Streams" %}
         {% include "alpine_fragments/create_fk.html"  %}
     {%endwith%}
-    {% with store_name="project", 
-            background_color=models["project.Contact"].trigger_color,
+    {% with background_color=models["project.Contact"].trigger_color,
             border_color=models["project.Contact"].hex_trigger_color,
             attr = "point_of_contact", 
             title = "Contact" %}
         {% include "alpine_fragments/edit_fk.html"  %}
     {%endwith%}
-    {% with store_name="project", 
-            background_color=models["project.Tag"].trigger_color,
+    {% with background_color=models["project.Tag"].trigger_color,
             border_color=models["project.Tag"].hex_trigger_color,
             attr = "tags", 
             title = "Tag" %}
         {% include "alpine_fragments/edit_fk.html"  %}
     {%endwith%}
-    {% with store_name="project", 
-            background_color=models["project.Team"].trigger_color,
+    {% with background_color=models["project.Team"].trigger_color,
             border_color=models["project.Team"].hex_trigger_color,
             attr = "teams", 
             title = "Teams" %}
         {% include "alpine_fragments/edit_fk.html" %}
     {%endwith%}
 </div>
+{%endwith%}
+

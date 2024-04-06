@@ -1,18 +1,44 @@
 {%with store_name="task", fields=models["project.Task"].form_fields_map%}
-<div class="col-4 border" 
+<div class="col-4 border pe-0" 
      x-data='task(
     {{dumps(task)}}, 
     "{{url("core:rest", kwargs={"pk" : task.id, "m" : "project.Task"})}}",
     "{{url("core:text_ac", kwargs={"pk" : task.id,"attr" : "__replace__", "m" : "project.Task"})}}",
     )'>
-        <button type="button" 
-                class="btn btn-link pb-1 ps-0"    
-                x-html="model.name">
-        </button>
+    <div class="d-flex justify-content-end">
+        <div class="">
+            <button class="btn btn-light dropdown-toggle" 
+                     type="button" 
+                     id="dropdownMenuButton{{task.id}}" 
+                     data-bs-toggle="dropdown" 
+                     aria-expanded="false">
+            ⋮
+            </button>
+            <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton{{task.id}}">
+                <li class="dropdown-item">
+                    {%with params=add_encode_parameter("f",{ "trigger" : make_signal_from_model("project.Task")}),
+                           _url =  url("core:rest", kwargs={"pk" : task.id, "m" : "project.Task"})
+                    %}
+                    <button class="btn btn-link"
+                            hx-delete="{{_url}}?{{params}}"
+                            hx-swap="none"> 
+                        Delete</button>
+
+                    {%endwith%}
+                </li>
+            </ul>
+        </div>
+    </div>
+    {%with attr = "name", title = "Name" %}
+        {% include "alpine_fragments/edit_attr.html"  %}
+    {%endwith%}
     {%with attr = "text", title = "Notes" %}
         {% include "alpine_fragments/edit_attr.html"  %}
     {%endwith%}
     {%with attr = "start_date", title = "Start Date" %}
+        {% include "alpine_fragments/edit_attr.html"  %}
+    {%endwith%}
+    {%with attr = "target_date", title = "Target Date" %}
         {% include "alpine_fragments/edit_attr.html"  %}
     {%endwith%}
     {% with store_name="task", 

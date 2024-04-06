@@ -12,19 +12,21 @@
 </div>
 
 
-<div id="project_content" hx-trigger="refresh-projectProject from:body">
-    <div hx-trigger="load, refreshProjectProject from:body" 
+<div id="project_content" >
+    <div hx-trigger="load" 
+         hx-swap="outerHTML"
          hx-get="{{url("core:rest", kwargs={"m":"project.Project"})}}">
     </div>
-    <script>
-        {# have to include the project store JS before the alpine compnent can be loaded #}
-        {%with model=Project%}
-            {% include "alpine_fragments/model_data_store.js"  %}
-        {%endwith%}
-    
-    </script>
 </div>
 
 
 {%endblock%}
+
+<script>
+    {% block scripts%}
+    document.addEventListener('alpine:init', () => {
+        setup_rest_model_store("project",{{dumps(Project.form_fields_map)|safe}});
+    });
+    {%endblock%}
+</script>
 
