@@ -1,4 +1,53 @@
-{%with store_name="project", fields=models["project.Project"].form_fields_map%}
+
+<div id="project{{project.id}}">
+</div>
+
+<script>
+(()=>{
+    const observable_data = mobx.makeAutoObservable(
+      {{dumps(project)|safe}}
+    );
+    const add_title_links  = false; //{{'true' if add_title_links else 'false'}};
+    const root = d3.select("#project{{project.id}}")
+        .selectAll("div")
+        .data([observable_data])
+        .join("div")
+        .classed("col-4 border pe-0" ,true)
+        .call(function(selection){
+            if (add_title_links){
+                selection
+                    .append("button")
+                    .classed("btn btn-link pb-1 ps-0",true)
+                    .attrs({
+                        "hx-push-url":"true",
+                        "hx-swap":"outerHTML",
+                        "hx-get" : "{{url('core:rest', kwargs={'pk' :project.id, 'm' : 'project.Project'})}}",
+                    })
+                    .setup_htmx()
+                    .html(d=>d.name)
+                    .select_parent()
+                    .append("div")
+                    .classed("text-dark text-opacity-75 lh-1 mb-2",true)
+                    .styles({
+                        "font-size" : "0.8em",
+                    })
+                    .html(d=>d.text)
+            } else {
+                append_edit_attr(selection, observable_data, attr="name", title="Name");
+                append_edit_attr(selection, observable_data, attr="text",title="Description");
+            }
+        })
+        .call(function(selection){
+            append_edit_fk(selection, observable_data,attr="streams", title="Streams");
+            append_edit_fk(selection, observable_data,attr="point_of_contact", title="Contact");
+            append_edit_fk(selection, observable_data,attr="tags", title="Tags");
+            append_edit_fk(selection, observable_data,attr="teams", title="Teams");
+        })
+
+})()
+</script>
+
+{#
 <div class="col-4 border" 
      x-data='project(
     {{dumps(project)|safe}}, 
@@ -11,7 +60,7 @@
                 x-html="model.name"
                 hx-push-url="true"
                 hx-swap="outerHTML"
-                hx-get="{{url('core:make_data_store', kwargs={'pk' :project.id, 'm' : 'project.Project'})}}">
+                hx-get="{{url('core:rss', kwargs={'pk' :project.id, 'm' : 'project.Project'})}}">
         </button>
         <div class="text-dark text-opacity-75 lh-1 mb-2 " 
              style="font-size: 0.8em;"
@@ -52,5 +101,5 @@
         {% include "alpine_fragments/edit_fk.html" %}
     {%endwith%}
 </div>
-{%endwith%}
+#}
 

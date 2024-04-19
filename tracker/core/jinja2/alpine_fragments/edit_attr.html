@@ -5,7 +5,6 @@
    title: the title to display to the user
    fields : dictionary of the fields
 #}
-{%with _id=random_id() %}
 <div class="mb-1" >  
     {#  display mode #}
     <div  x-show="!($store.{{store_name}}.active_edit == model.id +'{{attr}}')" >
@@ -133,4 +132,3 @@
             {%endif%}
     </div>
 </div>
-{% endwith %}

@@ -33,7 +33,7 @@ from django_lifecycle import (
     hook,
 )
 
-from . import producers
+from . import producers 
 
 
 class EXCompetency(AutoCompleteREST, trigger="`", hex_color="2c6e49"):
@@ -164,7 +164,7 @@ class Stream(AutoCompleteREST, trigger="~", hex_color="036666"):
 
 
 class Task(RESTModel, AutoCompleteNexus):
-    rest_spec = producers.task_rest_spec
+    rest_spec = producers.task_rest_spec 
 
     form_fields = [
         "stream",
@@ -264,10 +264,16 @@ class Task(RESTModel, AutoCompleteNexus):
 
 
 class ProjectTeam(RESTModel):
+
     @classmethod
     def belongs_to_user(cls, request):
         filters = cls.get_filters(request)
         return cls.objects.filter(project__users=request.user).filter(filters)
+
+    form_fields = [
+        "project",
+        "team",
+    ]
 
     users = None
     project = ForeignKey("Project", on_delete=CASCADE)

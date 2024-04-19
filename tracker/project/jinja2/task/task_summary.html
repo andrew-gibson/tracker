@@ -1,4 +1,26 @@
-{%with store_name="task", fields=models["project.Task"].form_fields_map%}
+{%with fields=models["project.Task"].form_fields_map%}
+
+<div class="col-4 border pe-0" id="projcet{}">
+
+
+</div>
+<script>
+
+   d3.select("#main-content")
+     .append("div")
+     .classed("row")
+     .append("div")
+     .classed("col-8")
+     .append("button")
+     .classed("btn btn-link")
+     .on("click", ()=> {
+
+     })
+
+
+</script>
+
+<!--
 <div class="col-4 border pe-0" 
      x-data='task(
     {{dumps(task)}}, 
@@ -65,5 +87,6 @@
     {%endwith%}
 
 </div>
+-->
 {%endwith%}
 

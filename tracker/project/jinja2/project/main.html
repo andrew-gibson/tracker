@@ -22,11 +22,4 @@
 
 {%endblock%}
 
-<script>
-    {% block scripts%}
-    document.addEventListener('alpine:init', () => {
-        setup_rest_model_store("project",{{dumps(Project.form_fields_map)|safe}});
-    });
-    {%endblock%}
-</script>
 

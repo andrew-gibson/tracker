@@ -6,6 +6,7 @@ from django.db.models import Field, ManyToManyField, Model, Q
 from django.forms import ModelForm, modelform_factory
 from django.http import JsonResponse, Http404, QueryDict
 from django_lifecycle import LifecycleModelMixin
+from django.urls import reverse
 from django_readers import specs
 from django.shortcuts import get_object_or_404
 from .utils import classproperty, render, flatten, get_related_model_or_404
@@ -37,6 +38,21 @@ class RESTModel(LifecycleModelMixin, Model):
 
 
     @classproperty
+    def model_info(cls):
+        return  {
+        "fields" : cls.fields_map,
+        "autocomplete" : reverse("core:text_ac",kwargs={"m" : cls._meta.label}),
+        "rest" : reverse("core:rest",kwargs={"m" : cls._meta.label}),
+        "rest_pk" : reverse("core:rest",kwargs={"m" : cls._meta.label, "pk" : 9999}).replace("9999","__pk__"),
+        "rbga" : getattr(cls,"trigger_color", "rgba(21,21,21,0.3))"),
+        "hex" : getattr(cls, "trigger_color", "#1a1a1a"), 
+    }
+
+    @classproperty
+    def fields_map(cls):
+        return {x.name : x.__class__.__name__  for x in cls._meta.get_fields()}
+
+    @classproperty
     def readers(cls):
         return specs.process(cls.rest_spec)
 
@@ -53,24 +69,10 @@ class RESTModel(LifecycleModelMixin, Model):
 
     @classproperty
     def _name(cls):
-        return f"{cls.__name__.lower()}"
+        return cls.__name__.lower()
 
     _Form = RequestForm
 
-    @classproperty
-    def form_fields_map(cls):
-        if hasattr(cls,"form_fields"):
-            f = cls.form_fields
-        elif hasattr(cls,"_Form"):
-            f = cls._Form._meta.fields
-        else:
-            return {}
-
-        return {x : cls._meta.get_field(x).__class__.__name__  for x in f}
-
-    @classproperty
-    def rest_models(cls):
-        return {k._meta.label: k for k in apps.get_models() if issubclass(k, RESTModel)}
 
     @classmethod
     def form(cls, request):
@@ -87,7 +89,7 @@ class RESTModel(LifecycleModelMixin, Model):
     @classmethod
     def POST(cls, request):
         form = cls.form(request)(request.POST)
-        context = {"form": form, "models": cls.rest_models}
+        context = {"form": form}
         preoare_qs, projection = cls.readers
         if form.is_valid():
             inst = form.save()
@@ -113,7 +115,7 @@ class RESTModel(LifecycleModelMixin, Model):
         inst, inst_dict = cls.get_projection_by_pk(request, pk)
         put = QueryDict(request.body)
         form = cls.form(request)(put, instance=inst)
-        context = {"form": form, "models": cls.rest_models}
+        context = {"form": form}
         if form.is_valid():
             form.save()
             obj, context["inst"] = cls.get_projection_by_pk(request, pk)
@@ -144,7 +146,6 @@ class RESTModel(LifecycleModelMixin, Model):
                 {
                     "inst": inst_dict,
                     "form": form,
-                    "models": cls.rest_models,
                     "standalone": not request.htmx,
                 },
             )
@@ -157,7 +158,6 @@ class RESTModel(LifecycleModelMixin, Model):
                 f"{cls._name}/{cls._name}s.html",
                 {
                     "insts": insts,
-                    "models": cls.rest_models,
                     "standalone": not request.htmx,
                 },
             )
@@ -169,9 +169,7 @@ class RESTModel(LifecycleModelMixin, Model):
         return render(
             request,
             f"{cls._name}/{cls._name}s.html",
-            {
-                "models": cls.rest_models,
-            },
+            {},
         )
 
     @classmethod

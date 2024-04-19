@@ -3,9 +3,11 @@ import json
 import random
 import string
 import base64
+
 from urllib import parse
 
 from crispy_forms.utils import render_crispy_form
+from django.apps import apps
 from django.http import QueryDict
 from django.template.backends.jinja2 import Jinja2
 from django.templatetags.static import static
@@ -87,10 +89,14 @@ def dumps(obj):
             default=default
             ))
 
+def all_model_info():
+    return SafeString(dumps({ m._meta.label : m.model_info for m in apps.get_models() if hasattr(m,"model_info") }))
+
 def environment(**options):
     env = Environment(**options)
     env.globals.update(
         {
+            "models" : all_model_info,
             "static": static,
             "url": reverse,
             "random_id": random_id,

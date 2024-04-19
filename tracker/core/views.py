@@ -67,7 +67,7 @@ def _logout(request):
     return render(request, "login.html", {})
 
 
-@api.get_post_delete_put(["m/<str:m>/", "m/<str:m>/<int:pk>/"])
+@api.get_post_delete_put(["m/<str:m>/", "m/<str:m>/<int:pk>/",])
 def rest(request, m="", pk=None):
     session, set_session = api.get_url_session(request)
     model = get_model_or_404(m)
@@ -88,15 +88,6 @@ def rest(request, m="", pk=None):
             return api.add_header(model.DELETE(request, pk), *event)
         case _:
             return HttpResponseBadRequest()
-
-
-@api.get(["make_data_store/<str:m>/", "make_data_store/<str:m>/<int:pk>/"])
-def make_data_store(request, m="", pk=None):
-    return render(
-        request,
-        "alpine_fragments/model_data_store.js",
-        {"model": get_model_or_404(m), "m": m, "pk": pk},
-    )
 
 
 @api.post_get("create_from_parsed/<str:m>/<str:attr>/")
@@ -190,7 +181,10 @@ async def post_and_link(request, m1, pk1, m2, attr=""):
         return HttpResponseBadRequest()
 
 
-@api.GET(["text_ac/<str:m>/<int:pk>/<str:attr>/"])
+@api.GET([
+    "text_ac/<str:m>/<int:pk>/<str:attr>/",
+    "text_ac/<str:m>/__id__/__attr__/"
+])
 def text_ac(request, m, pk, attr):
     try:
         filters = json.loads(request.GET.get("filters", "{}"))

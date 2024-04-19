@@ -1,6 +1,5 @@
 {#
  expects to be passed in:
-   store_name : the principle model name
    attr: of the related model 
    title: the title to display to the user
    border_color: the color of the choice buttons border
@@ -9,7 +8,7 @@
 
 <div x-cloak  class="mb-1" >  
     {#  display mode #}
-    <div  x-show="!($store.{{store_name}}.active_edit == model.id +'{{attr}}')" >
+    <div  id="">
         <div style='overflow-x: scroll, max-width: 100%;font-size: 0.8em'
              class="justify-content-between d-flex align-items-center">
                 <button type="button" class="btn btn-link mb-1" 
@@ -19,20 +18,17 @@
 
             <ul class="list-group list-group-horizontal d-flex align-items-center" 
                 style='overflow-x: scroll; max-width: 80%;scrollbar-width:none'>
-                <template x-for="item in (Array.isArray(model.{{attr}}) ? model.{{attr}} : model.{{attr}} ? [model.{{attr}} ] : [] )">   {# loop over all currently selected items to display them #} 
-                    <li class="list-group-item d-flex p-1 me-1 bg-opacity-10 border-1 w-100 fw-bold"  
-                        style="background-color: {{background_color}};
-                               border-color:{{border_color}};">
-                        <span x-html="item.name"></span>
-                    </li>
-                </template>
+                <li class="list-group-item d-flex p-1 me-1 bg-opacity-10 border-1 w-100 fw-bold"  
+                    style="background-color: {{background_color}};
+                           border-color:{{border_color}};">
+                    <span ></span>
+                </li>
             </ul>
         </div>
     </div>
 
     {# edit mode #}
-    <div x-show="$store.{{store_name}}.active_edit == model.id +'{{attr}}'"
-          style="width: 100%;"
+    <div style="width: 100%;"
           class="border p-2"
           method="post"
           @keyup.escape="cancel_edit_fk_value( '{{attr}}')"> {# cancel out if ESC pressed #}
@@ -58,11 +54,10 @@
                   @click="cancel_edit_fk_value( '{{attr}}')">  {# cancel out if button pressed #}
           </button>
         </div>
-        <div x-show="$store.{{store_name}}.search_results.results.length" 
+        <div class="autocomplete-results" 
              style='overflow-x: scroll; max-width: 100%;padding-bottom: 10px;'>
             <ul class="list-group list-group-horizontal pt-2 " 
                 style="font-size: 0.8em;">
-                <template x-for="result in $store.{{store_name}}.search_results.results">
                 <li class="list-group-item d-flex p-1 me-1 border-0  align-items-stretch" >
                     <span :style="result.selected ? 'border: 1px solid {{border_color}};' : ''" > 
                     <button class="btn p-1"
@@ -73,7 +68,6 @@
                     </button>
                     <span>
                 </li>
-            </template>
             </ul>
         </div>
     </div>

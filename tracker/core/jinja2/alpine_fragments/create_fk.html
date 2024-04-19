@@ -1,6 +1,5 @@
 {#
  expects to be passed in:
-   store_name : the principle model name
    attr: of the related model 
    hx_post:
    hx_vals:
@@ -8,8 +7,8 @@
    border_color: the color of the choice buttons border
    background_color : the color of the choice buttons background
 #}
-<div  x-cloak class="mb-1">
-    <div  x-show="!($store.{{store_name}}.active_edit == model.id +'{{attr}}')" >
+<div>
+    <div class='editor-normal'  >
         <div style='overflow-x: scroll, max-width: 100%;font-size: 0.8em'
              class="justify-content-between align-items-center d-flex" >
             <button type="button" class="btn btn-link mb-1"    
@@ -29,7 +28,7 @@
         </div>
     </div>
 
-    <div x-show="$store.{{store_name}}.active_edit == model.id +'{{attr}}'"
+    <div  class="editor-insert"
           style="width: 100%;"
           method="post"
           hx-swap="none"
