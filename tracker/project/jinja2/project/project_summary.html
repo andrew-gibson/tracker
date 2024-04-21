@@ -2,12 +2,13 @@
 <div id="project{{project.id}}">
 </div>
 
-<script>
+<script type="module">
+import  {append_edit_fk, append_edit_attr,dispose_functions } from "d3-ui";
 (()=>{
     const observable_data = mobx.makeAutoObservable(
       {{dumps(project)|safe}}
     );
-    const add_title_links  = false; //{{'true' if add_title_links else 'false'}};
+    const add_title_links  = {{'true' if add_title_links else 'false'}};
     const root = d3.select("#project{{project.id}}")
         .selectAll("div")
         .data([observable_data])
@@ -19,8 +20,9 @@
                     .append("button")
                     .classed("btn btn-link pb-1 ps-0",true)
                     .attrs({
-                        "hx-push-url":"true",
+                        "hx-replace-url":"true",
                         "hx-swap":"outerHTML",
+                        "hx-target" : "#main-content",
                         "hx-get" : "{{url('core:rest', kwargs={'pk' :project.id, 'm' : 'project.Project'})}}",
                     })
                     .setup_htmx()
@@ -33,73 +35,17 @@
                     })
                     .html(d=>d.text)
             } else {
-                append_edit_attr(selection, observable_data, attr="name", title="Name");
-                append_edit_attr(selection, observable_data, attr="text",title="Description");
+                append_edit_attr(selection, observable_data, "name", "Name");
+                append_edit_attr(selection, observable_data, "text","Description");
             }
         })
         .call(function(selection){
-            append_edit_fk(selection, observable_data,attr="streams", title="Streams");
-            append_edit_fk(selection, observable_data,attr="point_of_contact", title="Contact");
-            append_edit_fk(selection, observable_data,attr="tags", title="Tags");
-            append_edit_fk(selection, observable_data,attr="teams", title="Teams");
+            append_edit_fk(selection, observable_data,"streams", "Streams");
+            append_edit_fk(selection, observable_data,"point_of_contact", "Contact");
+            append_edit_fk(selection, observable_data,"tags", "Tags");
+            append_edit_fk(selection, observable_data,"teams", "Teams");
         })
 
 })()
 </script>
-
-{#
-<div class="col-4 border" 
-     x-data='project(
-    {{dumps(project)|safe}}, 
-    "{{url("core:rest", kwargs={"pk" :project.id, "m" : "project.Project"})}}",
-    "{{url("core:text_ac", kwargs={"pk" :project.id,"attr" : "__replace__", "m" : "project.Project"})}}",
-    )'>
-    {% if add_title_links %}
-        <button type="button" 
-                class="btn btn-link pb-1 ps-0"    
-                x-html="model.name"
-                hx-push-url="true"
-                hx-swap="outerHTML"
-                hx-get="{{url('core:rss', kwargs={'pk' :project.id, 'm' : 'project.Project'})}}">
-        </button>
-        <div class="text-dark text-opacity-75 lh-1 mb-2 " 
-             style="font-size: 0.8em;"
-             x-html="model.text">
-        </div>
-    {% else %}
-        {%with attr = "name", title = "Name" %}
-            {% include "alpine_fragments/edit_attr.html"  %}
-        {%endwith%}
-        {%with attr = "text", title = "Text" %}
-            {% include "alpine_fragments/edit_attr.html"  %}
-        {%endwith%}
-    {% endif  %}
-    {% with background_color="rgba(163,206,241,0.3)",
-            border_color="#a3cef1",
-            hx_post = url("core:rest", kwargs={"m" : "project.Stream" }),
-            hx_vals ={"project" :  project.id },
-            attr = "streams", 
-            title = "Streams" %}
-        {% include "alpine_fragments/create_fk.html"  %}
-    {%endwith%}
-    {% with background_color=models["project.Contact"].trigger_color,
-            border_color=models["project.Contact"].hex_trigger_color,
-            attr = "point_of_contact", 
-            title = "Contact" %}
-        {% include "alpine_fragments/edit_fk.html"  %}
-    {%endwith%}
-    {% with background_color=models["project.Tag"].trigger_color,
-            border_color=models["project.Tag"].hex_trigger_color,
-            attr = "tags", 
-            title = "Tag" %}
-        {% include "alpine_fragments/edit_fk.html"  %}
-    {%endwith%}
-    {% with background_color=models["project.Team"].trigger_color,
-            border_color=models["project.Team"].hex_trigger_color,
-            attr = "teams", 
-            title = "Teams" %}
-        {% include "alpine_fragments/edit_fk.html" %}
-    {%endwith%}
-</div>
-#}
 

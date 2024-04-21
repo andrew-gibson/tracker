@@ -1,25 +1,33 @@
-{%with fields=models["project.Task"].form_fields_map%}
-
-<div class="col-4 border pe-0" id="projcet{}">
-
-
+<div id="task{{task.id}}">
 </div>
-<script>
+<script type="module">
 
-   d3.select("#main-content")
-     .append("div")
-     .classed("row")
-     .append("div")
-     .classed("col-8")
-     .append("button")
-     .classed("btn btn-link")
-     .on("click", ()=> {
+import  {append_edit_fk, append_edit_attr } from "d3-ui";
+(()=>{
+    const observable_data = mobx.makeAutoObservable(
+        {{dumps(task)|safe}}
+    );
+    d3.select("#task{{task.id}}")
+        .append("div")
+        .data([observable_data])
+        .join("div")
+        .classed("col-4 border pe-0" ,true)
+        .call(function(selection){
+            append_edit_attr(selection, observable_data, "name", "Name");
+            append_edit_attr(selection, observable_data, "text","Notes");
+            append_edit_attr(selection, observable_data, "start_date", "Start Date");
+            append_edit_attr(selection, observable_data, "target_date","Target Date");
+            append_edit_fk(selection, observable_data,"lead", "Contact");
+            append_edit_fk(selection, observable_data,"teams", "Teams");
+            append_edit_fk(selection, observable_data,"competency", "Competency");
+            append_edit_attr(selection, observable_data,"done", "Done");
+        })
 
-     })
 
-
+})()
 </script>
 
+{#
 <!--
 <div class="col-4 border pe-0" 
      x-data='task(
@@ -88,5 +96,4 @@
 
 </div>
 -->
-{%endwith%}
-
+#}

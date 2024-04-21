@@ -12,6 +12,7 @@ from .utils import (
     unlink_or_404,
     refetch,
 )
+from django.apps import apps
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.db.models import Q
@@ -88,6 +89,12 @@ def rest(request, m="", pk=None):
             return api.add_header(model.DELETE(request, pk), *event)
         case _:
             return HttpResponseBadRequest()
+
+@api.get("model_info/")
+def model_info(request):
+    return JsonResponse(
+            { m._meta.label : m.model_info for m in apps.get_models() if hasattr(m,"model_info") }
+            )
 
 
 @api.post_get("create_from_parsed/<str:m>/<str:attr>/")
@@ -183,7 +190,7 @@ async def post_and_link(request, m1, pk1, m2, attr=""):
 
 @api.GET([
     "text_ac/<str:m>/<int:pk>/<str:attr>/",
-    "text_ac/<str:m>/__id__/__attr__/"
+    "text_ac/<str:m>/__pk__/__attr__/"
 ])
 def text_ac(request, m, pk, attr):
     try:

@@ -2,35 +2,40 @@
 
 {% block content %}
 
-<div id="smart_input" hx-swap-oob="true" >
+
+
+
+
+
+<div id="main-content" >
+    {%with add_title_links=False,project=inst  %}
+       {% include "project/project_summary.html"  %}
+
+        {% with insts=project.streams %}
+           {% include "stream/streams.html"  %}
+        {%endwith %}
+    {% endwith  %}
 
 </div>
-<script>
-   d3.select("#main-content")
-     .append("div")
-     .classed("row")
-     .append("div")
-     .classed("col-8")
-     .append("button")
-     .classed("btn btn-link")
-     .on("click", ()=> {
-
-     })
-
-
+<script type="module">
+    import  {append_edit_fk, append_edit_attr } from "d3-ui";
 </script>
 
+<script type="module">
+    import { dispose_functions } from "d3-ui";
+    import "d3";
+    const handler = e => {
+       if ("hx-replace-url" in e.target.attributes){
+           dispose_functions();
+           d3.select(document).on("htmx:beforeRequest",null);
+       }
+    }
+    d3.select(document).on("htmx:beforeRequest",handler)
+</script>
 
-
-<div id="main-content" hx-swap-oob="true">
-    </div>
-    {% with insts=project.streams %}
-       {% include "stream/streams.html"  %}
-    {%endwith %}
-    {%endwith%}
 {%endblock%}
 
-<!--
+{#
     {% with project=inst %}
 
     <div class="row">
@@ -68,10 +73,10 @@
                                   style="opacity: 0.3;"
                                   aria-label="Close" 
                                   x-show="show"
-                                  @click="show=false;">  {# cancel out if button pressed #}
+                                  @click="show=false;">  
                         </button>
                     </div>
                 {%endwith%}
             </div>
         </div>
--->
+#}

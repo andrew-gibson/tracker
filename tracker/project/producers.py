@@ -3,7 +3,7 @@ from django_readers import qs, pairs, projectors, producers, specs
 
 __type__ = {"__type__" : (qs.noop, producers.attrgetter("_meta.label"))}
 
-basic_rest_spec = ["name", "id", ]
+basic_rest_spec = ["name", "id", __type__,]
 
 task_rest_spec = [
     __type__,

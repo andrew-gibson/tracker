@@ -7,8 +7,11 @@ __pycache__/
 *.so
 
 # Distribution / packaging
-*bootstrap*
-tracker/static/*
+tracker/static/admin/*
+tracker/static/bootstrap*/*
+tracker/static/debug_toolbar/*
+tracker/static/debug_extensions/*
+
 .Python
 build/
 develop-eggs/

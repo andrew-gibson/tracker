@@ -41,7 +41,7 @@ class RESTModel(LifecycleModelMixin, Model):
     def model_info(cls):
         return  {
         "fields" : cls.fields_map,
-        "autocomplete" : reverse("core:text_ac",kwargs={"m" : cls._meta.label}),
+        "search_relation" : reverse("core:text_ac",kwargs={"m" : cls._meta.label}),
         "rest" : reverse("core:rest",kwargs={"m" : cls._meta.label}),
         "rest_pk" : reverse("core:rest",kwargs={"m" : cls._meta.label, "pk" : 9999}).replace("9999","__pk__"),
         "rbga" : getattr(cls,"trigger_color", "rgba(21,21,21,0.3))"),
@@ -438,7 +438,7 @@ class AutoCompleteREST(RESTModel):
         ):
             # not ending in space -- always create fake new one unless it
             # duplicates i.e. cursor was right at the end of the word
-            new_el = {"name": query, "id": -1, "new": True, f: query}
+            new_el = {"name": query, "id": -1, "new": True, f: query, "__type__" : cls._meta.label}
 
             if optional_projection:
                 new_el = optional_projection(new_el)

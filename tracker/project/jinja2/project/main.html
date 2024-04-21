@@ -2,24 +2,36 @@
 
 {% block content%}
 
-<div id="smart_input" x-data>
-    <p style="font-size: 0.8em" class="text-secondary mb-0">
-        {{Project.describe_links()}}
-    </p>
-    <div hx-trigger="load"
-         hx-get="{{url("core:create_from_parsed", kwargs={"attr" :"name", "m" : "project.Project"})}}">
+
+
+<div id="main-content" >
+    <div id="smart_input" x-data>
+        <p style="font-size: 0.8em" class="text-secondary mb-0">
+            {{Project.describe_links()}}
+        </p>
+        <div hx-trigger="load"
+             hx-get="{{url("core:create_from_parsed", kwargs={"attr" :"name", "m" : "project.Project"})}}">
+        </div>
     </div>
-</div>
 
-
-<div id="project_content" >
     <div hx-trigger="load" 
          hx-swap="outerHTML"
          hx-get="{{url("core:rest", kwargs={"m":"project.Project"})}}">
     </div>
+
+    <script type="module">
+        import { dispose_functions } from "d3-ui";
+        import "d3";
+        const handler = e => {
+           if ("hx-replace-url" in e.target.attributes){
+               dispose_functions();
+               d3.select(document).on("htmx:beforeRequest",null);
+           }
+        }
+        d3.select(document).on("htmx:beforeRequest",handler)
+    </script>
 </div>
 
 
+
 {%endblock%}
-
-
