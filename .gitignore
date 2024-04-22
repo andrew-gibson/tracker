@@ -10,7 +10,7 @@ __pycache__/
 tracker/static/admin/*
 tracker/static/bootstrap*/*
 tracker/static/debug_toolbar/*
-tracker/static/debug_extensions/*
+tracker/static/django_extensions/*
 
 .Python
 build/
