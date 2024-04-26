@@ -2,6 +2,21 @@ import fetch_recipies from "fetch-recipies";
 import "d3";
 import 'lo-dash';
 
+const clear_ui_state = ()=>{
+   console.log("clearing atoruns")
+   dispose_functions();
+   ui_state.active_elements = [];
+}
+window.clear_ui_state =  clear_ui_state
+
+const handler = e => {
+   if ("hx-replace-url" in e.target.attributes){
+       clear_state();
+       //d3.select(document).on("htmx:beforeRequest",null);
+   }
+}
+d3.select(document).on("htmx:beforeRequest",handler)
+
 d3.selection.prototype.styles = function(attrs){
     for ( var key in attrs ){
       this.node().style[key]  = attrs[key];
@@ -22,9 +37,10 @@ d3.selection.prototype.select_parent = function(){
    return d3.select(this.node().parentElement);
 }
 
-const ui_state = mobx.makeAutoObservable({
+export const ui_state = mobx.makeAutoObservable({
     active : null,
     search_results : [],
+    active_elements : [],
     models: await (await fetch_recipies.GET("/core/model_info/")).json(),
     active_model_info (){
        return this.models[this.active.d.__type__];
@@ -90,7 +106,7 @@ export const dispose_functions = ()=>{
     _.each(_dispose_functions, f=>f());
 };
 
-const autoRun = (func)=>{
+export const autoRun = (func)=>{
     _dispose_functions.push(
       mobx.autorun(func)
     );
@@ -225,7 +241,7 @@ export const append_edit_attr = function(selection,observable_data, attr="",titl
 
     const sel = selection
         .append("div")
-        .classed("mb-1", true)
+        .classed(`mb-1 ${attr}-row`, true)
 
     const insert_mode = sel
         .append("div")
@@ -398,7 +414,7 @@ export const append_edit_fk = function(selection,observable_data, attr="",title=
     const ids = ui_state.ids({attr,d})
     const sel = selection
         .append("div")
-        .classed("mb-1", true)
+        .classed(`mb-1 ${attr}-row`, true)
 
     const insert_mode = sel
         .append("div")

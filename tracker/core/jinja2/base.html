@@ -21,7 +21,8 @@
           "d3-ui": "{{ static('d3-ui.js') }}",
           "base": "{{ static('base.js') }}",
           "d3" : "{{static('d3.min.js')}}",
-          "lo-dash"  : "{{ static('lodash.full.min.js') }}"
+          "lo-dash"  : "{{ static('lodash.full.min.js') }}",
+          "project_summary"  : "{{ static('project_summary.js') }}"
         }
       }
     </script>
@@ -40,7 +41,7 @@
       <a href="{{ url("core:_logout")}}" class="btn link-light btn-link">{{ _("logout") }}</a>
     </div>
   </nav>
-  <main class="container-fluid" hx-history-elt id="main-content">
+  <main class="container-fluid">
       <!--<div hx-ext="ws" ws-connect="/ws/rss/" > -->
 
     <div id="modal-container" ></div>

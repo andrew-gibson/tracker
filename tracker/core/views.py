@@ -126,7 +126,7 @@ def create_from_parsed(request, m, attr, suppress_links=""):
 def parse_for_links(request, m, attr):
     model = get_model_or_404(m, test=lambda m: issubclass(m, AutoCompleteNexus))
     return render(
-        request, f"show_parsed_links.html", {"attr": attr, **model.parse_text(request)}
+            request, f"show_parsed_links.html", {"attr": attr,"m" : m.replace(".","-"), **model.parse_text(request)}
     )
 
 

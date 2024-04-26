@@ -44,8 +44,8 @@ class RESTModel(LifecycleModelMixin, Model):
         "search_relation" : reverse("core:text_ac",kwargs={"m" : cls._meta.label}),
         "rest" : reverse("core:rest",kwargs={"m" : cls._meta.label}),
         "rest_pk" : reverse("core:rest",kwargs={"m" : cls._meta.label, "pk" : 9999}).replace("9999","__pk__"),
-        "rbga" : getattr(cls,"trigger_color", "rgba(21,21,21,0.3))"),
-        "hex" : getattr(cls, "trigger_color", "#1a1a1a"), 
+        "rgba" : getattr(cls,"trigger_color", "rgba(21,21,21,0.3))"),
+        "hex" : getattr(cls, "hex_trigger_color", "#1a1a1a"), 
     }
 
     @classproperty
@@ -95,7 +95,7 @@ class RESTModel(LifecycleModelMixin, Model):
             inst = form.save()
             context["inst"] = projection(inst)
             # by default associate objects with their creator
-            inst.add_user(request.user)
+            inst.add_user(request)
             if request.json:
                 return JsonResponse(context["inst"])
         else:
@@ -193,9 +193,9 @@ class RESTModel(LifecycleModelMixin, Model):
         qs = cls.objects.filter(users=request.user).filter(filters)
         return cls.filter(qs, request)
 
-    def add_user(self, user):
+    def add_user(self, request):
         if getattr(self, "users", False):
-            inst.users.add(request.user)
+            self.users.add(request.user)
 
     def get_absolute_url(self):
         return reverse(
@@ -262,6 +262,8 @@ class AutoCompleteNexus:
             f.name: {
                 "trigger": f.related_model.text_search_trigger,
                 "model": f.related_model,
+                "model_info" : f.related_model.model_info,
+                "verbose" : getattr(f.related_model._meta, "verbose_name_plural" if f.many_to_many else "verbose_name").title(),
                 "name": f.name,
                 "many_to_many": f.many_to_many,
                 "search_terms": cls.find_words_from_trigger(
@@ -283,9 +285,9 @@ class AutoCompleteNexus:
         )  # default is nothing happens, but classes can add extra scanning, for example: dates
 
         for name in results:
+            trigger =  results[name]["trigger"]
             for parsed in results[name]["search_terms"]:
-                remainder = remainder.replace(parsed, "")
-            remainder = remainder.replace(results[name]["trigger"], "")
+                remainder = remainder.replace(trigger+parsed, "")
 
         return {
             "results": results,
@@ -307,7 +309,7 @@ class AutoCompleteNexus:
             setattr(obj, instructions["attr"], atachee)
 
         obj.save()
-        obj.add_user(request.user)
+        obj.add_user(request)
 
         for rel_name in results:
             x = results[rel_name]
@@ -347,14 +349,13 @@ class AutoCompleteNexus:
                         )
                         for new_one in new_ones
                     ]
-                    [x.add_user(request.user) for x in new_objs]
+                    [x.add_user(request) for x in new_objs]
 
                     existing_objs = (
                         x["model"].belongs_to_user(request).filter(id__in=existing_ids)
                     )
 
                     if x["many_to_many"]:
-                        for results in x["results"]:
                             getattr(obj, rel_name).add(*new_objs)
                             getattr(obj, rel_name).add(*existing_objs)
                     else:

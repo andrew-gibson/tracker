@@ -8,12 +8,13 @@
              autocomplete="off" 
              id="{{model._meta.model_name}}{{attr}}"
              hx-trigger="keyup changed delay:0.5s"
-             hx-target="#{{model._meta.model_name}}{{attr}}parsed"
+             hx-target="#{{m.replace(".","-")}}-{{attr}}-results"
              {% with url = url("core:parse_for_links", kwargs={"attr" : attr, "m" : m})%}
              hx-get="{{url}}?{{params}}"
+             hx-swap="outerHTML"
              {% endwith %}
              />
-      <div id="{{model._meta.model_name}}{{attr}}parsed">
+      <div id="{{m.replace(".","-")}}-{{attr}}-results">
       </div>
 </form>
 

@@ -2,12 +2,8 @@
 
 {% block content %}
 
-
-
-
-
-
 <div id="main-content" >
+    <button id="back">￩</button>
     {%with add_title_links=False,project=inst  %}
        {% include "project/project_summary.html"  %}
 
@@ -17,66 +13,25 @@
     {% endwith  %}
 
 </div>
-<script type="module">
-    import  {append_edit_fk, append_edit_attr } from "d3-ui";
-</script>
+
 
 <script type="module">
-    import { dispose_functions } from "d3-ui";
-    import "d3";
-    const handler = e => {
-       if ("hx-replace-url" in e.target.attributes){
-           dispose_functions();
-           d3.select(document).on("htmx:beforeRequest",null);
-       }
-    }
-    d3.select(document).on("htmx:beforeRequest",handler)
+import { dispose_functions,ui_state } from "d3-ui";
+import {project_summary} from "project_summary";
+import "d3";
+
+d3.select("#main-content #back")
+    .classed("btn btn-link",true)
+    .attrs({
+        "hx-replace-url":"true",
+        "hx-swap":"outerHTML",
+        "hx-target" : "#main-content",
+        "hx-get" : "{{url('project:main')}}",
+    })
+    .setup_htmx();
+
+project_summary( {{dumps(inst)|safe}}, "true");
+
 </script>
 
 {%endblock%}
-
-{#
-    {% with project=inst %}
-
-    <div class="row">
-            {%with add_title_links=False  %}
-               {% include "project/project_summary.html"  %}
-            {%endwith%}
-        <div class="col-8" 
-             x-data="{show : false}">
-            <button class="btn btn-link" 
-                    x-show="!show"
-                    @click="show=true;
-                            $nextTick(()=>htmx.find('#taskname').focus());
-                            htmx.find('#taskname').value='';
-                            htmx.find('#tasknameparsed').innerHTML='';">
-               + Add Task
-            </button>
-            <div x-show="show" x-data>
-                {%with params=add_encode_parameter("f",{"ac_filters" :  { "stream" : { "project_id" :inst.id }},
-                                                   "attach_to": {"attr" : "project", "pk" : inst.id},
-                                                   "trigger" : make_signal_from_model("project.Task"),
-                                                   "exclude" :  ["project"]}),
-                       _url =  url("core:create_from_parsed", kwargs={"attr" :"name", "m" : "project.Task"})
-                %}
-                    <p style="font-size: 0.8em" class="text-secondary mb-0">
-                        {{models["project.Task"].describe_links(excludes="project")}}
-                    </p>
-                    <div class='d-flex align-items-center'>
-                        <div hx-trigger="load"
-                             style="width: 90%;"
-                             @keyup.esc="show=false"
-                             hx-get="{{_url}}?{{params}}">
-                        </div>
-                        <button type="button" 
-                                  class="btn-close ms-2  p-2" 
-                                  style="opacity: 0.3;"
-                                  aria-label="Close" 
-                                  x-show="show"
-                                  @click="show=false;">  
-                        </button>
-                    </div>
-                {%endwith%}
-            </div>
-        </div>
-#}

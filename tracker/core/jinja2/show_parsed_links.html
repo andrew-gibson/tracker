@@ -1,48 +1,74 @@
-<div>
-{%if anything_removed %}
+<div id="{{m}}-{{attr}}-results">
 
-    <div class='d-flex pt-2 bg-secondary bg-opacity-10 justify-content-between'
-         style='font-size: 0.8em'>
-        <span class="m-1 pe-2 align-self-center  text-secondary" >
-            {{attr.title()}}
-        </span>
-        <ul class="list-group list-group-horizontal" >
-            <li class="list-group-item d-flex p-1 me-1 bg-opacity-10 border-1 w-100 fw-bold"  
-                tabindex="0" >
-                {{ remainder }}
-            </li>
-        </ul>
-    </div>
+    <script type="module">
+    import  {append_edit_fk, append_edit_attr,dispose_functions } from "d3-ui";
+    (()=>{
+        const data =_.chain({{dumps(results)|safe}})
+                   .values()
+                   .filter(x=>x.results.length >0)
+                   .map(x=>{
+                        const color = x.model_info.rgba;
+                        const border = x.model_info.hex;
+                        return {
+                          verbose : x.verbose,
+                          results : _.map(_.flatten(_.map(x.results,xx=>xx[1])), xx=> ({color,border,...xx}))
+                        }
+                   })
+                   .value()
+        const remainder =  "{{ remainder }}";
+        const selection = d3.select("#{{m}}-{{attr}}-results")
+            .classed("pt-2 bg-secondary bg-opacity-10 ",true)
+            .call(selection=>{
+                if (remainder){
+                    selection
+                        .append("div")
+                        .classed("d-flex pt-2 bg-secondary bg-opacity-10 justify-content-between remainder",true)
+                        .style("font-size","0.8em")
+                        .append("span")
+                            .classed("m-1 pe-2 align-self-center  text-secondary",true)
+                            .html("{{attr}} :")
+                        .select_parent()
+                        .append("ul")
+                            .classed("list-group list-group-horizontal",true)
+                            .append("li")
+                                .classed("list-group-item d-flex align-items-center justify-content-between p-1 me-1 bg-opacity-10 border-1 w-100 fw-bold",true)
+                                .html(remainder)
+                }
+            })
+             .selectAll("div.parsed")
+             .data(data)
+             .join("div")
+            .classed("d-flex pt-2 bg-secondary bg-opacity-10 justify-content-between parsed",true)
+            .style("font-size","0.8em")
 
-{%endif%}
+        selection.append("span")
+                .classed("m-1 pe-2 align-self-center  text-secondary",true)
+                .html(d=> d.verbose + ":")
 
-{%for relation in results.values() %}
-    {%if relation.results %}
-    <div x-data='{
-        results : {{ dumps(relation.results) }},
-        name : "{{relation.name.replace("_", " ").title() }}"  ,
-        many_to_many : {{dumps(relation.many_to_many)}} }' 
-         class='d-flex pt-2 bg-secondary bg-opacity-10 justify-content-between {%if loop.last%}pb-2{%endif%}'
-         style='font-size: 0.8em' >
-        <span x-bind:class="'m-1 pe-2 align-self-center  text-secondary ' + (results[0][1].length > 1 && !many_to_many ? 'fbg-danger bg-opacity-25' : '')"
-              x-text="name + ':'" >
-        </span>
-        <div style='overflow-x: scroll; max-width: 100%;'>
-        <ul class="list-group list-group-horizontal" >
-            <template x-for="grouping in results" >
-                <template x-for="match in grouping[1]">
-                    <li class="list-group-item d-flex p-1 me-1 bg-opacity-10 border-1 w-100 fw-bold"  
-                        tabindex="0"
-                        style="background-color: {{relation.model.trigger_color}};
-                               border-color:{{relation.model.hex_trigger_color}};">
-                        <span  x-text="match.name"></span>
-                        <span class="badge bg-success ms-1" x-show="match.new"> New</span> 
-                    </li>
-                </template>
-            </template>
-        </ul>
-        </div>
-    </div>
-    {%endif%}
-{%endfor%}
+        selection.append("ul")
+                .classed("list-group list-group-horizontal",true)
+                .styles({
+                   "overflow-x": "scroll", 
+                    "scrollbar-width":"none",
+                   "max-width": "100%",
+                })
+                .selectAll("li")
+                .data(d=>d.results)
+                .join("li")
+                .classed("list-group-item d-flex align-items-center justify-content-between p-1 me-1 bg-opacity-10 border-1 w-100 fw-bold",true)
+                .style("background-color", d=>d.color)
+                .style("border-color", d=>d.border)
+                .append("span").html(d=>d.name)
+                .select_parent()
+                .each(function(d){
+                    if (d.new){
+                      d3.select(this).append("span").classed("badge bg-success ms-1",true).html("New");
+                    }
+                })
+
+    })();
+    </script>
+
 </div>
+
+

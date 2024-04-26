@@ -33,6 +33,7 @@ def main(request):
             "task_form"  :  Task.form(request)() ,
             "Project" : Project,
             "Task" : Task,
+            "standalone": not request.htmx,
         },
     )
 
