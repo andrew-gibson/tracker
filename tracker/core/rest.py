@@ -4,7 +4,7 @@ import re
 from django.apps import apps
 from django.db.models import Field, ManyToManyField, Model, Q
 from django.forms import ModelForm, modelform_factory
-from django.http import JsonResponse, Http404, QueryDict
+from django.http import JsonResponse, Http404, QueryDict,HttpResponse
 from django_lifecycle import LifecycleModelMixin
 from django.urls import reverse
 from django_readers import specs
@@ -165,12 +165,12 @@ class RESTModel(LifecycleModelMixin, Model):
     @classmethod
     def DELETE(cls, request, pk):
         inst, inst_dict = cls.get_projection_by_pk(request, pk)
-        inst.delete()
-        return render(
-            request,
-            f"{cls._name}/{cls._name}s.html",
-            {},
-        )
+        try:
+            inst.delete()
+            return  HttpResponse("")
+        except:
+            return HttpResponseBadRequest()
+
 
     @classmethod
     def filter(cls, qs, request):
@@ -311,6 +311,7 @@ class AutoCompleteNexus:
         obj.save()
         obj.add_user(request)
 
+
         for rel_name in results:
             x = results[rel_name]
 
@@ -334,7 +335,7 @@ class AutoCompleteNexus:
                     setattr(obj, rel_name, x["results"][0][1][0]["val"])
 
                 else:
-                    flattened_results = list(flatten(y[1] for y in x["results"]))
+                    flattened_results = list(flatten(y[1] for y in x["results"] if y[0]))
                     new_ones = [y for y in flattened_results if "new" in y]
                     existing_ids = [
                         y["id"] for y in flattened_results if "new" not in y
@@ -361,7 +362,7 @@ class AutoCompleteNexus:
                     else:
                         if new_ones:
                             setattr(obj, rel_name, new_ones[0])
-                        else:
+                        if existing_objs:
                             setattr(obj, rel_name, existing_objs[0])
         obj.save()
         return obj

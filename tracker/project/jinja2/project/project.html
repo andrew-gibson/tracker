@@ -7,6 +7,19 @@
     {%with add_title_links=False,project=inst  %}
        {% include "project/project_summary.html"  %}
 
+
+        <div id="smart_input" x-data>
+            <p style="font-size: 0.8em" class="text-secondary mb-0">
+                {{models["project.Task"].describe_links()}}
+            </p>
+            <div hx-on::after-request="event.detail.requestConfig.verb == 'post' ? window.reset_ui('reloadTasks') : false">
+                <div hx-trigger="load"
+                     hx-swap="outerHTML"
+                     hx-get="{{url("core:create_from_parsed", kwargs={"attr" :"name", "m" : "project.Project"})}}">
+                </div>
+            </div>
+        </div>
+
         {% with insts=project.streams %}
            {% include "stream/streams.html"  %}
         {%endwith %}
@@ -17,8 +30,10 @@
 
 <script type="module">
 import { dispose_functions,ui_state } from "d3-ui";
-import {project_summary} from "project_summary";
-import "d3";
+import {project_summary} from "{{ static('project_summary.js') }}";
+import {task_summary} from "{{ static('task_summary.js') }}";
+
+const project = {{dumps(inst)|safe}};
 
 d3.select("#main-content #back")
     .classed("btn btn-link",true)
@@ -30,7 +45,9 @@ d3.select("#main-content #back")
     })
     .setup_htmx();
 
-project_summary( {{dumps(inst)|safe}}, "true");
+
+project_summary({...project} , "true");
+_.each(project.streams, s=> _.each(s.tasks,t => task_summary(t)));
 
 </script>
 

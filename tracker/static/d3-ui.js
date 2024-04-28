@@ -2,41 +2,6 @@ import fetch_recipies from "fetch-recipies";
 import "d3";
 import 'lo-dash';
 
-const clear_ui_state = ()=>{
-   console.log("clearing atoruns")
-   dispose_functions();
-   ui_state.active_elements = [];
-}
-window.clear_ui_state =  clear_ui_state
-
-const handler = e => {
-   if ("hx-replace-url" in e.target.attributes){
-       clear_state();
-       //d3.select(document).on("htmx:beforeRequest",null);
-   }
-}
-d3.select(document).on("htmx:beforeRequest",handler)
-
-d3.selection.prototype.styles = function(attrs){
-    for ( var key in attrs ){
-      this.node().style[key]  = attrs[key];
-    }
-    return this;
-}
-d3.selection.prototype.attrs = function(attrs){
-    for ( var key in attrs ){
-      this.node().setAttribute(key, attrs[key]);
-    }
-    return this;
-}
-d3.selection.prototype.setup_htmx = function(){
-    htmx.process(this.node());
-    return this;
-}
-d3.selection.prototype.select_parent = function(){
-   return d3.select(this.node().parentElement);
-}
-
 export const ui_state = mobx.makeAutoObservable({
     active : null,
     search_results : [],
@@ -72,10 +37,22 @@ export const ui_state = mobx.makeAutoObservable({
     },
     cancel_edit (e){
         this.active = null;
-    }
+    },
+    reset_ui(e) {
+        this.active_elements = [];
+        dispose_functions() ;
+        document.dispatchEvent(new Event(e))
+    },
 });
-        
 
+window.reset_ui =   _.bind(ui_state.reset_ui, ui_state);
+const handler = e => {
+   if ("hx-replace-url" in e.target.attributes){
+       window.reset_ui("HxReplaceURL");
+   }
+}
+d3.select(document).on("htmx:beforeRequest",handler)
+        
 mobx.autorun(()=>{
     d3.selectAll(".editor-insert").classed("d-none",true);
     d3.selectAll(".editor-normal").classed("d-none",false);
@@ -226,6 +203,31 @@ const toggle_fk_attr = async (result,model) => {
     Object.assign(model,data);
 };
 
+d3.selection.prototype.styles = function(attrs){
+    for ( var key in attrs ){
+      this.node().style[key]  = attrs[key];
+    }
+    return this;
+}
+d3.selection.prototype.attrs = function(attrs){
+    for ( var key in attrs ){
+      this.node().setAttribute(key, attrs[key]);
+    }
+    return this;
+}
+d3.selection.prototype.setup_htmx = function(){
+    htmx.process(this.node());
+    return this;
+}
+d3.selection.prototype.select_parent = function(){
+   return d3.select(this.node().parentElement);
+}
+
+d3.selection.prototype.last = function() {
+  const last = this.size() - 1;
+  return d3.select(this.nodes()[last]);
+}
+
 const make_cancel_button = function(selection){
     selection
             .append("button")
@@ -234,6 +236,25 @@ const make_cancel_button = function(selection){
             .on("click", (e)=>ui_state.cancel_edit(e))
     };
 
+export const make_right_dropdown = function(selection, call){
+    selection
+        .append("div")
+            .classed("dropdown d-flex justify-content-end",true)
+            .append("button")
+                .classed("btn btn-light m-1 p-1",true)
+                .attrs({
+                 "type": "button",
+                 "data-bs-toggle" : "dropdown",
+                "aria-expanded"  : "false",
+                })
+                .style("font-size", "0.6em")
+                .html("☰")
+            .select_parent()
+            .append("ul")
+                .classed("dropdown-menu",true)
+                .call(call)
+}
+
 export const append_edit_attr = function(selection,observable_data, attr="",title="" ){
     const d = selection.data()[0]
     const type = ui_state.models[d.__type__].fields[attr]
@@ -241,19 +262,19 @@ export const append_edit_attr = function(selection,observable_data, attr="",titl
 
     const sel = selection
         .append("div")
-        .classed(`mb-1 ${attr}-row`, true)
+        .classed(`mb-1`, true)
 
     const insert_mode = sel
         .append("div")
         .attr("id",ids.insert)
-        .classed("editor-insert d-none",true)
+        .classed(`editor-insert d-none ${attr}-row`,true)
 
     sel
         .append("div")
-        .classed("editor-normal",true)
+        .classed(`editor-normal ${attr}-row`,true)
         .attr("id",ids.normal)
         .append("div")
-        .classed("justify-content-between d-flex align-items-center",true)
+        .classed(`justify-content-between d-flex align-items-center`,true)
         .styles({
             "max-width" : "100%",
             "font-size" : "0.8em",
@@ -414,13 +435,14 @@ export const append_edit_fk = function(selection,observable_data, attr="",title=
     const ids = ui_state.ids({attr,d})
     const sel = selection
         .append("div")
-        .classed(`mb-1 ${attr}-row`, true)
+        .classed(`mb-1 `, true)
 
     const insert_mode = sel
         .append("div")
         .attr("id",ids.insert)
-        .classed("editor-insert d-none border p-2",true)
+        .classed(`editor-insert ${attr}-row d-none border p-2`,true)
         .style("width","100%")
+        .style("background","white")
         .append("div")
         .classed("input-group input-group-sm d-flex align-items-center ",true)
         .append("span")
@@ -468,7 +490,7 @@ export const append_edit_fk = function(selection,observable_data, attr="",title=
                         .join("span")
                         .classed("result-container rounded p-1", true)
                         .style("border", d =>  `2px solid ${d.selected ? ui_state.models[d.__type__].hex : "#fff"}`)
-                        .style("background-color", d=> ui_state.models[d.__type__].rbga)
+                        .style("background-color", d=> ui_state.models[d.__type__].rgba)
                         .selectAll("button")
                         .data(d=>[d])
                         .join("button")
@@ -495,12 +517,10 @@ export const append_edit_fk = function(selection,observable_data, attr="",title=
                 }
             })
         })
-                
-
 
     sel
         .append("div")
-        .classed("editor-normal",true)
+        .classed(`editor-normal ${attr}-row`,true)
         .attr("id",ids.normal)
         .append("div")
         .classed("justify-content-between d-flex align-items-center",true)
@@ -533,7 +553,7 @@ export const append_edit_fk = function(selection,observable_data, attr="",title=
                     .join("li")
                     .classed("list-group-item d-flex p-1 me-1 bg-opacity-10 border-1 w-100 fw-bold",true)
                     .style("background-color",dd=>{
-                        return ui_state.models[dd.__type__].rbga;
+                        return ui_state.models[dd.__type__].rgba;
                     })
                     .style("border-color",dd=>{
                         return ui_state.models[dd.__type__].hex;

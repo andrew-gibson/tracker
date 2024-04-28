@@ -6,7 +6,7 @@
 
 <script type="module">
 import { dispose_functions,ui_state, autoRun } from "d3-ui";
-import {project_summary} from "project_summary";
+import {project_summary} from "{{ static('project_summary.js') }}";
 import "d3";
 const projects =  {{dumps(insts)|safe}};
 
@@ -15,7 +15,7 @@ _.each(projects, p=> project_summary( p, "true"));
 autoRun(async ()=>{
     if (ui_state.active_elements.length == projects.length){
        _.each(["name","text","point_of_contact","streams","tags","teams"],attr=>{
-            const classq =  `.${attr}-row`;
+            const classq =  `.${attr}-row.editor-normal`;
             const max_height =  _.max(_.map(d3.selectAll(classq).nodes(),n=>n.offsetHeight)) + "px";
             d3.selectAll(classq).style("height", max_height);
        })

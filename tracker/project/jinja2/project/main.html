@@ -7,15 +7,7 @@
         <p style="font-size: 0.8em" class="text-secondary mb-0">
             {{Project.describe_links()}}
         </p>
-        <script >
-            const get_new_projects = event=>{
-                if (event.detail.requestConfig.verb  == "post"){
-                    window.clear_ui_state()
-                    document.dispatchEvent(new Event("reloadProjects"))
-                }
-            }
-        </script>
-        <div hx-on::after-request="get_new_projects(event)">
+        <div hx-on::after-request="event.detail.requestConfig.verb == 'post' ? window.reset_ui('reloadProjects') : false">
             <div hx-trigger="load"
                  hx-swap="outerHTML"
                  hx-get="{{url("core:create_from_parsed", kwargs={"attr" :"name", "m" : "project.Project"})}}">

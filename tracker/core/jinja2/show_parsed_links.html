@@ -16,8 +16,10 @@
                    })
                    .value()
         const remainder =  "{{ remainder }}";
-        const selection = d3.select("#{{m}}-{{attr}}-results")
-            .classed("pt-2 bg-secondary bg-opacity-10 ",true)
+        const root = d3.select("#{{m}}-{{attr}}-results")
+                        .classed("pt-2 bg-secondary bg-opacity-10 ",true)
+
+        const results_uls = root
             .call(selection=>{
                 if (remainder){
                     selection
@@ -41,30 +43,34 @@
             .classed("d-flex pt-2 bg-secondary bg-opacity-10 justify-content-between parsed",true)
             .style("font-size","0.8em")
 
-        selection.append("span")
-                .classed("m-1 pe-2 align-self-center  text-secondary",true)
-                .html(d=> d.verbose + ":")
+        if (data.length) {
+            results_uls.append("span")
+                    .classed("m-1 pe-2 align-self-center  text-secondary",true)
+                    .html(d=> d.verbose + ":")
 
-        selection.append("ul")
-                .classed("list-group list-group-horizontal",true)
-                .styles({
-                   "overflow-x": "scroll", 
-                    "scrollbar-width":"none",
-                   "max-width": "100%",
-                })
-                .selectAll("li")
-                .data(d=>d.results)
-                .join("li")
-                .classed("list-group-item d-flex align-items-center justify-content-between p-1 me-1 bg-opacity-10 border-1 w-100 fw-bold",true)
-                .style("background-color", d=>d.color)
-                .style("border-color", d=>d.border)
-                .append("span").html(d=>d.name)
-                .select_parent()
-                .each(function(d){
-                    if (d.new){
-                      d3.select(this).append("span").classed("badge bg-success ms-1",true).html("New");
-                    }
-                })
+            results_uls.append("ul")
+                    .classed("list-group list-group-horizontal",true)
+                    .styles({
+                       "overflow-x": "scroll", 
+                        "scrollbar-width":"none",
+                       "max-width": "100%",
+                    })
+                    .selectAll("li")
+                    .data(d=>d.results)
+                    .join("li")
+                    .classed("list-group-item d-flex align-items-center justify-content-between p-1 me-1 bg-opacity-10 border-1 w-100 fw-bold",true)
+                    .style("background-color", d=>d.color)
+                    .style("border-color", d=>d.border)
+                    .append("span").html(d=>d.name)
+                    .select_parent()
+                    .each(function(d){
+                        if (d.new){
+                          d3.select(this).append("span").classed("badge bg-success ms-1",true).html("New");
+                        }
+                    })
+        }
+
+        root.selectAll("ul").last().classed("pb-2",true)
 
     })();
     </script>

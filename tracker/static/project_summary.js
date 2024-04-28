@@ -1,4 +1,4 @@
-import  {append_edit_fk, append_edit_attr,ui_state } from "d3-ui";
+import  {append_edit_fk, append_edit_attr,ui_state, make_right_dropdown} from "d3-ui";
 export const project_summary = (project,add_title_links=false)=>{
     const observable_data = mobx.makeAutoObservable( project);
     const root = d3.select(`#project${project.id}`)
@@ -6,11 +6,25 @@ export const project_summary = (project,add_title_links=false)=>{
         .data([observable_data])
         .join("div")
         .classed("border pe-0" ,true)
+        .call(selection=>{
+            make_right_dropdown(selection,dropdown=>{
+                dropdown
+                    .append("li")
+                        .append("a")    
+                            .classed("dropdown-item",true)
+                            .attrs({
+                                "hx-delete" : ui_state.models["project.Project"].rest_pk.replace("__pk__", project.id),
+                                "hx-on::after-request"  :  "window.reset_ui('reloadProjects')"
+                            })
+                            .html("Deete")
+                            .setup_htmx()
+            })
+        })
         .call(function(selection){
             if (add_title_links){
                 selection
                     .append("div")
-                    .classed(`mb-1 name-row`, true)
+                    .classed(`mb-1 name-row editor-normal`, true)
                     .append("button")
                     .classed("btn btn-link pb-1 ps-0",true)
                     .attrs({
@@ -24,7 +38,7 @@ export const project_summary = (project,add_title_links=false)=>{
                     .select_parent()
                     .select_parent()
                     .append("div")
-                    .classed("text-dark text-opacity-75 lh-1 mb-2 text-row",true)
+                    .classed("text-dark text-opacity-75 lh-1 mb-2 text-row editor-normal",true)
                     .styles({
                         "font-size" : "0.8em",
                     })

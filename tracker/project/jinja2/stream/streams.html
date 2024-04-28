@@ -1,8 +1,4 @@
-{%if inst%}
-<div {{ rest_refresh("project.Stream",params={"filters":{"project" : inst.id}}) }}>
-{%else%}
-<div {{ rest_refresh("project.Task") }}>
-{%endif%}
+<div>
     {% for inst in insts %}
         {% include "stream/stream.html"%}
     {%endfor%}

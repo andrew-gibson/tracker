@@ -68,7 +68,12 @@ def _logout(request):
     return render(request, "login.html", {})
 
 
-@api.get_post_delete_put(["m/<str:m>/", "m/<str:m>/<int:pk>/",])
+@api.get_post_delete_put(
+    [
+        "m/<str:m>/",
+        "m/<str:m>/<int:pk>/",
+    ]
+)
 def rest(request, m="", pk=None):
     session, set_session = api.get_url_session(request)
     model = get_model_or_404(m)
@@ -90,11 +95,16 @@ def rest(request, m="", pk=None):
         case _:
             return HttpResponseBadRequest()
 
+
 @api.get("model_info/")
 def model_info(request):
     return JsonResponse(
-            { m._meta.label : m.model_info for m in apps.get_models() if hasattr(m,"model_info") }
-            )
+        {
+            m._meta.label: m.model_info
+            for m in apps.get_models()
+            if hasattr(m, "model_info")
+        }
+    )
 
 
 @api.post_get("create_from_parsed/<str:m>/<str:attr>/")
@@ -106,14 +116,10 @@ def create_from_parsed(request, m, attr, suppress_links=""):
         obj = model.save_from_parse(
             request, parse_payload["results"], attr, parse_payload["remainder"]
         )
-        return api.add_header(
-            render(
-                request,
-                f"parse_for_links.html",
-                ctx,
-            ),
-            "HX-Trigger",
-            jinja2.make_signal_from_model(m),
+        return render(
+            request,
+            f"parse_for_links.html",
+            ctx,
         )
     return render(
         request,
@@ -126,7 +132,9 @@ def create_from_parsed(request, m, attr, suppress_links=""):
 def parse_for_links(request, m, attr):
     model = get_model_or_404(m, test=lambda m: issubclass(m, AutoCompleteNexus))
     return render(
-            request, f"show_parsed_links.html", {"attr": attr,"m" : m.replace(".","-"), **model.parse_text(request)}
+        request,
+        f"show_parsed_links.html",
+        {"attr": attr, "m": m.replace(".", "-"), **model.parse_text(request)},
     )
 
 
@@ -188,10 +196,7 @@ async def post_and_link(request, m1, pk1, m2, attr=""):
         return HttpResponseBadRequest()
 
 
-@api.GET([
-    "text_ac/<str:m>/<int:pk>/<str:attr>/",
-    "text_ac/<str:m>/__pk__/__attr__/"
-])
+@api.GET(["text_ac/<str:m>/<int:pk>/<str:attr>/", "text_ac/<str:m>/__pk__/__attr__/"])
 def text_ac(request, m, pk, attr):
     try:
         filters = json.loads(request.GET.get("filters", "{}"))
