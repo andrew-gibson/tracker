@@ -1,54 +1,72 @@
 {% if  standalone %} {% extends "base.html" %} {% endif %}
 
-{% block content %}
+{% block header_menu %}
+    <div class="collapse navbar-collapse" id="navbarNav">
+      <ul class="navbar-nav">
+        <li class="nav-item">
+          <a class="nav-link active" aria-current="page" href="#">Home</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" 
+                hx-replace-url="true"
+                hx-swap="outerHTML"
+                hx-target = "#main-content"
+                hx-get="{{url('project:main')}}"> Back
+              </a>
+        </li>
+        <li class="nav-item dropdown">
+           <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                Settings ⚙️
+           </a>
+           <ul class="dropdown-menu">
+              <li><a class="dropdown-item" href="#">Delete</a></li>
+              <li><a class="dropdown-item" href="#" id="settings-completed"></a></li>
+          </ul>
+        </li>
+      </ul>
+    </div>
+{% endblock %}
 
+{% block content %}{%with project=inst  %}
 <div id="main-content" >
-    <button id="back">￩</button>
-    {%with add_title_links=False,project=inst  %}
-       {% include "project/project_summary.html"  %}
+    <div class="row">
+         {% include "project/project_summary.html"  %}
 
+        <div class="col-8">
 
-        <div id="smart_input" x-data>
+        {%with params=add_encode_parameter("f",{"ac_filters" :  { "stream" : { "project_id" :inst.id }},
+                                                           "attach_to": {"attr" : "project", "pk" : inst.id},
+                                                           "exclude" :  ["project"]}),
+               _url =  url("core:create_from_parsed", kwargs={"attr" :"name", "m" : "project.Task"}) %}
             <p style="font-size: 0.8em" class="text-secondary mb-0">
                 {{models["project.Task"].describe_links()}}
             </p>
             <div hx-on::after-request="event.detail.requestConfig.verb == 'post' ? window.reset_ui('reloadTasks') : false">
                 <div hx-trigger="load"
                      hx-swap="outerHTML"
-                     hx-get="{{url("core:create_from_parsed", kwargs={"attr" :"name", "m" : "project.Project"})}}">
+                     hx-get="{{_url}}?{{params}}">
                 </div>
             </div>
         </div>
+        {%endwith%}
 
-        {% with insts=project.streams %}
-           {% include "stream/streams.html"  %}
-        {%endwith %}
-    {% endwith  %}
+    <div class="row">
+    {%with params=add_encode_parameter("f",{"filters" :  { "project" : project.id }}),
+               _url =  url("core:rest", kwargs={ "m" : "project.Stream"})    %}
+        <div hx-trigger="load, reloadTasks from:document" 
+             hx-get="{{_url}}?{{params}}">
+        </div>
+    {%endwith%}
+    </div>
 
 </div>
 
 
 <script type="module">
-import { dispose_functions,ui_state } from "d3-ui";
-import {project_summary} from "{{ static('project_summary.js') }}";
-import {task_summary} from "{{ static('task_summary.js') }}";
-
+import { make_right_dropdown } from "d3-ui";
+import {project_summary} from "{{ static('task_summary.js') }}";
 const project = {{dumps(inst)|safe}};
-
-d3.select("#main-content #back")
-    .classed("btn btn-link",true)
-    .attrs({
-        "hx-replace-url":"true",
-        "hx-swap":"outerHTML",
-        "hx-target" : "#main-content",
-        "hx-get" : "{{url('project:main')}}",
-    })
-    .setup_htmx();
-
-
-project_summary({...project} , "true");
-_.each(project.streams, s=> _.each(s.tasks,t => task_summary(t)));
-
+project_summary({...project} );
 </script>
-
+{% endwith  %}
 {%endblock%}

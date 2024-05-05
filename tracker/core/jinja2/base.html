@@ -35,9 +35,7 @@
   <nav class="navbar navbar-expand-md navbar-dark bg-dark fixed-top">
     <div class="container-fluid">
       <span class="navbar-brand mb-0 h1">{{ _("PM") }}</span>
-      <div>
-        {% block header_menu %}<!-- insert default navigation text for every page -->{% endblock %}
-      </div>
+      {% block header_menu %}<!-- insert default navigation text for every page -->{% endblock %}
       <a href="{{ url("core:_logout")}}" class="btn link-light btn-link">{{ _("logout") }}</a>
     </div>
   </nav>

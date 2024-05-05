@@ -2,6 +2,7 @@ import json
 import re
 
 from django.apps import apps
+from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Field, ManyToManyField, Model, Q
 from django.forms import ModelForm, modelform_factory
 from django.http import JsonResponse, Http404, QueryDict,HttpResponse
@@ -36,7 +37,6 @@ class RESTModel(LifecycleModelMixin, Model):
 
     users = ManyToManyField("core.User")
 
-
     @classproperty
     def model_info(cls):
         return  {
@@ -48,17 +48,31 @@ class RESTModel(LifecycleModelMixin, Model):
         "hex" : getattr(cls, "hex_trigger_color", "#1a1a1a"), 
     }
 
+    @classmethod
+    def settings(cls, request):
+        try:
+            settings = apps.get_model(f"{cls._meta.app_label}.settings")
+            obj = settings.objects.get_or_create(user=request.user)[0]
+            prepare_qs, projection = settings.readers(request)
+            return projection(obj)
+        except LookupError:
+            return {}
+
     @classproperty
     def fields_map(cls):
         return {x.name : x.__class__.__name__  for x in cls._meta.get_fields()}
 
-    @classproperty
-    def readers(cls):
-        return specs.process(cls.rest_spec)
+    @classmethod
+    def readers(cls, request):
+        if callable(cls.spec):
+            spec = cls.spec(cls, request)
+        else:
+            spec = cls.spec
+        return specs.process(spec)
 
     @classmethod
     def get_projection_by_pk(cls, request, pk):
-        prepare_qs, projection = cls.readers
+        prepare_qs, projection = cls.readers(request)
         try:
             return [
                 (x, projection(x))
@@ -72,7 +86,6 @@ class RESTModel(LifecycleModelMixin, Model):
         return cls.__name__.lower()
 
     _Form = RequestForm
-
 
     @classmethod
     def form(cls, request):
@@ -90,7 +103,7 @@ class RESTModel(LifecycleModelMixin, Model):
     def POST(cls, request):
         form = cls.form(request)(request.POST)
         context = {"form": form}
-        preoare_qs, projection = cls.readers
+        preoare_qs, projection = cls.readers(request)
         if form.is_valid():
             inst = form.save()
             context["inst"] = projection(inst)
@@ -111,7 +124,7 @@ class RESTModel(LifecycleModelMixin, Model):
 
     @classmethod
     def PUT(cls, request, pk):
-        prepare_qs, projection = cls.readers
+        prepare_qs, projection = cls.readers(request)
         inst, inst_dict = cls.get_projection_by_pk(request, pk)
         put = QueryDict(request.body)
         form = cls.form(request)(put, instance=inst)
@@ -134,7 +147,7 @@ class RESTModel(LifecycleModelMixin, Model):
 
     @classmethod
     def GET(cls, request, pk=None):
-        prepare_qs, projection = cls.readers
+        prepare_qs, projection = cls.readers(request)
         if pk:
             inst, inst_dict = cls.get_projection_by_pk(request, pk)
             if request.json:
@@ -147,6 +160,7 @@ class RESTModel(LifecycleModelMixin, Model):
                     "inst": inst_dict,
                     "form": form,
                     "standalone": not request.htmx,
+                    "settings" : cls.settings(request) ,
                 },
             )
         else:
@@ -159,6 +173,8 @@ class RESTModel(LifecycleModelMixin, Model):
                 {
                     "insts": insts,
                     "standalone": not request.htmx,
+                    "settings" : cls.settings(request) ,
+
                 },
             )
 
@@ -204,6 +220,7 @@ class RESTModel(LifecycleModelMixin, Model):
 
 
 class AutoCompleteNexus:
+
     @classmethod
     def find_words_from_trigger(cls, text, trigger, many=True):
         split_text = text.split(" ")
@@ -279,11 +296,15 @@ class AutoCompleteNexus:
                 [term, results[name]["model"].ac(request, term, filter_qs=filter_qs)]
                 for term in results[name]["search_terms"]
             ]
+            trigger =  results[name]["trigger"]
+            for parsed in results[name]["search_terms"]:
+                remainder = remainder.replace(trigger+parsed, "")
 
         cls.cls_text_scan(
-            text_input, results
+            remainder, results, [x.related_model.text_search_trigger for x in fields]
         )  # default is nothing happens, but classes can add extra scanning, for example: dates
 
+        # secondd pass through 
         for name in results:
             trigger =  results[name]["trigger"]
             for parsed in results[name]["search_terms"]:
@@ -419,7 +440,7 @@ class AutoCompleteREST(RESTModel):
     ):
         f = f"{cls.search_field}"
 
-        preoare_qs, projection = cls.readers
+        preoare_qs, projection = cls.readers(request)
         qs = preoare_qs(cls.ac_query(request, query))
 
         if filter_qs:

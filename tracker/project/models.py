@@ -17,7 +17,9 @@ from django.db.models import (
     DateField,
     DateTimeField,
     EmailField,
+    OneToOneField,
     ForeignKey,
+    PositiveIntegerField,
     ManyToManyField,
     Model,
     Q,
@@ -35,9 +37,27 @@ from django_lifecycle import (
 
 from . import producers 
 
+class Settings(RESTModel):
+
+    class _Form(RequestForm):
+        class Meta:
+            fields = [ "hide_done", "id" ]
+
+        def save(self, *args, **kwargs):
+            self.instance.user = self.request.user
+            super().save(*args, **kwargs)
+
+    spec = ["hide_done", "id", producers.__type__]
+    form_fields = [ "user", "hide_done" ]
+    user = OneToOneField("core.User", on_delete=CASCADE, related_name="project_settings", blank=True)
+    hide_done = BooleanField(default=False,blank=True) 
+
+    @classmethod
+    def belongs_to_user(cls, request):
+        return cls.objects.filter(user=request.user)
 
 class EXCompetency(AutoCompleteREST, trigger="`", hex_color="2c6e49"):
-    rest_spec = producers.basic_rest_spec
+    spec = producers.basic_spec
     users = None
     name = CharField(max_length=300, unique=True)
     form_fields = [ "name" ]
@@ -48,13 +68,13 @@ class EXCompetency(AutoCompleteREST, trigger="`", hex_color="2c6e49"):
 
 
 class Tag(AutoCompleteREST, trigger="#", hex_color="ffbe0b"):
-    rest_spec = producers.basic_rest_spec
+    spec = producers.basic_spec
     form_fields = [ "name" ]
     name = CharField(max_length=100)
 
 
 class Contact(AutoCompleteREST, trigger="@", hex_color="ff006e"):
-    rest_spec = producers.basic_rest_spec
+    spec = producers.basic_spec
     form_fields = ["name", "email"]
 
     name = CharField(max_length=255)
@@ -62,7 +82,7 @@ class Contact(AutoCompleteREST, trigger="@", hex_color="ff006e"):
 
 
 class Team(AutoCompleteREST, trigger="*", hex_color="fb5607"):
-    rest_spec = producers.basic_rest_spec
+    spec = producers.basic_spec
     form_fields = ["name", "internal"]
 
     @classmethod
@@ -79,7 +99,7 @@ class Team(AutoCompleteREST, trigger="*", hex_color="fb5607"):
 
 
 class Project(AutoCompleteNexus, AutoCompleteREST, trigger="^", hex_color="8338ec"):
-    rest_spec = producers.project_rest_spec
+    spec = producers.project_spec
 
     class _Form(RequestForm):
         class Meta:
@@ -121,9 +141,10 @@ class Project(AutoCompleteNexus, AutoCompleteREST, trigger="^", hex_color="8338e
 
 
 class Stream(AutoCompleteREST, trigger="~", hex_color="036666"):
-    rest_spec = producers.stream_rest_spec
+    spec = producers.stream_spec
 
     class Meta:
+        ordering = ("id",)
         unique_together = ("name", "project")
 
     form_fields = [
@@ -164,9 +185,13 @@ class Stream(AutoCompleteREST, trigger="~", hex_color="036666"):
 
 
 class Task(RESTModel, AutoCompleteNexus):
-    rest_spec = producers.task_rest_spec 
+    spec = producers.task_spec 
+
+    class Meta:
+        ordering = ["done", "order", "start_date"]
 
     form_fields = [
+        "order",
         "stream",
         "start_date",
         "target_date",
@@ -181,7 +206,7 @@ class Task(RESTModel, AutoCompleteNexus):
         return cls.objects.filter(stream__project__users=request.user).filter(filters)
 
     @classmethod
-    def cls_text_scan(cls, text_input, results):
+    def cls_text_scan(cls, text_input, results, triggers):
         # chops up text_input and looks for combinations which get recognized as dates
 
         # get rid of any extra spaces and then split  by spaces into tokens
@@ -216,12 +241,12 @@ class Task(RESTModel, AutoCompleteNexus):
         # add the extra dictionary to results
         results["targt_date"] = {
             "trigger": uuid.uuid4().hex,
-            "model": {
-                "hex_trigger_color": "90e0ef",
-                "trigger_color": "rgb(144,224,239)",
+            "model_info": {
+                "hex": "90e0ef",
+                "rbga": "rgb(144,224,239)",
             },
             "attr_only": True,
-            "name": "Due Date",
+            "verbose": "Due Date",
             "many_to_many": False,
             "search_terms": date[1],
             "results": [
@@ -242,8 +267,14 @@ class Task(RESTModel, AutoCompleteNexus):
     def assign_to_unassigned(self):
         if not self.stream:
             self.stream = self.project.streams.get(project_default=True)
+        last_in_order = self.stream.tasks.order_by("order").last()
+        if last_in_order and last_in_order.order:
+            self.order =  last_in_order.order + 1
+        else:
+            self.order = 1
 
     users = None
+    order = PositiveIntegerField(null=True)
     project = ForeignKey(Project, on_delete=CASCADE, related_name="tasks")
     stream = ForeignKey(
         Stream, on_delete=PROTECT, blank=True, null=True, related_name="tasks"

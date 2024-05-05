@@ -1,10 +1,7 @@
-<div class="row">
-    <div class="col-12 text-secondary">
-        {{inst.name}}
+<div class="col-4">
+    <div class="col-12 text-secondary" id="stream{{inst.id}}">
     </div>
     {% with insts = inst.tasks %}
         {% include "task/tasks.html" %}
     {%endwith%}
 </div>
-
-

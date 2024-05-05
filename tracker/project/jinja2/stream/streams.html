@@ -1,5 +1,44 @@
-<div>
+<div class="row" class="overflow-x: scroll">
     {% for inst in insts %}
         {% include "stream/stream.html"%}
     {%endfor%}
 </div>
+
+
+<script type="module">
+import {autoRun, ui_state} from "d3-ui";
+import {task_summaries, task_state} from "{{ static('task_summary.js') }}";
+import {stream_mini} from "{{ static('stream_mini.js') }}";
+
+_.chain({{dumps(insts)|safe}})
+ .each(stream_mini)
+ .map(s=>s.tasks)
+ .each(task_summaries)
+ .each(tasks=>{
+    //autoRun(async ()=>{
+    //    const redraw = task_state.redraw;
+    //    if (tasks.length){
+    //        const select_statement = tasks.map(t=>`#task${t.id} .card-body`).join(", ");
+    //        d3.selectAll(select_statement).style("height",null);
+    //        _.delay(()=>{
+    //            const max_height =  _.max(_.map(d3.selectAll(select_statement).nodes(),n=>n.scrollHeight)) + "px";
+    //            d3.selectAll(".task .card-body").style("height", max_height);
+    //        })
+    //    }
+    //});
+ })
+ .value()
+
+</script>
+
+
+<a class="dropdown-item" 
+   hx-put="{{url("core:rest", kwargs={ "m" : "project.Settings", "pk" : settings.id})}}" 
+   hx-vals='{"hide_done" : {%if settings.hide_done%}false{%else%}true{%endif%} }'
+   hx-swap="none"
+   hx-headers='{"json-response" : true}'
+   hx-on::after-request="window.reset_ui('reloadTasks')"
+   hx-swap-oob="true"
+   id="settings-completed" >
+    {%if settings.hide_done%} Show All {%else%} Hide Completed {%endif%}
+</a>
