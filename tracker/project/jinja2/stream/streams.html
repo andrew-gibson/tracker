@@ -6,27 +6,12 @@
 
 
 <script type="module">
-import {autoRun, ui_state} from "d3-ui";
-import {task_summaries, task_state} from "{{ static('task_summary.js') }}";
+import {task_summaries} from "{{ static('task_summary.js') }}";
 import {stream_mini} from "{{ static('stream_mini.js') }}";
-
 _.chain({{dumps(insts)|safe}})
  .each(stream_mini)
  .map(s=>s.tasks)
  .each(task_summaries)
- .each(tasks=>{
-    //autoRun(async ()=>{
-    //    const redraw = task_state.redraw;
-    //    if (tasks.length){
-    //        const select_statement = tasks.map(t=>`#task${t.id} .card-body`).join(", ");
-    //        d3.selectAll(select_statement).style("height",null);
-    //        _.delay(()=>{
-    //            const max_height =  _.max(_.map(d3.selectAll(select_statement).nodes(),n=>n.scrollHeight)) + "px";
-    //            d3.selectAll(".task .card-body").style("height", max_height);
-    //        })
-    //    }
-    //});
- })
  .value()
 
 </script>

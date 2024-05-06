@@ -106,7 +106,7 @@ class RESTModel(LifecycleModelMixin, Model):
         preoare_qs, projection = cls.readers(request)
         if form.is_valid():
             inst = form.save()
-            context["inst"] = projection(inst)
+            _, context["inst"] = cls.get_projection_by_pk(request, inst.pk)
             # by default associate objects with their creator
             inst.add_user(request)
             if request.json:
@@ -164,7 +164,7 @@ class RESTModel(LifecycleModelMixin, Model):
                 },
             )
         else:
-            insts = [projection(p) for p in prepare_qs(cls.belongs_to_user(request))]
+            insts = [projection(p) for p in prepare_qs(cls.belongs_to_user(request)).order_by(*cls._meta.ordering)]
             if request.json:
                 return JsonResponse(insts, safe=False)
             return render(

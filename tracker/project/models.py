@@ -178,6 +178,9 @@ class Stream(AutoCompleteREST, trigger="~", hex_color="036666"):
 
         return cls.belongs_to_user(request).filter(q).distinct()
 
+    def __str__(self):
+        return f"{self.pk}-{self.name}"
+
     users = None
     project = ForeignKey(Project, on_delete=CASCADE, related_name="streams")
     project_default = BooleanField(default=False)

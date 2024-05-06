@@ -92,18 +92,22 @@ export const task_summaries = tasks=>{
 
            inplace_edit(header_left.append("div").style("width","15%").style("display","inline-block"), observable_data, "order", "Order",{btn_class : "btn-outline-primary", on_change : "reloadTasks", input_class : "w-25"} );
            inplace_edit(header_left.append("div").style("width","85%").style("display","inline-block"), observable_data, "name", "Name");
+           const hx_args =  {
+                "hx-delete" : ui_state.models["project.Task"].rest_pk.replace("__pk__", task.id),
+                "hx-on::after-request"  :  "window.reset_ui('reloadTasks')",
+                "hx-swap" : "none",
+           }
            make_right_dropdown(header_sel,dropdown=>{
                 dropdown
                     .append("li")
                         .append("a")    
-                            .classed("dropdown-item",true)
-                            .attrs({
-                                "hx-delete" : ui_state.models["project.Task"].rest_pk.replace("__pk__", observable_data.id),
-                                "hx-on::after-request"  :  "window.reset_ui('reloadTasks')"
-                            })
+                            .classed("dropdown-item text-end",true)
                             .html("Deete")
-                            .setup_htmx();
-            });
+                            .attrs(window.delete_modal.attrs)
+                            .on("click", e=>{
+                                window.delete_modal(hx_args);
+                            })
+           });
 
             autoRun(()=>{
                 task_state.redraw

@@ -14,19 +14,21 @@ export const stream_mini = (stream)=>{
         })
         .select_parent()
         .call(function(selection){
+            const hx_args =  {
+                "hx-delete" : ui_state.models["project.Stream"].rest_pk.replace("__pk__", stream.id),
+                "hx-on::after-request"  :  "window.reset_ui('reloadTasks')",
+                "hx-swap" : "none",
+            }
             make_right_dropdown(selection,dropdown=>{
                 dropdown
                     .append("li")
                         .append("a")    
                             .classed("dropdown-item text-end",true)
-                            .attrs({
-                                "hx-delete" : ui_state.models["project.Stream"].rest_pk.replace("__pk__", stream.id),
-                                "hx-on::after-request"  :  "window.reset_ui('reloadTasks')"
-                            })
                             .html("Deete")
-                            .setup_htmx()
-
-
+                            .attrs(window.delete_modal.attrs)
+                            .on("click", e=>{
+                                window.delete_modal(hx_args);
+                            })
             })
         })
 };

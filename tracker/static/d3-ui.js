@@ -287,6 +287,7 @@ export const make_right_dropdown = function(selection, call){
                 .classed("dropdown-menu",true)
                 .call(call)
 }
+
 export const create_button = function(selection,make_observable_data, attr="",title="" ,options){
 
     const ids = ui_state.ids({attr,d:make_observable_data() })
@@ -469,6 +470,13 @@ export const append_edit_local_attr = function(selection,observable_data, attr="
                     .classed("form-control ps-2 pe-0",true)
                     .call(selecion=>{
                         autoRun(()=>selecion.node().value = observable_data[attr] )
+                    })
+                    .on("change", e => {
+                        observable_data[attr] = e.target.value;
+                        send_model(observable_data);
+                        if (on_change){
+                            _.delay(ui_state.reset_ui, 100, on_change)
+                        }
                     })
 
 

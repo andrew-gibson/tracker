@@ -1,6 +1,6 @@
 from django.apps import apps
 from django.db.models import CharField, Value, Q, Count, CharField, F
-from django.db.models.functions import Concat
+from django.db.models.functions import Concat, Replace
 from django_readers import qs, pairs, projectors, producers, specs
 
 __type__ = {"__type__": (qs.noop, producers.attrgetter("_meta.label"))}
@@ -32,7 +32,7 @@ mini_task_spec = [x for x in task_spec if "project" not in x]
 name_count = (
     qs.annotate(
         name_count=Concat(
-            F("name"),
+            Replace(F("name"),Value("_"),Value(" ") ),
             Value(" ("),
             Count("tasks", filter=Q(tasks__done=False)),
             Value(")"),

@@ -45,6 +45,31 @@
     <div id="modal-container" ></div>
         {% block content %}{% endblock %}
     </div>
+    <div id="delete-modal">
+        <script>
+            window.delete_modal = attrs =>{
+                d3.select("#modal_delete_button").attrs(attrs).setup_htmx();
+            } 
+            window.delete_modal.attrs = {
+                "data-bs-toggle":"modal",
+                "data-bs-target":`#delete_modal`
+            }
+        </script>
+        <div class="modal fade" id="delete_modal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h1 class="modal-title fs-5" id="exampleModalLabel">Confirm Delete</h1>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" id="modal_delete_button" class="btn btn-danger" data-bs-dismiss="modal">Delete</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
   </main>
   <div id="ws-scripts"> </div>
   <script type="module">
