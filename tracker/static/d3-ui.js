@@ -216,24 +216,19 @@ const debounced_q = _.debounce(q,250);
 const toggle_fk_attr = async (result) => {
     const { attr ,  d } = ui_state.active;
     const model_info =  ui_state.active_model_info();
-
+    let resp;
     if (result.selected){
-        if (result.id && isarray(d[attr])) {
-            d[attr] = d[attr].filter(x=> x.id != result.id);
-        } else if (result.id){
-            d[attr] = undefined;
-        }
-        await fetch_recipies.DELETE(result.url);
+        resp = await fetch_recipies.DELETE(result.url);
     } else {
-        if (isarray(d[attr])) {
-            d[attr] = [...d[attr], result];
-        } else {
-            d[attr] =  result;
-        }
-        await fetch_recipies.POST(result.url, {},true);
+        resp = await fetch_recipies.POST(result.url, {},true);
     }
-    const data = await fetch_recipies.GETjson(model_info.rest_pk.replace("__pk__",d.id));
-    d[attr] = data[attr];
+    if (resp.status == 200) {
+        const data = await fetch_recipies.GETjson(model_info.rest_pk.replace("__pk__",d.id));
+        d[attr] = data[attr];
+        return true;
+    } else {
+        return false;
+    }
 };
 
 d3.selection.prototype.styles = function(attrs){
@@ -623,11 +618,11 @@ export const append_edit_fk = function(selection,
             .html(title)
             .select_parent()
             .append("input")
-            .classed("form-control",true)
+            .classed("form-control ms-2 ps-2 pe-0",true)
             .attrs({
                 "type":"text",
                 "id" :  ids.insert_input,
-                "area-describedby" : ids.insert_label,
+                "aria-describedby" : ids.insert_label,
                 "autocomplete" : "off",
                 "data-1p-ignore" : "true",
                 "name" : "name"
@@ -667,11 +662,12 @@ export const append_edit_fk = function(selection,
                             .selectAll("button")
                             .data(d=>[d])
                             .join("button")
-                            .on("click", (e,d)=>{
-                                toggle_fk_attr(d);
-                                ui_state.reset_active();
-                                if (on_change){
-                                    _.delay(ui_state.reset_ui, 100, on_change)
+                            .on("click", async (e,d)=>{
+                                if (await toggle_fk_attr(d)){
+                                    ui_state.reset_active();
+                                    if (on_change ){
+                                        _.delay(ui_state.reset_ui, 100, on_change)
+                                    }
                                 }
                             })
                             .style( "font-size" , "1em")

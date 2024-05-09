@@ -1,0 +1,19 @@
+{% if  standalone %} {% extends "base.html" %} {% endif %}
+
+{% block content %}
+<div class="row">
+    <div hx-trigger="load, reloadTags from:document" 
+         hx-get="{{url("core:rest", kwargs={ "m" : "project.Tag"})}}"
+         class="col-3">
+    </div>
+    <div hx-trigger="load, reloadContacts from:document" 
+         hx-get="{{url("core:rest", kwargs={ "m" : "project.Contact"})}}"
+         class="col-3">
+    </div>
+    <div hx-trigger="load, reloadTeams from:document" 
+         hx-get="{{url("core:rest", kwargs={ "m" : "project.Team"})}}"
+         class="col-3">
+    </div>
+</div>
+{% endblock %}
+

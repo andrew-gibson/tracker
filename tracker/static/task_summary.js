@@ -62,10 +62,11 @@ export const project_summary =  project => {
             const body_sel = selection.select(".card-body");
             append_edit_attr(body_sel, observable_data, "name", "Name");
             append_edit_attr(body_sel, observable_data, "text","Description");
-            append_edit_attr(body_sel, observable_data,"point_of_contact", "Contact");
-            append_edit_attr(body_sel, observable_data,"tags", "Tags");
-            append_edit_attr(body_sel, observable_data,"teams", "Teams");
-            create_button( selection.select(".card-footer"), 
+            const row = body_sel.append("div").classed("row",true)
+            append_edit_attr(row.append("div").classed("border-end border-3 col-4",true), observable_data,"point_of_contact", "Contact");
+            append_edit_attr(row.append("div").classed("border-end border-3 col-4",true), observable_data,"tags", "Tags");
+            append_edit_attr(row.append("div").classed("border-end border-3 col-4",true), observable_data,"teams", "Teams");
+            create_button( selection.select("#new-stream"), 
                           ()=>mobx.makeAutoObservable({name:"",__type__:"project.Stream",project:observable_data}),
                           "name",
                           "+ Workstream",
@@ -112,7 +113,7 @@ export const task_summaries = tasks=>{
             autoRun(()=>{
                 task_state.redraw
                 body_sel.html("")
-                _.each([ ["text","Notes",""],
+                _.each([["text","Notes",""],
                         ["start_date", "Start Date",""],
                         ["target_date","Target Date",""],
                         ["lead", "Contact",""],

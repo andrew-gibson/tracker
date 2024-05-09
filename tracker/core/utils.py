@@ -161,9 +161,12 @@ def unlink_or_404(o1, o2, attr=None):
     attr, rel = find_linking_attr(o1, o2, attr)
     if rel.many_to_many or rel.one_to_many:
         getattr(o1, attr).remove(o2)
-    else:
+    elif rel.null:
         setattr(o1, attr, None)
         o1.save()
+    else:
+        raise Http404("models could not be unlinked")
+
 
 
 def get_model_or_404(s, test=lambda x: True):

@@ -1,6 +1,8 @@
 <div class="row mt-2" >
     {% for project in insts  %}
+        <div class="col-4 mb-3">
            {% include "project/project_summary.html"  %}
+        </div>
     {%endfor%}
 </div>
 
@@ -13,7 +15,7 @@ const projects =  {{dumps(insts)|safe}};
 _.each(projects, p=> project_summary( p, "true"));
 
 autoRun(async ()=>{
-    if (ui_state.active_elements == projects.length){
+    if (ui_state.active_elements.length == projects.length){
        _.each(_.keys(ui_state.models['project.Project'].fields),attr=>{
             const classq =  `.${attr}-row.editor-normal`;
             const max_height =  _.max(_.map(d3.selectAll(classq).nodes(),n=>n.offsetHeight)) + "px";

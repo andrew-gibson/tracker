@@ -32,7 +32,7 @@ mini_task_spec = [x for x in task_spec if "project" not in x]
 name_count = (
     qs.annotate(
         name_count=Concat(
-            Replace(F("name"),Value("_"),Value(" ") ),
+            Replace(F("name"), Value("_"), Value(" ")),
             Value(" ("),
             Count("tasks", filter=Q(tasks__done=False)),
             Value(")"),
@@ -55,7 +55,7 @@ def stream_spec(cls, request):
         "name",
         "name",
         "id",
-        {"name_count" : name_count},
+        {"name_count": name_count},
         {"project": [__type__, "id", "name"]},
         {"tasks": tasks},
     ]
@@ -64,6 +64,12 @@ def stream_spec(cls, request):
 project_spec = [
     __type__,
     "text",
+    {
+        "rendered_text": (
+            qs.include_fields("text"),
+            producers.method("render_text"),
+        )
+    },
     "id",
     "name",
     specs.relationship(
@@ -83,7 +89,7 @@ project_spec = [
             __type__,
             "name",
             "id",
-             {"name_count" : name_count},
+            {"name_count": name_count},
             {"tasks": task_spec},
         ],
     },

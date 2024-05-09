@@ -1,4 +1,4 @@
-from django.contrib.auth.models import AbstractUser, UserManager
+from django.contrib.auth.models import AbstractUser, UserManager, Group
 from django.db.models import (CASCADE, PROTECT, SET_NULL, BigAutoField,
                               CharField, DateTimeField, ForeignKey, Model,
                               Prefetch, TextField)
@@ -18,11 +18,9 @@ def field_names(model):
     return {f.name: _(f.name) for f in fields}
 
 
-
 def from_dict(obj, data):
     for key, val in data.items():
         setattr(obj, key, val)
-
 
 def json_set_m2m(inst, attr, data):
     model = getattr(inst, attr).model
@@ -36,16 +34,15 @@ class GroupPrefetcherManager(UserManager):
 
     def get_queryset(self):
         return (
-            super(GroupPrefetcherManager, self)
+            super()
             .get_queryset()
             .prefetch_related(Prefetch("groups", to_attr="group_list"))
+            .prefetch_related("main_group")
         )
 
 
 @add_to_admin
 class User(AbstractUser):
-
-
     login_redirect = CharField(max_length=100, default="project:main")
     objects = GroupPrefetcherManager()
 
@@ -55,6 +52,8 @@ class User(AbstractUser):
 
     class Meta:
         base_manager_name = "objects"
+
+    main_group = ForeignKey(Group,on_delete=PROTECT,related_name="+")
 
 
 class ActiveChannels(Model):

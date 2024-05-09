@@ -37,4 +37,13 @@ def main(request):
         },
     )
 
+@api.get("metadata/")
+def metadata(request):
+    return render(
+        request,
+        "shared/metadata.html",
+        {
+            "standalone": not request.htmx,
+        },
+    )
 

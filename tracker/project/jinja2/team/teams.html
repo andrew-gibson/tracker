@@ -1,0 +1,43 @@
+<div id="teams">
+    <div class="card">
+      <div class="card-header"> </div>
+      <ul class="list-group list-group-flush">
+      </ul>
+    </div>
+</div>
+
+<script type="module">
+    import {ui_state, inplace_edit, create_button} from "d3-ui";
+    const teams = {{dumps(insts)|safe}};
+    const observable_data =   mobx.makeAutoObservable({teams});
+
+    create_button( d3.select("#teams .card-header"), 
+                  ()=>mobx.makeAutoObservable({name:"",__type__:"project.Team"}),
+                  "name",
+                  "+ Team",
+                {on_change : "reloadTeams"})
+
+    d3.select("#teams ul")
+      .selectAll("li.list-group-item")
+      .data(observable_data.teams,d=>d.id)
+      .join("li")
+      .classed("list-group-item d-flex align-items-middle justify-content-between",true)
+      .each(function(d){
+          const hx_args =  {
+              "hx-delete" : ui_state.models["project.Team"].rest_pk.replace("__pk__", d.id),
+              "hx-on::after-request"  :  "window.reset_ui('reloadTeams')",
+              "hx-swap" : "none",
+          }
+          const sel = d3.select(this);
+          inplace_edit(sel, d, "name", "Name",{display_attr : "name"});
+           sel
+            .append("button")    
+                .attr("type","button")
+                .classed("btn btn-outline-danger p-1 m-1",true)
+                .html("X")
+                .attrs(window.delete_modal.attrs)
+                .on("click", e=>{
+                    window.delete_modal(hx_args);
+                })
+      })
+</script>

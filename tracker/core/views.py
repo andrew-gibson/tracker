@@ -77,21 +77,17 @@ def _logout(request):
 def rest(request, m="", pk=None):
     session, set_session = api.get_url_session(request)
     model = get_model_or_404(m)
-    event = [
-        "HX-Trigger",
-        jinja2.decode_get_params(request.GET).get("f", {}).get("trigger"),
-    ]
     if not model:
         return HttpResponseBadRequest()
     match [request.method, pk]:
         case ["GET", _]:
-            return api.add_header(model.GET(request, pk), *event)
+            return model.GET(request, pk)
         case ["POST", None]:
-            return api.add_header(model.POST(request), *event)
+            return model.POST(request)
         case ["PUT", int()]:
-            return api.add_header(model.PUT(request, pk), *event)
+            return model.PUT(request, pk)
         case ["DELETE", int()]:
-            return api.add_header(model.DELETE(request, pk), *event)
+            return model.DELETE(request, pk)
         case _:
             return HttpResponseBadRequest()
 
@@ -153,7 +149,7 @@ def toggle_link(request, m1, pk1, m2, pk2, attr=""):
         link_or_404(obj1, obj2, attr)
     if request.method == "DELETE":
         unlink_or_404(obj1, obj2, attr)
-    projection = model1.readers[1]
+    projection = model1.readers(request)[1]
     return JsonResponse(projection(obj1))
 
 

@@ -2,8 +2,9 @@ import json
 import re
 
 from django.apps import apps
+from django.contrib.auth.models import Group
 from django.core.exceptions import ObjectDoesNotExist
-from django.db.models import Field, ManyToManyField, Model, Q
+from django.db.models import Field, Model, Q, PROTECT, ForeignKey
 from django.forms import ModelForm, modelform_factory
 from django.http import JsonResponse, Http404, QueryDict,HttpResponse
 from django_lifecycle import LifecycleModelMixin
@@ -35,7 +36,7 @@ class RESTModel(LifecycleModelMixin, Model):
     class Meta:
         abstract = True
 
-    users = ManyToManyField("core.User")
+    group = ForeignKey(Group, blank=True,on_delete=PROTECT)
 
     @classproperty
     def model_info(cls):
@@ -106,9 +107,9 @@ class RESTModel(LifecycleModelMixin, Model):
         preoare_qs, projection = cls.readers(request)
         if form.is_valid():
             inst = form.save()
-            _, context["inst"] = cls.get_projection_by_pk(request, inst.pk)
             # by default associate objects with their creator
             inst.add_user(request)
+            _, context["inst"] = cls.get_projection_by_pk(request, inst.pk)
             if request.json:
                 return JsonResponse(context["inst"])
         else:
@@ -206,12 +207,13 @@ class RESTModel(LifecycleModelMixin, Model):
     @classmethod
     def belongs_to_user(cls, request):
         filters = cls.get_filters(request)
-        qs = cls.objects.filter(users=request.user).filter(filters)
+        qs = cls.objects.filter(group__in=request.user.groups.all()).filter(filters)
         return cls.filter(qs, request)
 
     def add_user(self, request):
-        if getattr(self, "users", False):
-            self.users.add(request.user)
+        if getattr(self, "group", False):
+            self.group =request.user.main_group
+            self.save()
 
     def get_absolute_url(self):
         return reverse(

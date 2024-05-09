@@ -24,17 +24,14 @@ def encode_get_param(data):
     b64_jsonb = base64.urlsafe_b64encode(jsonb)
     return b64_jsonb.decode()
 
-
 def decode_get_param(val):
     try:
         return json.loads(base64.urlsafe_b64decode(val.encode("utf-8")).decode())
     except:
         return val
 
-
 def decode_get_params(querydict):
     return {k: decode_get_param(v) for k, v in querydict.items()}
-
 
 def add_encode_parameter(key, data, querydict=None):
     querydict = querydict if querydict else QueryDict()
