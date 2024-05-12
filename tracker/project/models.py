@@ -9,6 +9,7 @@ import dateparser
 from core.rest import AutoCompleteNexus, AutoCompleteREST, RequestForm, RESTModel
 from core.utils import add_to_admin, classproperty, render
 from django.apps import apps
+from django.contrib import admin
 from django.db.models import (
     CASCADE,
     PROTECT,
@@ -67,6 +68,9 @@ class EXCompetency(AutoCompleteREST, trigger="`", hex_color="2c6e49"):
     def belongs_to_user(cls, request):
         return cls.objects.all()
 
+    def can_i_delete(self,request):
+        return False
+
     def __str__(self):
         return self.name
 
@@ -75,20 +79,37 @@ class EXCompetency(AutoCompleteREST, trigger="`", hex_color="2c6e49"):
     name = CharField(max_length=300, unique=True)
     form_fields = [ "name" ]
 
+@add_to_admin
 class Tag(AutoCompleteREST, trigger="#", hex_color="ffbe0b"):
 
+    class adminClass(admin.ModelAdmin):
+        list_display = ("id","name","public","group")
+        list_editable = ("name","public","group")
+        list_filter = ("public","group")
+        search_fields = ("name",)
 
-    spec = producers.basic_spec
-    form_fields = [ "name" ]
+    spec = producers.tag_spec
+    form_fields = [ "name","public" ]
+
+    @classmethod
+    def belongs_to_user(cls, request):
+        filters = cls.get_filters(request)
+        q = Q(group__in = request.user.groups.all()) | Q(public=True)
+        return cls.objects.filter(q).filter(filters).distinct()
+
+    def can_i_delete(self,request):
+        return self.group in request.user.groups.all()
+
+    def __str__(self):
+        return self.name
+
     name = CharField(max_length=100)
+    public = BooleanField(db_default=False)
 
 @add_to_admin
 class Contact(AutoCompleteREST, trigger="@", hex_color="ff006e"):
     spec = producers.basic_spec
     form_fields = ["name", "email"]
-
-    def __str__(self):
-        return self.name
 
     name = CharField(max_length=255)
     email = EmailField(null=True, blank=True)
@@ -96,23 +117,24 @@ class Contact(AutoCompleteREST, trigger="@", hex_color="ff006e"):
 
 @add_to_admin
 class Team(AutoCompleteREST, trigger="*", hex_color="fb5607"):
-    spec = producers.basic_spec
-    form_fields = ["name", "internal"]
+    spec = producers.team_spec
+    form_fields = ["name", "public"]
 
     @classmethod
     def belongs_to_user(cls, request):
         filters = cls.get_filters(request)
-        q = Q(group__in = request.user.groups.all()) | Q(private=False)
+        q = Q(group__in = request.user.groups.all()) | Q(public=True)
         return cls.objects.filter(q).filter(filters).distinct()
+
+    def can_i_delete(self,request):
+        return self.group in request.user.groups.all()
 
     def __str__(self):
         return self.name
 
-
     group = ForeignKey(Group, blank=True,null=True, on_delete=PROTECT)
     name = CharField(max_length=255, unique=True)
-    private = BooleanField(db_default=True)
-    internal = BooleanField(default=False)
+    public = BooleanField(db_default=False)
 
 
 class Project(AutoCompleteNexus, AutoCompleteREST, trigger="^", hex_color="8338ec"):
@@ -293,7 +315,7 @@ class Task(RESTModel, AutoCompleteNexus):
 
     @hook(BEFORE_CREATE)
     def assign_to_new(self):
-        if not self.stream:
+        if not getattr(self,"stream",False):
             self.stream = self.project.default_stream
         last_in_order = self.stream.tasks.order_by("order").last()
         if last_in_order and last_in_order.order:

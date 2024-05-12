@@ -27,12 +27,8 @@ api = API(namespace="project", session={})
 def main(request):
     return render(
         request,
-        "project/main.html",
+        "shared/main.html",
         {
-            "project_form": Project.form(request)(),
-            "task_form"  :  Task.form(request)() ,
-            "Project" : Project,
-            "Task" : Task,
             "standalone": not request.htmx,
         },
     )

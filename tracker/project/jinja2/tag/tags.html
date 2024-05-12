@@ -7,7 +7,7 @@
 </div>
 
 <script type="module">
-    import {ui_state, inplace_edit, create_button} from "d3-ui";
+    import {ui_state, inplace_edit, create_button,append_edit_attr} from "d3-ui";
     const tags = {{dumps(insts)|safe}};
     const observable_data =   mobx.makeAutoObservable({tags});
 
@@ -21,23 +21,28 @@
       .selectAll("li.list-group-item")
       .data(observable_data.tags,d=>d.id)
       .join("li")
-      .classed("list-group-item d-flex align-items-middle justify-content-between",true)
+      .classed("list-group-item ",true)
       .each(function(d){
           const hx_args =  {
               "hx-delete" : ui_state.models["project.Tag"].rest_pk.replace("__pk__", d.id),
               "hx-on::after-request"  :  "window.reset_ui('reloadTags')",
               "hx-swap" : "none",
           }
-          const sel = d3.select(this);
-          inplace_edit(sel, d, "name", "Name",{display_attr : "name"});
-           sel
-            .append("button")    
-                .attr("type","button")
-                .classed("btn btn-outline-danger p-1 m-1",true)
-                .html("X")
-                .attrs(window.delete_modal.attrs)
-                .on("click", e=>{
-                    window.delete_modal(hx_args);
-                })
+          const sel = d3.select(this).append("div").classed("d-flex align-items-middle justify-content-between",true);
+          if (d.can_delete){
+              inplace_edit(sel, d, "name", "Name",{display_attr : "name"});
+               sel
+                .append("button")    
+                    .attr("type","button")
+                    .classed("btn btn-outline-danger p-1 m-1",true)
+                    .html("X")
+                    .attrs(window.delete_modal.attrs)
+                    .on("click", e=>{
+                        window.delete_modal(hx_args);
+                    })
+                append_edit_attr(d3.select(this).append("div"), d, "public", "Public" );
+            } else {
+               sel.html(d.name)
+            }
       })
 </script>

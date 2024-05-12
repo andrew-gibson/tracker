@@ -1,11 +1,16 @@
 {% if  standalone %} {% extends "base.html" %} {% endif %}
 
-{% block content%}
+{% block nav %}
+    {%with navbar=[],navdropdown=[ "shared/metadata-link.html"]%}
+        {%include "navbar.html"%}
+    {%endwith%}
+{%endblock%}
 
+{% block content%}
 <div id="main-content" >
     <div id="smart_input" x-data>
         <p style="font-size: 0.8em" class="text-secondary mb-0">
-            {{Project.describe_links()}}
+            {{models["project.Project"].describe_links()}}
         </p>
         <div hx-on::after-request="event.detail.requestConfig.verb == 'post' ? window.reset_ui('reloadProjects') : false">
             <div hx-trigger="load"
@@ -20,7 +25,4 @@
     </div>
 
 </div>
-
-
-
 {%endblock%}

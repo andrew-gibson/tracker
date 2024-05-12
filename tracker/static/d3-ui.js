@@ -475,7 +475,7 @@ export const append_edit_local_attr = function(selection,observable_data, attr="
                     })
 
 
-            } else if (type == "CharField"){
+            } else if (type == "CharField" || type == "EmailField"){
                 normal_mode
                     .append("button")
                     .attr("type","button")

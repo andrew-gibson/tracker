@@ -183,8 +183,9 @@ class RESTModel(LifecycleModelMixin, Model):
     def DELETE(cls, request, pk):
         inst, inst_dict = cls.get_projection_by_pk(request, pk)
         try:
-            inst.delete()
-            return  HttpResponse("")
+            if getattr(inst,"can_i_delete",lambda r : True)(request):
+                inst.delete()
+                return  HttpResponse("")
         except:
             return HttpResponseBadRequest()
 
@@ -211,8 +212,8 @@ class RESTModel(LifecycleModelMixin, Model):
         return cls.filter(qs, request)
 
     def add_user(self, request):
-        if getattr(self, "group", False):
-            self.group =request.user.main_group
+        if "group" in self.model_info["fields"]:
+            self.group = request.user.main_group
             self.save()
 
     def get_absolute_url(self):

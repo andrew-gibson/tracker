@@ -42,6 +42,34 @@ name_count = (
     producers.attr("name_count"),
 )
 
+def tag_spec(cls, request):
+    return [
+        __type__,
+        "id",
+        {
+            "can_delete": (
+                qs.include_fields("group"),
+                producers.method("can_i_delete", request),
+            )
+        },
+        "name",
+        "public",
+    ]
+
+def team_spec(cls, request):
+    return [
+        __type__,
+        "id",
+        {
+            "can_delete": (
+                qs.include_fields("group"),
+                producers.method("can_i_delete", request),
+            )
+        },
+        "name",
+        "public",
+    ]
+
 
 def stream_spec(cls, request):
     settings = cls.settings(request)

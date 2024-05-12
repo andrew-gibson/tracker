@@ -1,9 +1,10 @@
 {% if  standalone %} {% extends "base.html" %} {% endif %}
 
-{% block account_dropdown %}
-  <li><a class="dropdown-item" href="#" id="settings-completed"></a></li>
-  <li><a class="dropdown-item" href="#">Delete</a></li>
-{% endblock %}
+{% block nav %}
+    {%with navbar=[ "shared/main-link.html"],navdropdown=[ "shared/metadata-link.html","project/project-navdropdown.html"]%}
+        {%include "navbar.html"%}
+    {%endwith%}
+{%endblock%}
 
 {% block content %}{%with project=inst  %}
 <div id="main-content" >
