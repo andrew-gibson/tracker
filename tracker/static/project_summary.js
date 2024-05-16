@@ -1,4 +1,5 @@
-import  { append_edit_attr,ui_state, make_right_dropdown, create_button} from "d3-ui";
+import  { append_edit_attr,ui_state, make_right_dropdown, create_button } from "d3-ui";
+
 export const project_summary = project => {
     const observable_data = mobx.makeAutoObservable( project);
     const root = d3.select(`#project${project.id}`)

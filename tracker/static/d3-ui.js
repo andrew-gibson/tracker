@@ -29,7 +29,7 @@ export const ui_state = mobx.makeAutoObservable({
         if (!active) {
             return "";
         }
-        const id =  active.d.id ?  active.d.id : "__new__";
+        const id =  active.d.id ?  active.d.id : "-new-";
         return  `${active.d.__type__.replace(".","-")}-${id}-${active.attr}-`
     },
     ids (active=null){
@@ -336,7 +336,8 @@ export const create_button = function(selection,make_observable_data, attr="",ti
         .html(title)
 };
 
-export const inplace_edit = function(selection,
+
+export const inplace_char_edit = function(selection,
                                     observable_data, 
                                     attr="",
                                     title="" , 
@@ -396,8 +397,8 @@ export const append_edit_attr = function(selection,observable_data, ...args ){
     }
 }
 
-export const append_edit_local_attr = function(selection,observable_data, attr="",title="",options={on_change:null}  ){
-    const {on_change} = options;
+export const append_edit_local_attr = function(selection,observable_data, attr="",title="",options={}  ){
+    const {on_change,display_attr=attr} = options;
     const type = ui_state.models[observable_data.__type__].fields[attr]
     const ids = ui_state.ids({attr,d:observable_data})
 
@@ -536,37 +537,44 @@ export const append_edit_local_attr = function(selection,observable_data, attr="
                     .append("div")
                     .classed("me-1",true)
                     .call(selecion=>{
-                        autoRun(()=>selecion.html(observable_data[attr] ))
+                        autoRun(()=>selecion.html(observable_data[display_attr] ))
                     })
 
                 insert_mode
                     .append("div")
-                    .classed("align-items-center border p-1 w-100",true)
-                    .append("span")
-                    .classed("input-group-text w-100",true)
-                    .attr("id", ids.insert_label)
-                    .html(title)
+                    .styles({
+                        "background-color" : "rgba(0,0,0,.03)",
+                    })
+                    .classed("d-flex justify-content-between align-items-center border p-1 w-100",true)
+                    .append("div")
+                        .classed(" fw-bold pe-3 ps-3",true)
+                        .attr("id", ids.insert_label)
+                        .html(title)
+                    .select_parent()
+                        .append("div")
+                        .classed("",true)
+                        .styles({
+                            "overflow-x" : "hidden",
+                        })
+                        .attr("id", ids.insert_label+"command-bar")
+                .select_parent()
                 .select_parent()
                     .append("textarea")
                     .classed("form-control mt-1",true)
                     .attr("id",ids.insert_input)
                     .attr("rows", 5)
                     .attr("name", attr)
-                    .on("keyup",e => {
-                        keyup_esc(reset_active)(e)
-                        keyup_enter(e=>{
-                            observable_data[attr] = e.target.value;
-                            send_model(observable_data);
-                            reset_active(e)
-                            if (on_change){
-                                _.delay(ui_state.reset_ui, 100, on_change)
-                            }
-                        })(e)
-                    })
                     .call(selection =>{
+                        const content =  observable_data[attr] || "1. \n2. \n3. ";
+                        const element =  selection.node();
                         autoRun(()=>{
-                          selection.html(observable_data[attr])
-                        } )
+                          selection.node().value = observable_data[attr];
+                        })
+                        const editor =  new TinyMDE.Editor({content, element});
+                        new TinyMDE.CommandBar({
+                            element: ids.insert_label+"command-bar",
+                            editor
+                        })
                     })
                 .select_parent()
                     .append("div")

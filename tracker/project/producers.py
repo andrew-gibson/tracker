@@ -1,9 +1,22 @@
+import markdown
 from django.apps import apps
 from django.db.models import CharField, Value, Q, Count, CharField, F
 from django.db.models.functions import Concat, Replace
 from django_readers import qs, pairs, projectors, producers, specs
+from core import utils
+
+
+def render_markdown(attr):
+    prepare = qs.include_fields(attr)
+
+    def produce(inst):
+        return markdown.markdown(getattr(inst, attr))
+
+    return prepare, produce
+
 
 __type__ = {"__type__": (qs.noop, producers.attrgetter("_meta.label"))}
+
 
 basic_spec = [
     "name",
@@ -42,6 +55,7 @@ name_count = (
     producers.attr("name_count"),
 )
 
+
 def tag_spec(cls, request):
     return [
         __type__,
@@ -55,6 +69,7 @@ def tag_spec(cls, request):
         "name",
         "public",
     ]
+
 
 def team_spec(cls, request):
     return [
@@ -89,45 +104,67 @@ def stream_spec(cls, request):
     ]
 
 
-project_spec = [
-    __type__,
-    "text",
-    {
-        "rendered_text": (
-            qs.include_fields("text"),
-            producers.method("render_text"),
-        )
-    },
-    "id",
-    "name",
-    specs.relationship(
-        "streams",
-        [
-            pairs.filter(project_default=True),
-            __type__,
-            "name",
-            "id",
-            {"tasks": task_spec},
-        ],
-        to_attr="unassigned_tasks",
-    ),
-    {
-        "streams": [
-            pairs.filter(project_default=False),
-            __type__,
-            "name",
-            "id",
-            {"name_count": name_count},
-            {"tasks": task_spec},
-        ],
-    },
-    {
-        "point_of_contact": [__type__, "name", "id"],
-    },
-    {
-        "teams": [__type__, "name", "id"],
-    },
-    {
-        "tags": [__type__, "name", "id"],
-    },
-]
+def project_spec(cls, request):
+    Stream = apps.get_model("project.Stream")
+    ProjectLog = apps.get_model("project.ProjectLog")
+    return [
+        __type__,
+        "text",
+        {"rendered_text": render_markdown("text")},
+        "id",
+        "name",
+        specs.relationship(
+            "streams",
+            [
+                pairs.filter(project_default=True),
+                __type__,
+                "name",
+                "id",
+                {"tasks": task_spec},
+            ],
+            to_attr="unassigned_tasks",
+        ),
+        {
+            "streams": [
+                pairs.filter(project_default=False),
+                __type__,
+                "name",
+                "id",
+                {"name_count": name_count},
+                {"tasks": task_spec},
+            ],
+        },
+        {
+            "log": [__type__, "id"],
+        },
+        {
+            "point_of_contact": [__type__, "name", "id"],
+        },
+        {
+            "teams": [__type__, "name", "id"],
+        },
+        {
+            "tags": [__type__, "name", "id"],
+        },
+    ]
+
+
+def projectlog_spec(cls, request):
+    ProjectLogEntry = apps.get_model("project.ProjectLogEntry")
+    return [
+        __type__,
+        {"project" : ["id",__type__]},
+        "id",
+        {"entries": projectlogentry_spec(ProjectLogEntry, request)},
+    ]
+
+
+def projectlogentry_spec(cls, request):
+    return [
+        __type__,
+        "id",
+        "text",
+        {"log": ["id",__type__]},
+        {"rendered_text": render_markdown("text")},
+        "addstamp",
+    ]

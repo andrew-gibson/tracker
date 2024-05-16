@@ -9,9 +9,16 @@
 {% block content %}{%with project=inst  %}
 <div id="main-content" >
     <div id="project{{project.id}}" class="card task p-0">
-        <div class="card-header fs-6 p-0 justify-content-between d-flex align-items-center">
-        </div>
-        <div class="card-body pt-1 pb-0">
+        <div class="card-body pt-0 pb-0 row">
+            <div class="col-6 left ">
+            </div>
+            <div class="col-6 right border-start border-2 p-0" style="overflow-y:scroll;scrollbar-width:none; ">
+                {%with _url =  url("core:rest", kwargs={ "m" : "project.ProjectLog","pk" : project.log.id })    %}
+                    <div hx-trigger="load,reloadLog from:document" 
+                         hx-get="{{_url}}">
+                    </div>
+                {%endwith%}
+            </div>
         </div>
         <div class="row align-items-center card-footer text-body-secondary fs-6 p-2">
             <div class=" col-4" id="new-stream">
@@ -19,8 +26,8 @@
             </div>
             <div class="col-8">
                 {%with params=add_encode_parameter("f",{"ac_filters" :  { "stream" : { "project_id" :inst.id }},
-                                                                   "attach_to": {"attr" : "project", "pk" : inst.id},
-                                                                   "exclude" :  ["project"]}),
+                                                         "attach_to": {"attr" : "project", "pk" : inst.id},
+                                                         "exclude" :  ["project"]}),
                        _url =  url("core:create_from_parsed", kwargs={"attr" :"name", "m" : "project.Task"}) %}
                     <p style="font-size: 0.8em" class="text-secondary mb-0">
                         {{models["project.Task"].describe_links()}}

@@ -1,7 +1,6 @@
 import re
 import sys
 import uuid
-import markdown
 from datetime import date
 from itertools import product
 
@@ -14,6 +13,7 @@ from django.db.models import (
     CASCADE,
     PROTECT,
     SET_NULL,
+    BigAutoField,
     BooleanField,
     CharField,
     DateField,
@@ -164,13 +164,11 @@ class Project(AutoCompleteNexus, AutoCompleteREST, trigger="^", hex_color="8338e
     @hook(AFTER_CREATE)
     def add_default_stream(self):
         self.streams.create(name="New", project_default=True)
+        ProjectLog(project=self).save()
 
     @property
     def default_stream(self):
         return self.streams.get(project_default=True)
-
-    def render_text(self):
-        return markdown.markdown(self.text)
 
     name = CharField(max_length=255)
     text = TextField(blank=True)
@@ -182,9 +180,44 @@ class Project(AutoCompleteNexus, AutoCompleteREST, trigger="^", hex_color="8338e
         related_name="sub_projects",
     )
     point_of_contact = ForeignKey("Contact", on_delete=SET_NULL, null=True)
-    teams = ManyToManyField("Team" )
+    teams = ManyToManyField("Team")
     tags = ManyToManyField("Tag")
 
+
+class ProjectLog(RESTModel):
+    spec = producers.projectlog_spec
+    form_fields = ["project"]
+
+    @classmethod
+    def belongs_to_user(cls, request):
+        filters = cls.get_filters(request)
+        return cls.objects.filter(project__group__in = request.user.groups.all()).filter(filters)   
+
+    @property
+    def id(self):
+        return self.project.id
+
+    group = None
+    project = OneToOneField(Project, on_delete=CASCADE, related_name="log")
+
+
+class ProjectLogEntry(RESTModel):
+    spec = producers.projectlogentry_spec
+    form_fields = ["log","text"]
+
+    class Meta:
+        ordering = ("-addstamp",)
+
+    @classmethod
+    def belongs_to_user(cls, request):
+        filters = cls.get_filters(request)
+        return cls.objects.filter(log__project__group__in = request.user.groups.all()).filter(filters)   
+
+    group = None
+    text = TextField(blank=True)
+    addstamp = DateTimeField(auto_now_add=True)
+    editstamp = DateTimeField(auto_now=True)
+    log = ForeignKey(ProjectLog, on_delete=CASCADE, related_name="entries")
 
 
 class Stream(AutoCompleteREST, trigger="~", hex_color="036666"):

@@ -1,4 +1,4 @@
-import  {ui_state, make_right_dropdown, inplace_edit,make_cancel_button, append_edit_attr} from "d3-ui";
+import  {ui_state, make_right_dropdown, inplace_char_edit,make_cancel_button, append_edit_attr} from "d3-ui";
 export const stream_mini = (stream)=>{
     const observable_data = mobx.makeAutoObservable(stream);
 
@@ -10,7 +10,7 @@ export const stream_mini = (stream)=>{
         .classed("border-bottom fs-3 mb-2 p-1 d-flex align-items-center justify-content-between pe-0" ,true)
         .append("span")
         .call(function(selection){
-            inplace_edit(selection, observable_data, "name", "Name",{display_attr : "name_count"});
+            inplace_char_edit(selection, observable_data, "name", "Name",{display_attr : "name_count"});
         })
         .select_parent()
         .call(function(selection){

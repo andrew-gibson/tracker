@@ -7,7 +7,7 @@
 </div>
 
 <script type="module">
-    import {ui_state, inplace_edit, create_button} from "d3-ui";
+    import {ui_state, inplace_char_edit, create_button} from "d3-ui";
     const contacts = {{dumps(insts)|safe}};
     const observable_data =   mobx.makeAutoObservable({contacts});
 
@@ -29,7 +29,7 @@
               "hx-swap" : "none",
           }
           const sel = d3.select(this);
-          inplace_edit(sel, d, "name", "Name",{display_attr : "name"});
+          inplace_char_edit(sel, d, "name", "Name",{display_attr : "name"});
            sel
             .append("button")    
                 .attr("type","button")

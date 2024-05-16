@@ -241,7 +241,7 @@ class AutoCompleteNexus:
         return words
 
     @classmethod
-    def cls_text_scan(cls, text_input, results):
+    def cls_text_scan(cls, text_input, results, triggers):
         return results
 
     @classmethod
@@ -332,7 +332,6 @@ class AutoCompleteNexus:
             )
             setattr(obj, instructions["attr"], atachee)
 
-        obj.save()
         obj.add_user(request)
 
 

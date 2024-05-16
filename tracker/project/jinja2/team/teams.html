@@ -7,7 +7,7 @@
 </div>
 
 <script type="module">
-    import {ui_state, inplace_edit, create_button,append_edit_attr} from "d3-ui";
+    import {ui_state, inplace_char_edit, create_button,append_edit_attr} from "d3-ui";
     const teams = {{dumps(insts)|safe}};
     const observable_data =   mobx.makeAutoObservable({teams});
 
@@ -32,7 +32,7 @@
           const sel = d3.select(this).append("div").classed("d-flex align-items-middle justify-content-between",true);
 
           if (d.can_delete){
-              inplace_edit(sel, d, "name", "Name",{display_attr : "name"});
+              inplace_char_edit(sel, d, "name", "Name",{display_attr : "name"});
                sel
                 .append("button")    
                     .attr("type","button")

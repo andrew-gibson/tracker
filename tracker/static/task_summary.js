@@ -1,5 +1,5 @@
 
-import  { append_edit_attr,ui_state, make_right_dropdown,autoRun, is_null,create_button, inplace_edit} from "d3-ui";
+import  { append_edit_attr,ui_state, make_right_dropdown,autoRun, is_null,create_button, inplace_char_edit} from "d3-ui";
 
 export const task_state = mobx.makeAutoObservable({
     tasks : [],
@@ -58,20 +58,19 @@ export const project_summary =  project => {
     const observable_data = mobx.makeAutoObservable( project);
     const root = d3.select(`#project${project.id}`)
         .call(function(selection){
-            selection.select(".card-header").remove();
-            const body_sel = selection.select(".card-body");
-            append_edit_attr(body_sel, observable_data, "name", "Name");
-            append_edit_attr(body_sel, observable_data, "text","Description");
-            const row = body_sel.append("div").classed("row",true)
-            append_edit_attr(row.append("div").classed("border-end border-3 col-4",true), observable_data,"point_of_contact", "Contact");
-            append_edit_attr(row.append("div").classed("border-end border-3 col-4",true), observable_data,"tags", "Tags");
-            append_edit_attr(row.append("div").classed("border-end border-3 col-4",true), observable_data,"teams", "Teams");
+            const left_sel = selection.select(".card-body .left");
+            append_edit_attr(left_sel, observable_data, "name", "Name");
+            append_edit_attr(left_sel, observable_data, "text","Description",{display_attr:"rendered_text"});
+            append_edit_attr(left_sel, observable_data,"point_of_contact", "Contact");
+            append_edit_attr(left_sel, observable_data,"tags", "Tags");
+            append_edit_attr(left_sel, observable_data,"teams", "Teams");
             create_button( selection.select("#new-stream"), 
                           ()=>mobx.makeAutoObservable({name:"",__type__:"project.Stream",project:observable_data}),
                           "name",
                           "+ Workstream",
                         {on_change : "reloadTasks"})
         })
+
     ui_state.active_elements.push(root)
 };
 
@@ -91,8 +90,8 @@ export const task_summaries = tasks=>{
             const body_sel = selection.select(".card-body");
             const footer_sel = selection.select(".card-footer");
 
-           inplace_edit(header_left.append("div").style("width","15%").style("display","inline-block"), observable_data, "order", "Order",{btn_class : "btn-outline-primary", on_change : "reloadTasks", input_class : "w-25"} );
-           inplace_edit(header_left.append("div").style("width","85%").style("display","inline-block"), observable_data, "name", "Name");
+           inplace_char_edit(header_left.append("div").style("width","15%").style("display","inline-block"), observable_data, "order", "Order",{btn_class : "btn-outline-primary", on_change : "reloadTasks", input_class : "w-25"} );
+           inplace_char_edit(header_left.append("div").style("width","85%").style("display","inline-block"), observable_data, "name", "Name");
            const hx_args =  {
                 "hx-delete" : ui_state.models["project.Task"].rest_pk.replace("__pk__", task.id),
                 "hx-on::after-request"  :  "window.reset_ui('reloadTasks')",

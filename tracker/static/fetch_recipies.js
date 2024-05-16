@@ -29,3 +29,4 @@ const fetch_recipies = {
     }
 };
 export default fetch_recipies;
+window.__fetch =  fetch_recipies;
