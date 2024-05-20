@@ -15,7 +15,7 @@ export const stream_mini = (stream)=>{
         .select_parent()
         .call(function(selection){
             const hx_args =  {
-                "hx-delete" : ui_state.models["project.Stream"].rest_pk.replace("__pk__", stream.id),
+                "hx-delete" : ui_state.models["project.Stream"].main_pk.replace("__pk__", stream.id),
                 "hx-on::after-request"  :  "window.reset_ui('reloadTasks')",
                 "hx-swap" : "none",
             }

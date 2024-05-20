@@ -2,9 +2,8 @@ import json
 import re
 
 from django.apps import apps
-from django.contrib.auth.models import Group
 from django.core.exceptions import ObjectDoesNotExist
-from django.db.models import Field, Model, Q, PROTECT, ForeignKey
+from django.db.models import Field, Model, Q, PROTECT, ForeignKey, Manager
 from django.forms import ModelForm, modelform_factory
 from django.http import JsonResponse, Http404, QueryDict,HttpResponse
 from django_lifecycle import LifecycleModelMixin
@@ -14,11 +13,6 @@ from django.shortcuts import get_object_or_404
 from .utils import classproperty, render, flatten, get_related_model_or_404
 from tracker.jinja2 import add_encode_parameter, decode_get_params
 
-
-class belongs_to:
-    @classmethod
-    def belongs_to_user(cls, request):
-        return cls.objects
 
 
 class RequestForm(ModelForm):
@@ -32,19 +26,50 @@ class RequestForm(ModelForm):
                 setattr(field.widget.a_c, "request", self.request)
 
 
-class RESTModel(LifecycleModelMixin, Model):
+class CoreManager(Manager):
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        if "group" in [x.name for x in self.model._meta.concrete_fields]:
+            return  qs.prefetch_related("group")
+        return qs
+
+    def user_get(self,request,*args,**kwargs):
+        try:
+            return self.user_filter(request).get(*args,**kwargs)
+        except self.model.DoesNotExist:
+            raise Http404("cannot find requested object")
+
+    def user_filter(self, request):
+        if hasattr(self.model, "user_filter"):
+            return self.model.user_filter(request)
+        return self.filter(group__in=request.user.groups.all())
+
+    def user_delete(self,request,*args,**kwargs):
+        try:
+            obj =  self.user_filter(request).get(*args,**kwargs)
+            if getattr(obj,"can_delete",lambda r : True)(request):
+                obj.delete()
+            else:
+                raise Http404("cannot find requested object")
+        except self.model.DoesNotExist:
+            raise Http404("cannot find requested object")
+
+
+
+class CoreModel(LifecycleModelMixin, Model):
     class Meta:
         abstract = True
 
-    group = ForeignKey(Group, blank=True,on_delete=PROTECT)
+    objects = CoreManager()
 
     @classproperty
     def model_info(cls):
         return  {
         "fields" : cls.fields_map,
         "search_relation" : reverse("core:text_ac",kwargs={"m" : cls._meta.label}),
-        "rest" : reverse("core:rest",kwargs={"m" : cls._meta.label}),
-        "rest_pk" : reverse("core:rest",kwargs={"m" : cls._meta.label, "pk" : 9999}).replace("9999","__pk__"),
+        "main" : reverse("core:main",kwargs={"m" : cls._meta.label}),
+        "main_pk" : reverse("core:main",kwargs={"m" : cls._meta.label, "pk" : 9999}).replace("9999","__pk__"),
         "rgba" : getattr(cls,"trigger_color", "rgba(21,21,21,0.3))"),
         "hex" : getattr(cls, "hex_trigger_color", "#1a1a1a"), 
     }
@@ -77,10 +102,10 @@ class RESTModel(LifecycleModelMixin, Model):
         try:
             return [
                 (x, projection(x))
-                for x in prepare_qs(cls.belongs_to_user(request).filter(pk=pk))
+                for x in prepare_qs(cls.objects.user_filter(request).filter(pk=pk))
             ][0]
-        except:
-            raise Http404("No Model matches the given query")
+        except cls.DoesNotExist:
+            raise Http404("No object matches the given query")
 
     @classproperty
     def _name(cls):
@@ -106,8 +131,8 @@ class RESTModel(LifecycleModelMixin, Model):
         context = {"form": form}
         preoare_qs, projection = cls.readers(request)
         if form.is_valid():
-            inst = form.save()
-            # by default associate objects with their creator
+            inst = form.instance
+            # by default associasave()te objects with their creator
             inst.add_user(request)
             _, context["inst"] = cls.get_projection_by_pk(request, inst.pk)
             if request.json:
@@ -165,7 +190,7 @@ class RESTModel(LifecycleModelMixin, Model):
                 },
             )
         else:
-            insts = [projection(p) for p in prepare_qs(cls.belongs_to_user(request)).order_by(*cls._meta.ordering)]
+            insts = [projection(p) for p in prepare_qs(cls.objects.user_filter(request)).order_by(*cls._meta.ordering)]
             if request.json:
                 return JsonResponse(insts, safe=False)
             return render(
@@ -181,14 +206,8 @@ class RESTModel(LifecycleModelMixin, Model):
 
     @classmethod
     def DELETE(cls, request, pk):
-        inst, inst_dict = cls.get_projection_by_pk(request, pk)
-        try:
-            if getattr(inst,"can_i_delete",lambda r : True)(request):
-                inst.delete()
-                return  HttpResponse("")
-        except:
-            return HttpResponseBadRequest()
-
+        cls.objects.user_delete(request,pk=pk)
+        return HttpResponse("Deleted")
 
     @classmethod
     def filter(cls, qs, request):
@@ -200,27 +219,14 @@ class RESTModel(LifecycleModelMixin, Model):
             filters = decode_get_params(request.GET).get("f",{}).get("filters",{})
             # remove any possible filter terms which might try to alter the
             # users filter condition
-            return Q(**{k: v for k,v in filters.items() if "users" not in k})
+            return Q(**{k: v for k,v in filters.items() if "group" not in k})
         except:
             raise Http404("incorrectly formatted GET params")
-
-
-    @classmethod
-    def belongs_to_user(cls, request):
-        filters = cls.get_filters(request)
-        qs = cls.objects.filter(group__in=request.user.groups.all()).filter(filters)
-        return cls.filter(qs, request)
 
     def add_user(self, request):
         if "group" in self.model_info["fields"]:
             self.group = request.user.main_group
             self.save()
-
-    def get_absolute_url(self):
-        return reverse(
-            "project:project", kwarg={"modelname": self._name(), "pk": self.pk}
-        )
-
 
 class AutoCompleteNexus:
 
@@ -264,7 +270,7 @@ class AutoCompleteNexus:
                 for x in cls.get_autocompletes(excludes=excludes)
             ]
         )
-        return f"Type: {autocompletes}"
+        return f"Add {cls._meta.verbose_name.title()} (Type: {autocompletes})"
 
     @classmethod
     def parse_text(cls, request):
@@ -328,7 +334,7 @@ class AutoCompleteNexus:
             instructions = f.get("attach_to")
             atachee_model = get_related_model_or_404(cls, instructions["attr"])[0]
             atachee = get_object_or_404(
-                atachee_model.belongs_to_user(request), pk=instructions["pk"]
+                atachee_model.objects.user_filter(request), pk=instructions["pk"]
             )
             setattr(obj, instructions["attr"], atachee)
 
@@ -376,7 +382,7 @@ class AutoCompleteNexus:
                     [x.add_user(request) for x in new_objs]
 
                     existing_objs = (
-                        x["model"].belongs_to_user(request).filter(id__in=existing_ids)
+                        x["model"].objects.user_filter(request).filter(id__in=existing_ids)
                     )
 
                     if x["many_to_many"]:
@@ -394,7 +400,7 @@ class AutoCompleteNexus:
 triggers = set()
 
 
-class AutoCompleteREST(RESTModel):
+class AutoCompleteCoreModel(CoreModel):
     class Meta:
         abstract = True
 
@@ -428,7 +434,7 @@ class AutoCompleteREST(RESTModel):
         else:
             q = Q(**{f"{f}__icontains": query})
 
-        return cls.belongs_to_user(request).filter(q).distinct()
+        return cls.objects.user_filter(request).filter(q).distinct()
 
     @classmethod
     def ac(

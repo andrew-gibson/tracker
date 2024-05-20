@@ -26,5 +26,6 @@ psycopg
 python-dateutil
 pytz
 redis
+rules
 requests
 uvicorn

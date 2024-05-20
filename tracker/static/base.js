@@ -12,7 +12,7 @@ const setClipboard = (text) => {
 
 
 
-const setup_rest_model_store = (model_name, fields)=> {
+const setup_main_model_store = (model_name, fields)=> {
 
 
 

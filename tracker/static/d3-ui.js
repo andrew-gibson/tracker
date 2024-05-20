@@ -170,10 +170,10 @@ const send_model = async model =>{
     let url;
     if (obj.id) {
         f = fetch_recipies.PUT;
-        url = ui_state.models[model.__type__].rest_pk.replace("__pk__",model.id);
+        url = ui_state.models[model.__type__].main_pk.replace("__pk__",model.id);
     } else {
         f = fetch_recipies.POST;
-        url = ui_state.models[model.__type__].rest;
+        url = ui_state.models[model.__type__].main;
     }
     const resp = await f(url, 
         new URLSearchParams(obj).toString(), 
@@ -223,7 +223,7 @@ const toggle_fk_attr = async (result) => {
         resp = await fetch_recipies.POST(result.url, {},true);
     }
     if (resp.status == 200) {
-        const data = await fetch_recipies.GETjson(model_info.rest_pk.replace("__pk__",d.id));
+        const data = await fetch_recipies.GETjson(model_info.main_pk.replace("__pk__",d.id));
         d[attr] = data[attr];
         return true;
     } else {

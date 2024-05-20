@@ -12,7 +12,7 @@
     const observable_data =   mobx.makeAutoObservable({teams});
 
     create_button( d3.select("#teams .card-header"), 
-                  ()=>mobx.makeAutoObservable({name:"",__type__:"project.Team"}),
+                  ()=>mobx.makeAutoObservable({name:"",__type__:"project.ProjectGroup"}),
                   "name",
                   "+ Team",
                 {on_change : "reloadTeams"})
@@ -25,7 +25,7 @@
       .each(function(d){
 
           const hx_args =  {
-              "hx-delete" : ui_state.models["project.Team"].rest_pk.replace("__pk__", d.id),
+              "hx-delete" : ui_state.models["project.ProjectGroup"].main_pk.replace("__pk__", d.id),
               "hx-on::after-request"  :  "window.reset_ui('reloadTeams')",
               "hx-swap" : "none",
           }
@@ -42,7 +42,7 @@
                     .on("click", e=>{
                         window.delete_modal(hx_args);
                     })
-                append_edit_attr(d3.select(this).append("div"), d, "public", "Public" );
+                //append_edit_attr(d3.select(this).append("div"), d, "public", "Public" );
             } else {
                sel.html(d.name)
             }

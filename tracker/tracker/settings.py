@@ -20,6 +20,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 LOGIN_URL = "/core/login/"
 ALLOWED_HOSTS = ["0.0.0.0", "127.0.0.1"]
 AUTH_USER_MODEL = "core.User"
+AUTH_GROUP_MODEL = "core.Group"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 INTERNAL_IPS = [
     "127.0.0.1",
@@ -58,10 +59,14 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "core",
     "project",
+    "rules",
     #"debug_toolbar",
 ]
 
-
+AUTHENTICATION_BACKENDS = (
+    'rules.permissions.ObjectPermissionBackend',
+    'django.contrib.auth.backends.ModelBackend',
+)
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",

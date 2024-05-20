@@ -65,6 +65,13 @@ def add_to_admin(cls):
     cls.__add_to_admin = True
     return cls
 
+def field_names(model):
+    fields = (
+        model._meta.concrete_fields
+        + model._meta.related_objects
+        + model._meta.many_to_many
+    )
+    return {f.name: _(f.name) for f in fields}
 
 class classproperty:
     """

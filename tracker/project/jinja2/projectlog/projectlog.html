@@ -5,11 +5,10 @@
 </div>
 
 <script type="module">
+import { append_edit_attr, ui_state } from "d3-ui";
 
-import { append_edit_attr } from "d3-ui";
 const log = {{dumps(inst)|safe}};
 const observable_data = mobx.makeAutoObservable(log);
-
 const height = d3.select(`#project${log.project.id} .card-body .left`).node().offsetHeight;
 d3.select(`#project${log.project.id} .card-body .right`).style("max-height", `${height}px`);
 
@@ -19,13 +18,27 @@ d3.select(`#projectlog${log.id} .list-group`)
     .join("li")
     .classed("list-group-item",true)
     .each(function(d,i){
+       const delete_hx_args =  {
+            "hx-delete" : ui_state.models["project.ProjectLogEntry"].main_pk.replace("__pk__", d.id),
+            "hx-on::after-request" : "window.reset_ui('reloadLog')",
+            "hx-swap" : "none",
+       }
         const selection = d3.select(this)
                             .append("div")
-                            .classed(" d-flex justify-content-start align-items-center",true)
+                            .classed(" d-flex justify-content-between align-items-center",true);
         append_edit_attr(selection, 
                         d,
                         "text",new Date(d.addstamp).toLocaleDateString(),
                         {on_change : "reloadLog",display_attr : "rendered_text" });
+
+       selection
+            .append("button")    
+                .classed("btn btn-close",true)
+                .attrs(window.delete_modal.attrs)
+                .on("click", e=>{
+                    window.delete_modal(delete_hx_args);
+                })
+
     })
 
 d3.select(`#projectlog${log.id} .list-group`)

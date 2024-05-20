@@ -29,7 +29,7 @@ from text.translate import gettext_lazy as _
 
 from . import models
 from tracker import jinja2
-from .rest import AutoCompleteNexus
+from .core import AutoCompleteNexus
 
 api = API(namespace="core")
 
@@ -74,7 +74,7 @@ def _logout(request):
         "m/<str:m>/<int:pk>/",
     ]
 )
-def rest(request, m="", pk=None):
+def main(request, m="", pk=None):
     session, set_session = api.get_url_session(request)
     model = get_model_or_404(m)
     if not model:
@@ -163,7 +163,7 @@ async def post_and_link(request, m1, pk1, m2, attr=""):
     # create the new m2
     resp = await refetch(
         request,
-        url_name="core:rest",
+        url_name="core:main",
         url_kwargs={"m": m2},
         method="POST",
         payload=request.POST,
@@ -200,7 +200,7 @@ def text_ac(request, m, pk, attr):
     except:
         return HttpResponseBadRequest("incorrectly formatted GET params")
     model = get_model_or_404(m, test=lambda m: issubclass(m, (AutoCompleteNexus,)))
-    obj = get_object_or_404(model.belongs_to_user(request), pk=pk)
+    obj = get_object_or_404(model.user_filter(request), pk=pk)
     f = model._meta.get_field(attr)
     related_model = f.related_model
 

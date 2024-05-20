@@ -18,7 +18,7 @@ _.chain({{dumps(insts)|safe}})
 
 
 <a class="dropdown-item" 
-   hx-put="{{url("core:rest", kwargs={ "m" : "project.Settings", "pk" : settings.id})}}" 
+   hx-put="{{url("core:main", kwargs={ "m" : "project.Settings", "pk" : settings.id})}}" 
    hx-vals='{"hide_done" : {%if settings.hide_done%}false{%else%}true{%endif%} }'
    hx-swap="none"
    hx-headers='{"json-response" : true}'

@@ -13,7 +13,7 @@ export const project_summary = project => {
                     .append("a")    
                         .classed("dropdown-item",true)
                         .attrs({
-                            "hx-delete" : ui_state.models["project.Project"].rest_pk.replace("__pk__", project.id),
+                            "hx-delete" : ui_state.models["project.Project"].main_pk.replace("__pk__", project.id),
                             "hx-on::after-request"  :  "window.reset_ui('reloadProjects')"
                         })
                         .html("Deete")
@@ -29,13 +29,13 @@ export const project_summary = project => {
                     "hx-replace-url":"true",
                     "hx-swap":"outerHTML",
                     "hx-target" : "#main-content",
-                    "hx-get" : ui_state.models["project.Project"].rest_pk.replace("__pk__", project.id),
+                    "hx-get" : ui_state.models["project.Project"].main_pk.replace("__pk__", project.id),
                 })
                 .setup_htmx()
                 .html(observable_data.name)
             append_edit_attr(body_sel, observable_data,"text", "Description");
             append_edit_attr(body_sel, observable_data,"streams", "Streams",{read_only:true, name_attr:"name_count"});
-            append_edit_attr(body_sel, observable_data,"point_of_contact", "Contact");
+            append_edit_attr(body_sel, observable_data,"lead", "Lead");
             append_edit_attr(body_sel, observable_data,"tags", "Tags");
             append_edit_attr(body_sel, observable_data,"teams", "Teams");
             footer_sel.node().remove()

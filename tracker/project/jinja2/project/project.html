@@ -13,7 +13,7 @@
             <div class="col-6 left ">
             </div>
             <div class="col-6 right border-start border-2 p-0" style="overflow-y:scroll;scrollbar-width:none; ">
-                {%with _url =  url("core:rest", kwargs={ "m" : "project.ProjectLog","pk" : project.log.id })    %}
+                {%with _url =  url("core:main", kwargs={ "m" : "project.ProjectLog","pk" : project.log.id })    %}
                     <div hx-trigger="load,reloadLog from:document" 
                          hx-get="{{_url}}">
                     </div>
@@ -27,10 +27,10 @@
             <div class="col-8">
                 {%with params=add_encode_parameter("f",{"ac_filters" :  { "stream" : { "project_id" :inst.id }},
                                                          "attach_to": {"attr" : "project", "pk" : inst.id},
-                                                         "exclude" :  ["project"]}),
+                                                         "excludes" :  ["project","competency"]}),
                        _url =  url("core:create_from_parsed", kwargs={"attr" :"name", "m" : "project.Task"}) %}
                     <p style="font-size: 0.8em" class="text-secondary mb-0">
-                        {{models["project.Task"].describe_links()}}
+                        {{models["project.Task"].describe_links(excludes=["competency","project"])}}
                     </p>
                     <div hx-on::after-request="event.detail.requestConfig.verb == 'post' ? window.reset_ui('reloadTasks') : false">
                         <div hx-trigger="load"
@@ -44,7 +44,7 @@
     </div>
 
     {%with params=add_encode_parameter("f",{"filters" :  { "project" : project.id }}),
-               _url =  url("core:rest", kwargs={ "m" : "project.Stream"})    %}
+               _url =  url("core:main", kwargs={ "m" : "project.Stream"})    %}
         <div hx-trigger="load, reloadTasks from:document" 
              hx-get="{{_url}}?{{params}}">
         </div>

@@ -5,8 +5,12 @@ from datetime import date
 from itertools import product
 
 import dateparser
-from core.rest import AutoCompleteNexus, AutoCompleteREST, RequestForm, RESTModel
+from core.core import AutoCompleteNexus, AutoCompleteCoreModel, RequestForm, CoreModel
+from core.models import Group, User
+
 from core.utils import add_to_admin, classproperty, render
+
+from django.contrib.auth.models import UserManager, GroupManager
 from django.apps import apps
 from django.contrib import admin
 from django.db.models import (
@@ -25,10 +29,10 @@ from django.db.models import (
     PositiveIntegerField,
     ManyToManyField,
     Model,
+    Manager,
     Q,
     TextField,
 )
-from django.contrib.auth.models import Group
 from django.http import QueryDict
 from django.urls import reverse
 from django_lifecycle import (
@@ -39,105 +43,175 @@ from django_lifecycle import (
     hook,
 )
 
-from . import producers 
+from . import producers
 
-class Settings(RESTModel):
+class ProjectGroupManager(GroupManager):
+
+    def get_queryset(self):
+        return (
+            super()
+            .get_queryset()
+            .filter(app="project")
+        )
+
+    def user_get(self,request,*args,**kwargs):
+        try:
+            return self.get(*args,**kwargs)
+        except self.model.DoesNotExist:
+            raise Http404("cannot find requested object")
+
+    def user_filter(self, request):
+        return self.filter()
+
+    def user_delete(self,request,*args,**kwargs):
+        try:
+            obj =  self.get(*args,**kwargs)
+            if request.user.is_staff:
+                obj.delete()
+            else:
+                raise Http404("Cannot delete this object")
+        except self.model.DoesNotExist:
+            raise Http404("cannot find requested object")
+
+class ProjectGroup(Group):
+    objects = ProjectGroupManager()
+    spec = producers.projectgroup_spec
+    form_fields = ["name",]
+
+    class Meta:
+        proxy = True
+
+    @classmethod
+    def user_filter(cls, request):
+        return cls.objects.filter(app="project",system=False)
+
+    def can_i_delete(self, request):
+        return request.user.is_staff
+
+    def add_user(self,request):
+        self.save()
+
+    def save(self,*args,**kwargs):
+        self.app = self.__class__._meta.app_label
+        super().save(*args,**kwargs)
+
+
+class GroupPrefetcherManager(UserManager):
+    use_for_related_fields = True
+
+    def get_queryset(self):
+        return (
+            super()
+            .get_queryset()
+            .prefetch_related("groups")
+            .prefetch_related("projects")
+        )
+
+class ProjectUser(User):
+
+    class Meta:
+        proxy = True
+
+    objects = GroupPrefetcherManager()
+
+
+class Settings(CoreModel):
 
     class _Form(RequestForm):
         class Meta:
-            fields = [ "hide_done", "id" ]
+            fields = ["hide_done", "id"]
 
         def save(self, *args, **kwargs):
             self.instance.user = self.request.user
             super().save(*args, **kwargs)
 
-    group = None
-    spec = ["hide_done", "id", producers.__type__]
-    form_fields = [ "user", "hide_done" ]
-    user = OneToOneField("core.User", on_delete=CASCADE, related_name="project_settings", blank=True)
-    hide_done = BooleanField(default=False,blank=True) 
+    spec = ["hide_done","see_all_projects", "id", producers.__type__]
+    form_fields = ["user", "hide_done"]
+    user = OneToOneField(
+        User, on_delete=CASCADE,  blank=True
+    )
+    hide_done = BooleanField(default=False, blank=True)
+    see_all_projects = BooleanField(default=True, blank=True)
 
     @classmethod
-    def belongs_to_user(cls, request):
+    def user_filter(cls, request):
         return cls.objects.filter(user=request.user)
 
+
 @add_to_admin
-class EXCompetency(AutoCompleteREST, trigger="`", hex_color="2c6e49"):
+class EXCompetency(AutoCompleteCoreModel, trigger="`", hex_color="2c6e49"):
+
+    form_fields = ["name"]
 
     @classmethod
-    def belongs_to_user(cls, request):
+    def user_filter(cls, request):
         return cls.objects.all()
 
-    def can_i_delete(self,request):
+    def can_i_delete(self, request):
         return False
 
     def __str__(self):
         return self.name
 
     spec = producers.basic_spec
-    group = None
     name = CharField(max_length=300, unique=True)
-    form_fields = [ "name" ]
+
 
 @add_to_admin
-class Tag(AutoCompleteREST, trigger="#", hex_color="ffbe0b"):
+class Tag(AutoCompleteCoreModel, trigger="#", hex_color="ffbe0b"):
 
-    class adminClass(admin.ModelAdmin):
-        list_display = ("id","name","public","group")
-        list_editable = ("name","public","group")
-        list_filter = ("public","group")
+    class aVdminClass(admin.ModelAdmin):
+        list_display = ("id", "name", "public", "group")
+        list_editable = ("name", "public", "group")
+        list_filter = ("public", "group")
         search_fields = ("name",)
 
     spec = producers.tag_spec
-    form_fields = [ "name","public" ]
-
-    @classmethod
-    def belongs_to_user(cls, request):
-        filters = cls.get_filters(request)
-        q = Q(group__in = request.user.groups.all()) | Q(public=True)
-        return cls.objects.filter(q).filter(filters).distinct()
-
-    def can_i_delete(self,request):
-        return self.group in request.user.groups.all()
-
-    def __str__(self):
-        return self.name
-
-    name = CharField(max_length=100)
-    public = BooleanField(db_default=False)
-
-@add_to_admin
-class Contact(AutoCompleteREST, trigger="@", hex_color="ff006e"):
-    spec = producers.basic_spec
-    form_fields = ["name", "email"]
-
-    name = CharField(max_length=255)
-    email = EmailField(null=True, blank=True)
-    account = OneToOneField("core.User",null=True, blank=True,on_delete=SET_NULL, related_name="+")
-
-@add_to_admin
-class Team(AutoCompleteREST, trigger="*", hex_color="fb5607"):
-    spec = producers.team_spec
     form_fields = ["name", "public"]
 
     @classmethod
-    def belongs_to_user(cls, request):
+    def user_filter(cls, request):
         filters = cls.get_filters(request)
-        q = Q(group__in = request.user.groups.all()) | Q(public=True)
+        q = Q(group__in=request.user.groups.all()) | Q(public=True)
         return cls.objects.filter(q).filter(filters).distinct()
 
-    def can_i_delete(self,request):
+    def can_i_delete(self, request):
         return self.group in request.user.groups.all()
 
     def __str__(self):
         return self.name
 
-    group = ForeignKey(Group, blank=True,null=True, on_delete=PROTECT)
-    name = CharField(max_length=255, unique=True)
+    group = ForeignKey(ProjectGroup, blank=True,on_delete=PROTECT, related_name="tags")
+    name = CharField(max_length=100)
     public = BooleanField(db_default=False)
 
 
-class Project(AutoCompleteNexus, AutoCompleteREST, trigger="^", hex_color="8338ec"):
+@add_to_admin
+class Contact(AutoCompleteCoreModel, trigger="@", hex_color="ff006e"):
+    spec = producers.basic_spec
+    form_fields = ["name", "email"]
+
+    class adminClass(admin.ModelAdmin):
+        list_display = (
+            "id",
+            "name",
+        )
+        search_fields = ("name",)
+
+    group = ForeignKey(ProjectGroup, blank=True,on_delete=PROTECT, related_name="contacts")
+    name = CharField(max_length=255)
+    email = EmailField(null=True, blank=True)
+    account = OneToOneField(
+        User,
+        null=True,
+        blank=True,
+        on_delete=SET_NULL,
+        related_name="contact",
+    )
+
+
+@add_to_admin
+class Project(AutoCompleteNexus, AutoCompleteCoreModel, trigger="^", hex_color="8338ec"):
     spec = producers.project_spec
 
     class _Form(RequestForm):
@@ -170,8 +244,24 @@ class Project(AutoCompleteNexus, AutoCompleteREST, trigger="^", hex_color="8338e
     def default_stream(self):
         return self.streams.get(project_default=True)
 
+    def am_i_viewer(self, request):
+        return {
+            "selected": request.user in self.viewers.all(),
+            "url": reverse(
+                "core:toggle_link",
+                kwargs={
+                    "m1": self._meta.label,
+                    "pk1": self.id,
+                    "m2": Contact._meta.label,
+                    "pk2": request.user.id,
+                    "attr": "viewers",
+                },
+            ),
+        }
+
+    group = ForeignKey(ProjectGroup, blank=True,on_delete=PROTECT, related_name="projects")
     name = CharField(max_length=255)
-    text = TextField(blank=True)
+    text = TextField(blank=True, null=True)
     parent_project = ForeignKey(
         "self",
         on_delete=SET_NULL,
@@ -179,48 +269,52 @@ class Project(AutoCompleteNexus, AutoCompleteREST, trigger="^", hex_color="8338e
         blank=True,
         related_name="sub_projects",
     )
-    point_of_contact = ForeignKey("Contact", on_delete=SET_NULL, null=True)
-    teams = ManyToManyField("Team")
+    lead = ForeignKey(Contact, on_delete=SET_NULL, null=True)
+    teams = ManyToManyField(ProjectGroup, related_name="projects_supporting")
     tags = ManyToManyField("Tag")
+    viewers = ManyToManyField(User, related_name="projects", blank=True)
 
 
-class ProjectLog(RESTModel):
+class ProjectLog(CoreModel):
     spec = producers.projectlog_spec
     form_fields = ["project"]
 
     @classmethod
-    def belongs_to_user(cls, request):
+    def user_filter(cls, request):
         filters = cls.get_filters(request)
-        return cls.objects.filter(project__group__in = request.user.groups.all()).filter(filters)   
+        return cls.objects.filter(project__group__in=request.user.groups.all()).filter(
+            filters
+        )
 
     @property
     def id(self):
         return self.project.id
 
-    group = None
     project = OneToOneField(Project, on_delete=CASCADE, related_name="log")
 
 
-class ProjectLogEntry(RESTModel):
+class ProjectLogEntry(CoreModel):
     spec = producers.projectlogentry_spec
-    form_fields = ["log","text"]
+    form_fields = ["log", "text"]
 
     class Meta:
         ordering = ("-addstamp",)
 
     @classmethod
-    def belongs_to_user(cls, request):
+    def user_filter(cls, request):
         filters = cls.get_filters(request)
-        return cls.objects.filter(log__project__group__in = request.user.groups.all()).filter(filters)   
+        return cls.objects.filter(
+            log__project__group__in=request.user.groups.all()
+        ).filter(filters)
 
-    group = None
     text = TextField(blank=True)
     addstamp = DateTimeField(auto_now_add=True)
     editstamp = DateTimeField(auto_now=True)
     log = ForeignKey(ProjectLog, on_delete=CASCADE, related_name="entries")
 
 
-class Stream(AutoCompleteREST, trigger="~", hex_color="036666"):
+@add_to_admin
+class Stream(AutoCompleteCoreModel, trigger="~", hex_color="036666"):
     spec = producers.stream_spec
 
     class Meta:
@@ -243,9 +337,11 @@ class Stream(AutoCompleteREST, trigger="~", hex_color="036666"):
             raise Exception("Can't rename 'New'")
 
     @classmethod
-    def belongs_to_user(cls, request):
+    def user_filter(cls, request):
         filters = cls.get_filters(request)
-        return cls.objects.filter(project__group__in = request.user.groups.all()).filter(filters)   
+        return cls.objects.filter(project__group__in=request.user.groups.all()).filter(
+            filters
+        )
 
     @classmethod
     def ac_query(cls, request, query):
@@ -256,19 +352,18 @@ class Stream(AutoCompleteREST, trigger="~", hex_color="036666"):
         else:
             q = Q(name__icontains=query) | Q(project__name__icontains=query)
 
-        return cls.belongs_to_user(request).filter(q).distinct()
+        return cls.user_filter(request).filter(q).distinct()
 
     def __str__(self):
         return f"{self.pk}-{self.name}"
 
-    group = None
     project = ForeignKey(Project, on_delete=CASCADE, related_name="streams")
     project_default = BooleanField(default=False)
     name = CharField(max_length=300)
 
 
-class Task(RESTModel, AutoCompleteNexus):
-    spec = producers.task_spec 
+class Task(CoreModel, AutoCompleteNexus):
+    spec = producers.task_spec
 
     class Meta:
         ordering = ["done", "order", "start_date"]
@@ -284,9 +379,11 @@ class Task(RESTModel, AutoCompleteNexus):
     ]
 
     @classmethod
-    def belongs_to_user(cls, request):
+    def user_filter(cls, request):
         filters = cls.get_filters(request)
-        return cls.objects.filter(project__group__in = request.user.groups.all()).filter(filters)
+        return cls.objects.filter(project__group__in=request.user.groups.all()).filter(
+            filters
+        )
 
     @classmethod
     def cls_text_scan(cls, text_input, results, triggers):
@@ -348,26 +445,23 @@ class Task(RESTModel, AutoCompleteNexus):
 
     @hook(BEFORE_CREATE)
     def assign_to_new(self):
-        if not getattr(self,"stream",False):
+        if not getattr(self, "stream", False):
             self.stream = self.project.default_stream
         last_in_order = self.stream.tasks.order_by("order").last()
         if last_in_order and last_in_order.order:
-            self.order =  last_in_order.order + 1
+            self.order = last_in_order.order + 1
         else:
             self.order = 1
 
-    group = None
     order = PositiveIntegerField(null=True)
     project = ForeignKey(Project, on_delete=CASCADE, related_name="tasks")
-    stream = ForeignKey(
-        Stream, on_delete=PROTECT, blank=True,  related_name="tasks"
-    )
+    stream = ForeignKey(Stream, on_delete=PROTECT, blank=True, related_name="tasks")
     start_date = DateField(default=date.today, blank=True, null=True)
     target_date = DateField(blank=True, null=True)
     name = CharField(max_length=255)
-    text = TextField(blank=True)
+    text = TextField(blank=True, null=True)
     lead = ForeignKey(Contact, on_delete=SET_NULL, null=True, blank=True)
-    teams = ManyToManyField(Team, blank=True)
+    teams = ManyToManyField(ProjectGroup, blank=True)
     addstamp = DateTimeField(auto_now_add=True)
     editstamp = DateTimeField(auto_now=True)
     competency = ForeignKey(EXCompetency, on_delete=PROTECT, null=True, blank=True)
@@ -376,9 +470,10 @@ class Task(RESTModel, AutoCompleteNexus):
     def __str__(self):
         return self.name
 
-class TimeReport(RESTModel):
 
-    user = ForeignKey("core.User",null=True,on_delete=SET_NULL)
+class TimeReport(CoreModel):
+
+    user = ForeignKey("core.User", null=True, on_delete=SET_NULL)
     project = ForeignKey(Project, on_delete=CASCADE)
-    time = DecimalField(max_digits=5,decimal_places=1)
+    time = DecimalField(max_digits=5, decimal_places=1)
     week = DateField()

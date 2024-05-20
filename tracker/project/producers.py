@@ -71,18 +71,18 @@ def tag_spec(cls, request):
     ]
 
 
-def team_spec(cls, request):
+def projectgroup_spec(cls, request):
     return [
         __type__,
         "id",
         {
             "can_delete": (
-                qs.include_fields("group"),
+                qs.noop,
                 producers.method("can_i_delete", request),
             )
         },
+        {"projects": ["id","name"]},
         "name",
-        "public",
     ]
 
 
@@ -110,6 +110,12 @@ def project_spec(cls, request):
     return [
         __type__,
         "text",
+        {
+            "my_project": (
+                qs.include_fields("viewers"),
+                producers.method("am_i_viewer", request),
+            )
+        },
         {"rendered_text": render_markdown("text")},
         "id",
         "name",
@@ -138,7 +144,7 @@ def project_spec(cls, request):
             "log": [__type__, "id"],
         },
         {
-            "point_of_contact": [__type__, "name", "id"],
+            "lead": [__type__, "name", "id"],
         },
         {
             "teams": [__type__, "name", "id"],
