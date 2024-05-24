@@ -29,7 +29,7 @@ from text.translate import gettext_lazy as _
 
 from . import models
 from tracker import jinja2
-from .core import AutoCompleteNexus
+from .core import AutoCompleteCoreModel,AutoCompleteNexus
 
 api = API(namespace="core")
 
@@ -199,8 +199,8 @@ def text_ac(request, m, pk, attr):
         q = request.GET.get("q")
     except:
         return HttpResponseBadRequest("incorrectly formatted GET params")
-    model = get_model_or_404(m, test=lambda m: issubclass(m, (AutoCompleteNexus,)))
-    obj = get_object_or_404(model.user_filter(request), pk=pk)
+    model = get_model_or_404(m, test=lambda m: issubclass(m, (AutoCompleteCoreModel,)))
+    obj = get_object_or_404(model.objects.user_filter(request), pk=pk)
     f = model._meta.get_field(attr)
     related_model = f.related_model
 

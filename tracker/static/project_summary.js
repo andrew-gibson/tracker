@@ -35,10 +35,16 @@ export const project_summary = project => {
                 .html(observable_data.name)
             append_edit_attr(body_sel, observable_data,"text", "Description");
             append_edit_attr(body_sel, observable_data,"streams", "Streams",{read_only:true, name_attr:"name_count"});
-            append_edit_attr(body_sel, observable_data,"lead", "Lead");
+            append_edit_attr(body_sel, observable_data,"leads", "Leads");
             append_edit_attr(body_sel, observable_data,"tags", "Tags");
             append_edit_attr(body_sel, observable_data,"teams", "Teams");
-            footer_sel.node().remove()
+
+            footer_sel   
+                 .classed("d-flex justify-content-between align-items-center", true)
+                 .append("div")
+                 .call(function(foodter_sel){
+                    append_edit_attr(foodter_sel, observable_data, "private", "Private");
+                 })
         })
     ui_state.active_elements.push(root)
 };

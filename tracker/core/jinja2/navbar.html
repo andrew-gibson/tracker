@@ -5,7 +5,7 @@
 
   <li class="nav-item dropdown">
      <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-          Account 👤
+         {{request.user.username}} 👤
      </a>
      <ul class="dropdown-menu" id="nav-dropdown">
          {%for template in navdropdown %}

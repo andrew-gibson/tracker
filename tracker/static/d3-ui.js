@@ -22,7 +22,7 @@ export const ui_state = mobx.makeAutoObservable({
     },
     is_fk (type){
        type = type || this.attr_type()
-       return  ["ManyToOneRel", "ManyToManyField", "ForeignKey"].includes(type);
+       return  ["ManyToOneRel", "ManyToManyField", "ForeignKey","OneToOneRel"].includes(type);
     },
     make_id (active=null){
         active = active ? active : this.active;
@@ -82,12 +82,6 @@ mobx.reaction(
     } 
 });
 
-//mobx.autorun(()=>{
-//    if (ui_state.search_results.length){
-//        d3.selectAll(".autocomplete-results").classed("d-none",true);
-//        d3.select(`#${ui_state.id}`).select(".autocomplete-results").classed("d-none",false);
-//    }
-//});
 
 const _dispose_functions = [];
 
@@ -152,7 +146,7 @@ const observable_to_obj = model=>{
             if (val.length) {
                 obj[x] = val;
             }
-        }  else if (fields[x] == "ForeignKey" ){
+        }  else if (["OneToOneRel", "ForeignKey"].includes(fields[x]) ){
             const val = (model[x] || {}).id || "";
             if (val){
                 obj[x] = val;

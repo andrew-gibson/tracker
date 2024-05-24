@@ -7,7 +7,7 @@
 </div>
 
 <script type="module">
-    import {ui_state, inplace_char_edit, create_button} from "d3-ui";
+    import {ui_state, inplace_char_edit, create_button,append_edit_attr} from "d3-ui";
     const contacts = {{dumps(insts)|safe}};
     const observable_data =   mobx.makeAutoObservable({contacts});
 
@@ -21,7 +21,7 @@
       .selectAll("li.list-group-item")
       .data(observable_data.contacts,d=>d.id)
       .join("li")
-      .classed("list-group-item d-flex align-items-middle justify-content-between",true)
+      .attr("class","list-group-item ")
       .each(function(d){
           const hx_args =  {
               "hx-delete" : ui_state.models["project.Contact"].main_pk.replace("__pk__", d.id),
@@ -29,8 +29,9 @@
               "hx-swap" : "none",
           }
           const sel = d3.select(this);
-          inplace_char_edit(sel, d, "name", "Name",{display_attr : "name"});
-           sel
+          const top_row = sel.append("div").attr("class"," d-flex align-items-middle justify-content-between")
+          inplace_char_edit(top_row, d, "name", "Name",{display_attr : "name"});
+          top_row
             .append("button")    
                 .attr("type","button")
                 .classed("btn btn-outline-danger p-1 m-1",true)
@@ -39,5 +40,6 @@
                 .on("click", e=>{
                     window.delete_modal(hx_args);
                 })
+           append_edit_attr(sel, d, "group", "Group");
       })
 </script>

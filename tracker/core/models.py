@@ -17,7 +17,12 @@ permissions_related_name = 'custom_group_set' if group_model_name == "Group" els
 # The only additional thing set is abstract=True in meta
 # This class should not be updated unless replacing it with a new version from django.contrib.auth.models.Group
 class AbstractGroup(Model):
-    name = CharField(_("name"), max_length=150, unique=True)
+    name_en = CharField(_("name"), max_length=150, unique=True)
+    name_fr = CharField(_("name"), max_length=150, unique=True,null=True,blank=True)
+    acronym_en = CharField(_("name"), max_length=10, unique=True,null=True,blank=True)
+    acronym_fr  = CharField(_("name"), max_length=10, unique=True,null=True,blank=True)
+    system = BooleanField(db_default=False)
+    app = CharField(max_length=100,null=True,blank=True)
     permissions = ManyToManyField(
         Permission,
         verbose_name=_("permissions"),
@@ -33,7 +38,7 @@ class AbstractGroup(Model):
         abstract = True
 
     def __str__(self):
-        return self.name
+        return self.name_en
 
     def natural_key(self):
         return (self.name,)
@@ -43,8 +48,8 @@ class AbstractGroup(Model):
 class Group(AbstractGroup, AutoCompleteCoreModel, trigger="*", hex_color="fb5607"):
 
     class adminClass(admin.ModelAdmin):
-        list_display = ("id", "name", "system", "app")
-        list_editable = ( "system", "app")
+        list_display = ("id", "name_en", "system", "app")
+        list_editable = ( "name_en","system", "app")
         list_filter = ("system", "app")
         search_fields = ("name",)
 
@@ -56,8 +61,7 @@ class Group(AbstractGroup, AutoCompleteCoreModel, trigger="*", hex_color="fb5607
         return False
 
     group = None
-    system = BooleanField(db_default=False)
-    app = CharField(max_length=100,null=True,blank=True)
+    parent = ForeignKey("Group",on_delete=CASCADE,related_name="children",null=True,blank=True)
 
 
 class GroupPrefetcherManager(UserManager):
@@ -75,6 +79,9 @@ class User(AbstractUser):
     login_redirect = CharField(max_length=100, default="project:main")
     objects = GroupPrefetcherManager()
 
+    class adminClass(admin.ModelAdmin):
+        list_display = ( "username", "belongs_to", "manages")
+
     @classmethod
     def user_filter(cls, request):
         return cls.objects
@@ -85,7 +92,8 @@ class User(AbstractUser):
     class Meta:
         base_manager_name = "objects"
 
-    main_group = ForeignKey(Group,on_delete=PROTECT,related_name="+")
+    belongs_to = ForeignKey(Group,on_delete=PROTECT,related_name="+")
+    manages = ForeignKey(Group,on_delete=PROTECT,related_name="+",null=True,blank=True)
     groups = ManyToManyField(
         Group,
         blank=True,

@@ -11,6 +11,7 @@ from django.urls import reverse
 from django_readers import specs
 from django.shortcuts import get_object_or_404
 from .utils import classproperty, render, flatten, get_related_model_or_404
+from .lang import resolve_field_to_current_lang
 from tracker.jinja2 import add_encode_parameter, decode_get_params
 
 
@@ -18,21 +19,17 @@ from tracker.jinja2 import add_encode_parameter, decode_get_params
 class RequestForm(ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        for attr, field in self.fields.items():
-            setattr(field, "request", self.request)
-            setattr(field.widget, "request", self.request)
-            if hasattr(field.widget, "a_c"):
-                setattr(field.a_c, "request", self.request)
-                setattr(field.widget.a_c, "request", self.request)
+        import pdb
+        pdb.set_trace()
+        #for attr, field in self.fields.items():
+        #    setattr(field, "request", self.request)
+        #    setattr(field.widget, "request", self.request)
+        #    if hasattr(field.widget, "a_c"):
+        #        setattr(field.a_c, "request", self.request)
+        #        setattr(field.widget.a_c, "request", self.request)
 
 
 class CoreManager(Manager):
-
-    def get_queryset(self):
-        qs = super().get_queryset()
-        if "group" in [x.name for x in self.model._meta.concrete_fields]:
-            return  qs.prefetch_related("group")
-        return qs
 
     def user_get(self,request,*args,**kwargs):
         try:
@@ -72,6 +69,7 @@ class CoreModel(LifecycleModelMixin, Model):
         "main_pk" : reverse("core:main",kwargs={"m" : cls._meta.label, "pk" : 9999}).replace("9999","__pk__"),
         "rgba" : getattr(cls,"trigger_color", "rgba(21,21,21,0.3))"),
         "hex" : getattr(cls, "hex_trigger_color", "#1a1a1a"), 
+        "bilingual_fields" : cls.bilingual_fields,
     }
 
     @classmethod
@@ -85,8 +83,20 @@ class CoreModel(LifecycleModelMixin, Model):
             return {}
 
     @classproperty
+    def bilingual_fields(cls):
+        return [x.replace("_en","") for x in cls._fields_map.keys() if x.endswith("_en")]
+
+    @classproperty
+    def _fields_map(cls):
+           return {x.name : x.__class__.__name__  for x in cls._meta.get_fields()}
+
+    @classproperty
     def fields_map(cls):
-        return {x.name : x.__class__.__name__  for x in cls._meta.get_fields()}
+        all_fields = cls._fields_map 
+        for bif in cls.bilingual_fields:
+            all_fields[bif] = all_fields[resolve_field_to_current_lang(bif)]
+        return  all_fields
+
 
     @classmethod
     def readers(cls, request):
@@ -133,7 +143,7 @@ class CoreModel(LifecycleModelMixin, Model):
         if form.is_valid():
             inst = form.instance
             # by default associasave()te objects with their creator
-            inst.add_user(request)
+            inst.add_user_and_save(request)
             _, context["inst"] = cls.get_projection_by_pk(request, inst.pk)
             if request.json:
                 return JsonResponse(context["inst"])
@@ -223,10 +233,10 @@ class CoreModel(LifecycleModelMixin, Model):
         except:
             raise Http404("incorrectly formatted GET params")
 
-    def add_user(self, request):
+    def add_user_and_save(self, request):
         if "group" in self.model_info["fields"]:
             self.group = request.user.main_group
-            self.save()
+        self.save()
 
 class AutoCompleteNexus:
 
@@ -338,7 +348,7 @@ class AutoCompleteNexus:
             )
             setattr(obj, instructions["attr"], atachee)
 
-        obj.add_user(request)
+        obj.add_user_and_save(request)
 
 
         for rel_name in results:
@@ -379,7 +389,7 @@ class AutoCompleteNexus:
                         )
                         for new_one in new_ones
                     ]
-                    [x.add_user(request) for x in new_objs]
+                    [x.add_user_and_save(request) for x in new_objs]
 
                     existing_objs = (
                         x["model"].objects.user_filter(request).filter(id__in=existing_ids)

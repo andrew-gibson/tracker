@@ -86,8 +86,10 @@ export const task_summaries = tasks=>{
         .data([task])
         .call(function(selection){
             const header_sel =  selection.select(".card-header");
+            header_sel.html(""); // clear out placeh9olders
             const header_left = header_sel.append("div").classed("flex-fill",true);
             const body_sel = selection.select(".card-body");
+            body_sel.html(""); // clear out placeh9olders
             const footer_sel = selection.select(".card-footer");
 
            inplace_char_edit(header_left.append("div").style("width","15%").style("display","inline-block"), observable_data, "order", "Order",{btn_class : "btn-outline-primary", on_change : "reloadTasks", input_class : "w-25"} );

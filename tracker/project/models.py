@@ -45,6 +45,28 @@ from django_lifecycle import (
 
 from . import producers
 
+''' 
+1- tool for managers
+2- employees can ttack hours worked against all the projects that they are assigned to
+    a- can they search up extra projects?
+3-contacts belong to a team
+4-teams (groups) are universal
+5-staff can
+    - more contacts between teams
+    - create new teams
+6 tags 
+    - can be public
+    - mostly belong to a team
+7- Andrew - director    manages: PHDSS part_of: DMIA
+    Hanah - manager      manages: science part_of: PHDSS
+        Robyn            manages:  part_of: science
+    Darren - manager   manages: services part_of: PHDSS
+        Caroline       manages:  part_of: services
+    Jsoh                manages:  part_of: PHDSS
+
+
+'''
+
 class ProjectGroupManager(GroupManager):
 
     def get_queryset(self):
@@ -115,6 +137,32 @@ class ProjectUser(User):
     objects = GroupPrefetcherManager()
 
 
+@add_to_admin
+class Contact(AutoCompleteCoreModel, trigger="@", hex_color="ff006e"):
+    spec = producers.contact_spec
+    form_fields = ["name", "email"]
+
+    def can_i_delete(self, request):
+        return request.user.is_staff
+
+    class adminClass(admin.ModelAdmin):
+        list_display = (
+            "id",
+            "name",
+        )
+        search_fields = ("name",)
+
+    group = ForeignKey(ProjectGroup, blank=True,on_delete=PROTECT, related_name="contacts")
+    name = CharField(max_length=255)
+    email = EmailField(null=True, blank=True)
+    account = OneToOneField(
+        User,
+        null=True,
+        blank=True,
+        on_delete=SET_NULL,
+        related_name="contact",
+    )
+
 class Settings(CoreModel):
 
     class _Form(RequestForm):
@@ -141,7 +189,7 @@ class Settings(CoreModel):
 @add_to_admin
 class EXCompetency(AutoCompleteCoreModel, trigger="`", hex_color="2c6e49"):
 
-    form_fields = ["name"]
+    form_fields = ["name_en"]
 
     @classmethod
     def user_filter(cls, request):
@@ -151,11 +199,29 @@ class EXCompetency(AutoCompleteCoreModel, trigger="`", hex_color="2c6e49"):
         return False
 
     def __str__(self):
-        return self.name
+        return self.name_en
 
     spec = producers.basic_spec
-    name = CharField(max_length=300, unique=True)
+    name_en = CharField(max_length=300, unique=True)
 
+
+@add_to_admin
+class ProjectStatus(CoreModel):
+
+    form_fields = ["name_en"]
+
+    @classmethod
+    def user_filter(cls, request):
+        return cls.objects.all()
+
+    def can_i_delete(self, request):
+        return False
+
+    def __str__(self):
+        return self.name_en
+
+    spec = producers.basic_spec
+    name_en = CharField(max_length=300, unique=True)
 
 @add_to_admin
 class Tag(AutoCompleteCoreModel, trigger="#", hex_color="ffbe0b"):
@@ -186,29 +252,6 @@ class Tag(AutoCompleteCoreModel, trigger="#", hex_color="ffbe0b"):
     public = BooleanField(db_default=False)
 
 
-@add_to_admin
-class Contact(AutoCompleteCoreModel, trigger="@", hex_color="ff006e"):
-    spec = producers.basic_spec
-    form_fields = ["name", "email"]
-
-    class adminClass(admin.ModelAdmin):
-        list_display = (
-            "id",
-            "name",
-        )
-        search_fields = ("name",)
-
-    group = ForeignKey(ProjectGroup, blank=True,on_delete=PROTECT, related_name="contacts")
-    name = CharField(max_length=255)
-    email = EmailField(null=True, blank=True)
-    account = OneToOneField(
-        User,
-        null=True,
-        blank=True,
-        on_delete=SET_NULL,
-        related_name="contact",
-    )
-
 
 @add_to_admin
 class Project(AutoCompleteNexus, AutoCompleteCoreModel, trigger="^", hex_color="8338ec"):
@@ -220,6 +263,7 @@ class Project(AutoCompleteNexus, AutoCompleteCoreModel, trigger="^", hex_color="
                 "name",
                 "parent_project",
                 "text",
+                "private",
             ]
 
         def __init__(self, *args, **kwargs):
@@ -229,11 +273,28 @@ class Project(AutoCompleteNexus, AutoCompleteCoreModel, trigger="^", hex_color="
             ].queryset.exclude(pk=self.instance.pk)
             self.fields["parent_project"].widget.attrs["class"] = "form-control"
 
+        def save(self,*args,**kwargs):
+            ## ensure if project has been set to private, use the request.user to set the private owner
+            if self.cleaned_data["private"]:
+                self.instance.private_owner = self.request.user
+            else:
+                self.instance.private_owner = None
+            super().save(*args,**kwargs)
+
     @classmethod
     def get_autocompletes(cls, excludes=None):
         return [
             x for x in super().get_autocompletes(excludes) if x.related_model != Stream
         ]
+
+    @classmethod
+    def user_filter(cls, request):
+        filters = cls.get_filters(request)
+        return (
+            cls.objects
+              .filter(group__in=request.user.groups.all())
+              .exclude(Q(private=True) & ~Q(private_owner=request.user))  
+        )
 
     @hook(AFTER_CREATE)
     def add_default_stream(self):
@@ -244,9 +305,13 @@ class Project(AutoCompleteNexus, AutoCompleteCoreModel, trigger="^", hex_color="
     def default_stream(self):
         return self.streams.get(project_default=True)
 
+    def __str__(self):
+        return f'{self.pk}-{self.name_en}'
+
+
     def am_i_viewer(self, request):
         return {
-            "selected": request.user in self.viewers.all(),
+            "selected": request.user in self.viewers.all() or self.group in request.user.groups.all(),
             "url": reverse(
                 "core:toggle_link",
                 kwargs={
@@ -260,8 +325,12 @@ class Project(AutoCompleteNexus, AutoCompleteCoreModel, trigger="^", hex_color="
         }
 
     group = ForeignKey(ProjectGroup, blank=True,on_delete=PROTECT, related_name="projects")
-    name = CharField(max_length=255)
-    text = TextField(blank=True, null=True)
+    status = ForeignKey(ProjectStatus,blank=True,on_delete=SET_NULL,null=True)
+    addstamp = DateTimeField(null=True)
+    name_en = CharField(max_length=255)
+    name_fr = CharField(max_length=255,null=True,blank=True)
+    text_en = TextField(blank=True, null=True)
+    text_fr = TextField(blank=True, null=True)
     parent_project = ForeignKey(
         "self",
         on_delete=SET_NULL,
@@ -269,10 +338,14 @@ class Project(AutoCompleteNexus, AutoCompleteCoreModel, trigger="^", hex_color="
         blank=True,
         related_name="sub_projects",
     )
-    lead = ForeignKey(Contact, on_delete=SET_NULL, null=True)
+    leads = ManyToManyField(Contact, blank=True)
     teams = ManyToManyField(ProjectGroup, related_name="projects_supporting")
-    tags = ManyToManyField("Tag")
-    viewers = ManyToManyField(User, related_name="projects", blank=True)
+    tags = ManyToManyField(Tag)
+    private = BooleanField(db_default=False)
+    private_owner = ForeignKey(ProjectUser, related_name="private_projects",null=True, blank=True,on_delete=SET_NULL)
+    viewers = ManyToManyField(ProjectUser, related_name="projects", blank=True)
+    short_term_outcomes = TextField(blank=True, null=True) 
+    long_term_outcomes = TextField(blank=True, null=True) 
 
 
 class ProjectLog(CoreModel):
@@ -281,10 +354,10 @@ class ProjectLog(CoreModel):
 
     @classmethod
     def user_filter(cls, request):
-        filters = cls.get_filters(request)
-        return cls.objects.filter(project__group__in=request.user.groups.all()).filter(
+       filters = cls.get_filters(request)
+       return cls.objects.filter(project__group__in=request.user.groups.all()).filter(
             filters
-        )
+       )
 
     @property
     def id(self):
@@ -319,10 +392,10 @@ class Stream(AutoCompleteCoreModel, trigger="~", hex_color="036666"):
 
     class Meta:
         ordering = ("id",)
-        unique_together = ("name", "project")
+        unique_together = ("name_en", "project")
 
     form_fields = [
-        "name",
+        "name_en",
         "project",
     ]
 
@@ -359,7 +432,8 @@ class Stream(AutoCompleteCoreModel, trigger="~", hex_color="036666"):
 
     project = ForeignKey(Project, on_delete=CASCADE, related_name="streams")
     project_default = BooleanField(default=False)
-    name = CharField(max_length=300)
+    name_en = CharField(max_length=300)
+    name_fr = CharField(max_length=300,null=True, blank=True)
 
 
 class Task(CoreModel, AutoCompleteNexus):
@@ -373,8 +447,10 @@ class Task(CoreModel, AutoCompleteNexus):
         "stream",
         "start_date",
         "target_date",
-        "name",
-        "text",
+        "name_en",
+        "name_fr",
+        "text_en",
+        "text_fr",
         "done",
     ]
 
@@ -458,8 +534,10 @@ class Task(CoreModel, AutoCompleteNexus):
     stream = ForeignKey(Stream, on_delete=PROTECT, blank=True, related_name="tasks")
     start_date = DateField(default=date.today, blank=True, null=True)
     target_date = DateField(blank=True, null=True)
-    name = CharField(max_length=255)
-    text = TextField(blank=True, null=True)
+    name_en = CharField(max_length=255)
+    name_fr = CharField(max_length=255, null=True,blank=True)
+    text_en = TextField(blank=True, null=True)
+    text_fr = TextField(blank=True, null=True)
     lead = ForeignKey(Contact, on_delete=SET_NULL, null=True, blank=True)
     teams = ManyToManyField(ProjectGroup, blank=True)
     addstamp = DateTimeField(auto_now_add=True)
