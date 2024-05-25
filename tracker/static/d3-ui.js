@@ -54,16 +54,29 @@ export const ui_state = mobx.makeAutoObservable({
     },
 });
 
+_.each(ui_state.models,m=>{
+     m.filters = {}
+})
 window.reset_ui =   _.bind(ui_state.reset_ui, ui_state);
 window.__uistate = ui_state;
 const reset_active = _.bind(ui_state.reset_active, ui_state);
+
 const handler = e => {
    if ("hx-replace-url" in e.target.attributes){
        window.reset_ui("HxReplaceURL");
    }
 }
+
 d3.select(document).on("htmx:beforeRequest",handler)
         
+document.body.addEventListener('htmx:configRequest', (event) => {
+  const elt = event.detail.elt;
+  if ("data-check-for-filters" in elt.attributes){
+      const filters = _.omitBy(ui_state.models[elt.attributes["data-model"].value].filters, _.isUndefined)
+      event.detail.path += `?f=${btoa(JSON.stringify({filters}))}`
+  }
+});
+
 mobx.reaction(
     ()=>[ui_state.active.attr, ui_state.active.d.id],
     ()=>{

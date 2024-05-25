@@ -23,6 +23,7 @@ from django.db.models import (
     DateField,
     DateTimeField,
     EmailField,
+    JSONField,
     OneToOneField,
     ForeignKey,
     DecimalField,
@@ -174,10 +175,11 @@ class Settings(CoreModel):
     spec = ["hide_done","see_all_projects", "id", producers.__type__]
     form_fields = ["user", "hide_done"]
     user = OneToOneField(
-        User, on_delete=CASCADE,  blank=True
+        ProjectUser, on_delete=CASCADE,  blank=True
     )
     hide_done = BooleanField(default=False, blank=True)
     see_all_projects = BooleanField(default=True, blank=True)
+    projects_filter = JSONField(db_default="{}")
 
     @classmethod
     def user_filter(cls, request):
@@ -187,7 +189,7 @@ class Settings(CoreModel):
 @add_to_admin
 class EXCompetency(AutoCompleteCoreModel, trigger="`", hex_color="2c6e49"):
 
-    form_fields = ["name_en"]
+    form_fields = ["name_en","name_fr"]
 
     @classmethod
     def user_filter(cls, request):
@@ -201,12 +203,13 @@ class EXCompetency(AutoCompleteCoreModel, trigger="`", hex_color="2c6e49"):
 
     spec = producers.basic_spec
     name_en = CharField(max_length=300, unique=True)
+    name_fr = CharField(max_length=300, null=True,blank=True)
 
 
 @add_to_admin
 class ProjectStatus(AutoCompleteCoreModel, hex_color="8e6bc7"):
 
-    form_fields = ["name_en"]
+    form_fields = ["name_en","name_fr"]
 
     class Meta:
         verbose_name_plural = "Statuses"
@@ -228,6 +231,7 @@ class ProjectStatus(AutoCompleteCoreModel, hex_color="8e6bc7"):
 
     spec = producers.basic_spec
     name_en = CharField(max_length=300, unique=True)
+    name_fr = CharField(max_length=300, null=True,blank=True)
 
 @add_to_admin
 class Tag(AutoCompleteCoreModel, trigger="#", hex_color="ffbe0b"):
@@ -301,6 +305,7 @@ class Project(AutoCompleteNexus, AutoCompleteCoreModel, trigger="^", hex_color="
         return (
             cls.objects
               .filter(group__in=request.user.groups.all())
+              .filter(filters)
               .exclude(Q(private=True) & ~Q(private_owner=request.user))  
         )
 

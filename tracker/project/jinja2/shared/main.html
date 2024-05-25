@@ -1,7 +1,7 @@
 {% if  standalone %} {% extends "base.html" %} {% endif %}
 
 {% block nav %}
-    {%with navbar=[],navdropdown=[ "shared/metadata-link.html"]%}
+    {%with navbar=["project/filters.html"],navdropdown=[ "shared/metadata-link.html"]%}
         {%include "navbar.html"%}
     {%endwith%}
 {%endblock%}
@@ -21,6 +21,8 @@
     </div>
 
     <div hx-trigger="load, reloadProjects from:document" 
+         data-model="project.Project"
+         data-check-for-filters="true"
          hx-get="{{url("core:main", kwargs={"m":"project.Project"})}}">
     </div>
 

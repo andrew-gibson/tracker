@@ -1,0 +1,68 @@
+<form class="d-flex">
+    <input class="form-control me-2" type="search" placeholder="Seach Projects" aria-label="Search" id="full-text-search">
+</form>
+<li class="nav-item dropdown" >
+   <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+       <span id="leads-header">Leads</span>
+   </a>
+   <ul class="dropdown-menu" id="leads-dropdown" style="max-height: 500px;overflow-y:scroll;scrollbar-width:none;">
+  </ul>
+</li>
+<li class="nav-item dropdown">
+   <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+       <span id="tags-header">Tags</span>
+   </a>
+   <ul class="dropdown-menu" id="tags-dropdown" style="max-height: 500px;overflow-y:scroll;scrollbar-width:none;">
+  </ul>
+</li>
+<li class="nav-item dropdown">
+   <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+       <span id="status-header">Status</span>
+   </a>
+   <ul class="dropdown-menu" id="status-dropdown" style="max-height: 500px;overflow-y:scroll;scrollbar-width:none;">
+  </ul>
+</li>
+
+<script type="module">
+import  {ui_state} from "d3-ui";
+import fetch_recipies from "fetch-recipies";
+const f = ui_state.models["project.Project"].filters
+d3.select("#full-text-search")
+  .on("keyup", _.debounce( e=>{
+       f["full-text-search"] =  e.target.value;
+       ui_state.reset_ui('reloadProjects');
+  },500))
+
+
+const render_leads_menu = async (attr,model)=>{
+    const data = await (await fetch_recipies.GET(ui_state.models[model].main)).json();
+    const _render = ()=>{
+       d3.select(`#${attr}-header`)
+         .classed("fw-bold text-white",f[attr])
+         .classed("text-muted",!f[attr])
+       d3.select(`#${attr}-dropdown`)
+            .selectAll("li")
+            .data(data,d=>d.id)
+            .join("li")
+            .attr("class","list-group-item")
+            .classed("active", d=> d.id == f[attr])
+            .selectAll("button")
+            .data(d=>[d],d=>d.id)
+            .join("button")
+            .attr("class","btn btn-link text-nowrap")
+            .classed("text-white", d=> d.id == f[attr])
+            .html(d=>d.name)
+            .on("click",e=>{
+               const data = d3.select(e.target).datum();
+               f[attr] = f[attr] == data.id  ? undefined  : data.id;
+              window.reset_ui('reloadProjects');
+               _render();
+            })
+    }
+    _render();
+}
+render_leads_menu("leads","project.Contact");
+render_leads_menu("tags","project.Tag");
+render_leads_menu("status","project.ProjectStatus");
+</script>
+

@@ -1,11 +1,13 @@
 import json
 import re
+import operator
+import functools
 
 from django.apps import apps
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Field, Model, Q, PROTECT, ForeignKey, Manager
 from django.forms import ModelForm, modelform_factory
-from django.http import JsonResponse, Http404, QueryDict,HttpResponse
+from django.http import JsonResponse, Http404, QueryDict, HttpResponse
 from django_lifecycle import LifecycleModelMixin
 from django.urls import reverse
 from django_readers import specs
@@ -15,16 +17,15 @@ from .lang import resolve_field_to_current_lang
 from tracker.jinja2 import add_encode_parameter, decode_get_params
 
 
-
 class RequestForm(ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if self.data:
             for field in self._meta.model.bilingual_fields:
                 if field in self.data:
-                    self.data[resolve_field_to_current_lang(field)]  = self.data[field]
+                    self.data[resolve_field_to_current_lang(field)] = self.data[field]
                     del self.data[field]
-        #for attr, field in self.fields.items():
+        # for attr, field in self.fields.items():
         #    setattr(field, "request", self.request)
         #    setattr(field.widget, "request", self.request)
         #    if hasattr(field.widget, "a_c"):
@@ -34,9 +35,9 @@ class RequestForm(ModelForm):
 
 class CoreManager(Manager):
 
-    def user_get(self,request,*args,**kwargs):
+    def user_get(self, request, *args, **kwargs):
         try:
-            return self.user_filter(request).get(*args,**kwargs)
+            return self.user_filter(request).get(*args, **kwargs)
         except self.model.DoesNotExist:
             raise Http404("cannot find requested object")
 
@@ -45,16 +46,15 @@ class CoreManager(Manager):
             return self.model.user_filter(request)
         return self.filter(group__in=request.user.groups.all())
 
-    def user_delete(self,request,*args,**kwargs):
+    def user_delete(self, request, *args, **kwargs):
         try:
-            obj =  self.user_filter(request).get(*args,**kwargs)
-            if getattr(obj,"can_delete",lambda r : True)(request):
+            obj = self.user_filter(request).get(*args, **kwargs)
+            if getattr(obj, "can_delete", lambda r: True)(request):
                 obj.delete()
             else:
                 raise Http404("cannot find requested object")
         except self.model.DoesNotExist:
             raise Http404("cannot find requested object")
-
 
 
 class CoreModel(LifecycleModelMixin, Model):
@@ -65,15 +65,17 @@ class CoreModel(LifecycleModelMixin, Model):
 
     @classproperty
     def model_info(cls):
-        return  {
-        "fields" : cls.fields_map,
-        "search_relation" : reverse("core:text_ac",kwargs={"m" : cls._meta.label}),
-        "main" : reverse("core:main",kwargs={"m" : cls._meta.label}),
-        "main_pk" : reverse("core:main",kwargs={"m" : cls._meta.label, "pk" : 9999}).replace("9999","__pk__"),
-        "rgba" : getattr(cls,"trigger_color", "rgba(21,21,21,0.3))"),
-        "hex" : getattr(cls, "hex_trigger_color", "#1a1a1a"), 
-        "bilingual_fields" : cls.bilingual_fields,
-    }
+        return {
+            "fields": cls.fields_map,
+            "search_relation": reverse("core:text_ac", kwargs={"m": cls._meta.label}),
+            "main": reverse("core:main", kwargs={"m": cls._meta.label}),
+            "main_pk": reverse(
+                "core:main", kwargs={"m": cls._meta.label, "pk": 9999}
+            ).replace("9999", "__pk__"),
+            "rgba": getattr(cls, "trigger_color", "rgba(21,21,21,0.3))"),
+            "hex": getattr(cls, "hex_trigger_color", "#1a1a1a"),
+            "bilingual_fields": cls.bilingual_fields,
+        }
 
     @classmethod
     def settings(cls, request):
@@ -87,19 +89,20 @@ class CoreModel(LifecycleModelMixin, Model):
 
     @classproperty
     def bilingual_fields(cls):
-        return [x.replace("_en","") for x in cls._fields_map.keys() if x.endswith("_en")]
+        return [
+            x.replace("_en", "") for x in cls._fields_map.keys() if x.endswith("_en")
+        ]
 
     @classproperty
     def _fields_map(cls):
-           return {x.name : x.__class__.__name__  for x in cls._meta.get_fields()}
+        return {x.name: x.__class__.__name__ for x in cls._meta.get_fields()}
 
     @classproperty
     def fields_map(cls):
-        all_fields = cls._fields_map 
+        all_fields = cls._fields_map
         for bif in cls.bilingual_fields:
             all_fields[bif] = all_fields[resolve_field_to_current_lang(bif)]
-        return  all_fields
-
+        return all_fields
 
     @classmethod
     def readers(cls, request):
@@ -199,11 +202,16 @@ class CoreModel(LifecycleModelMixin, Model):
                     "inst": inst_dict,
                     "form": form,
                     "standalone": not request.htmx,
-                    "settings" : cls.settings(request) ,
+                    "settings": cls.settings(request),
                 },
             )
         else:
-            insts = [projection(p) for p in prepare_qs(cls.objects.user_filter(request)).order_by(*cls._meta.ordering)]
+            insts = [
+                projection(p)
+                for p in prepare_qs(cls.objects.user_filter(request)).order_by(
+                    *cls._meta.ordering
+                )
+            ]
             if request.json:
                 return JsonResponse(insts, safe=False)
             return render(
@@ -212,14 +220,13 @@ class CoreModel(LifecycleModelMixin, Model):
                 {
                     "insts": insts,
                     "standalone": not request.htmx,
-                    "settings" : cls.settings(request) ,
-
+                    "settings": cls.settings(request),
                 },
             )
 
     @classmethod
     def DELETE(cls, request, pk):
-        cls.objects.user_delete(request,pk=pk)
+        cls.objects.user_delete(request, pk=pk)
         return HttpResponse("Deleted")
 
     @classmethod
@@ -227,19 +234,30 @@ class CoreModel(LifecycleModelMixin, Model):
         return qs
 
     @classmethod
-    def get_filters(cls,request):
-        try:
-            filters = decode_get_params(request.GET).get("f",{}).get("filters",{})
+    def get_filters(cls, request):
+            filters = decode_get_params(request.GET).get("f", {}).get("filters", {})
             # remove any possible filter terms which might try to alter the
             # users filter condition
-            return Q(**{k: v for k,v in filters.items() if "group" not in k})
-        except:
-            raise Http404("incorrectly formatted GET params")
+            q_param = {k: v for k, v in filters.items() if "group" not in k}
+            if "full-text-search" in q_param:
+                val =  q_param["full-text-search"]
+                del q_param["full-text-search"]
+                fts = [ Q(**{f"{k}__icontains": val})
+                        for k, v in cls._fields_map.items()
+                        if v in ["CharField", "TextField"]
+                    ]
+                q = functools.reduce(operator.or_, fts)
+            else:
+                q = Q()
+            q = q & Q(**q_param)
+            print(q)
+            return q
 
     def add_user_and_save(self, request):
         if "group" in self.model_info["fields"]:
             self.group = request.user.main_group
         self.save()
+
 
 class AutoCompleteNexus:
 
@@ -287,22 +305,25 @@ class AutoCompleteNexus:
 
     @classmethod
     def parse_text(cls, request):
-        f =  decode_get_params(request.GET).get("f",{})
+        f = decode_get_params(request.GET).get("f", {})
         ac_filters = f.get("ac_filters", {})
         exclude = f.get("exclude", [])
 
         if request.method == "POST":
             remainder = text_input = request.POST.get("q")
         else:
-            remainder = text_input = request.GET.get("q","")
+            remainder = text_input = request.GET.get("q", "")
 
         fields = cls.get_autocompletes(exclude)
         results = {
             f.name: {
                 "trigger": f.related_model.text_search_trigger,
                 "model": f.related_model,
-                "model_info" : f.related_model.model_info,
-                "verbose" : getattr(f.related_model._meta, "verbose_name_plural" if f.many_to_many else "verbose_name").title(),
+                "model_info": f.related_model.model_info,
+                "verbose": getattr(
+                    f.related_model._meta,
+                    "verbose_name_plural" if f.many_to_many else "verbose_name",
+                ).title(),
                 "name": f.name,
                 "many_to_many": f.many_to_many,
                 "search_terms": cls.find_words_from_trigger(
@@ -318,19 +339,19 @@ class AutoCompleteNexus:
                 [term, results[name]["model"].ac(request, term, filter_qs=filter_qs)]
                 for term in results[name]["search_terms"]
             ]
-            trigger =  results[name]["trigger"]
+            trigger = results[name]["trigger"]
             for parsed in results[name]["search_terms"]:
-                remainder = remainder.replace(trigger+parsed, "")
+                remainder = remainder.replace(trigger + parsed, "")
 
         cls.cls_text_scan(
             remainder, results, [x.related_model.text_search_trigger for x in fields]
         )  # default is nothing happens, but classes can add extra scanning, for example: dates
 
-        # secondd pass through 
+        # secondd pass through
         for name in results:
-            trigger =  results[name]["trigger"]
+            trigger = results[name]["trigger"]
             for parsed in results[name]["search_terms"]:
-                remainder = remainder.replace(trigger+parsed, "")
+                remainder = remainder.replace(trigger + parsed, "")
 
         return {
             "results": results,
@@ -340,7 +361,7 @@ class AutoCompleteNexus:
 
     @classmethod
     def save_from_parse(cls, request, results, attr, attr_val):
-        f =  decode_get_params(request.GET).get("f",{})
+        f = decode_get_params(request.GET).get("f", {})
         obj = cls(**{attr: attr_val})
 
         if "attach_to" in f:
@@ -352,7 +373,6 @@ class AutoCompleteNexus:
             setattr(obj, instructions["attr"], atachee)
 
         obj.add_user_and_save(request)
-
 
         for rel_name in results:
             x = results[rel_name]
@@ -377,7 +397,9 @@ class AutoCompleteNexus:
                     setattr(obj, rel_name, x["results"][0][1][0]["val"])
 
                 else:
-                    flattened_results = list(flatten(y[1] for y in x["results"] if y[0]))
+                    flattened_results = list(
+                        flatten(y[1] for y in x["results"] if y[0])
+                    )
                     new_ones = [y for y in flattened_results if "new" in y]
                     existing_ids = [
                         y["id"] for y in flattened_results if "new" not in y
@@ -395,12 +417,14 @@ class AutoCompleteNexus:
                     [x.add_user_and_save(request) for x in new_objs]
 
                     existing_objs = (
-                        x["model"].objects.user_filter(request).filter(id__in=existing_ids)
+                        x["model"]
+                        .objects.user_filter(request)
+                        .filter(id__in=existing_ids)
                     )
 
                     if x["many_to_many"]:
-                            getattr(obj, rel_name).add(*new_objs)
-                            getattr(obj, rel_name).add(*existing_objs)
+                        getattr(obj, rel_name).add(*new_objs)
+                        getattr(obj, rel_name).add(*existing_objs)
                     else:
                         if new_ones:
                             setattr(obj, rel_name, new_ones[0])
@@ -438,13 +462,13 @@ class AutoCompleteCoreModel(CoreModel):
     def get_autocomplete_triggers(cls):
         """return the instrcutions for self.search_field"""
 
-    @classproperty 
+    @classproperty
     def search_field(cls):
         f = cls._search_field
         if f in cls.bilingual_fields:
-            f =  resolve_field_to_current_lang(f)
+            f = resolve_field_to_current_lang(f)
         return f
-            
+
     @classmethod
     def ac_query(cls, request, query):
         f = cls.search_field
@@ -490,7 +514,13 @@ class AutoCompleteCoreModel(CoreModel):
         ):
             # not ending in space -- always create fake new one unless it
             # duplicates i.e. cursor was right at the end of the word
-            new_el = {"name": query, "id": -1, "new": True, f: query, "__type__" : cls._meta.label}
+            new_el = {
+                "name": query,
+                "id": -1,
+                "new": True,
+                f: query,
+                "__type__": cls._meta.label,
+            }
 
             if optional_projection:
                 new_el = optional_projection(new_el)
