@@ -11,6 +11,8 @@ tracker/static/admin/*
 tracker/static/bootstrap*/*
 tracker/static/debug_toolbar/*
 tracker/static/django_extensions/*
+*min*
+*.csv
 
 .Python
 build/

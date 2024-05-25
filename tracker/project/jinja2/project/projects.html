@@ -11,7 +11,7 @@ import { dispose_functions,ui_state, autoRun } from "d3-ui";
 import {project_summary} from "{{ static('project_summary.js') }}";
 import "d3";
 const projects =  {{dumps(insts)|safe}};
-console.log(projects)
+
 _.each(projects, p=> project_summary( p, "true"));
 
 //autoRun(async ()=>{

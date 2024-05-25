@@ -19,8 +19,11 @@ from tracker.jinja2 import add_encode_parameter, decode_get_params
 class RequestForm(ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        import pdb
-        pdb.set_trace()
+        if self.data:
+            for field in self._meta.model.bilingual_fields:
+                if field in self.data:
+                    self.data[resolve_field_to_current_lang(field)]  = self.data[field]
+                    del self.data[field]
         #for attr, field in self.fields.items():
         #    setattr(field, "request", self.request)
         #    setattr(field.widget, "request", self.request)
@@ -420,23 +423,31 @@ class AutoCompleteCoreModel(CoreModel):
         super().__init_subclass__(**kwargs)
         if hex_color:
             rgba = f"rgba{tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4)) + (0.3,)}"
-            cls.text_search_trigger = trigger
+
             cls.trigger_color = rgba
             cls.hex_trigger_color = "#" + hex_color
-            cls.search_field = search_field
-            if cls.text_search_trigger in triggers:
-                raise Exception(
-                    f"{cls} is trying to register {cls.text_search_trigger} as a trigger, it has already been assigned"
-                )
-            triggers.add(cls.text_search_trigger)
+            cls._search_field = search_field
+            if trigger:
+                cls.text_search_trigger = trigger
+                if cls.text_search_trigger in triggers:
+                    raise Exception(
+                        f"{cls} is trying to register {cls.text_search_trigger} as a trigger, it has already been assigned"
+                    )
+                triggers.add(cls.text_search_trigger)
 
     def get_autocomplete_triggers(cls):
         """return the instrcutions for self.search_field"""
 
+    @classproperty 
+    def search_field(cls):
+        f = cls._search_field
+        if f in cls.bilingual_fields:
+            f =  resolve_field_to_current_lang(f)
+        return f
+            
     @classmethod
     def ac_query(cls, request, query):
         f = cls.search_field
-
         if query == "":
             q = Q()
         elif query.endswith(" "):
@@ -456,7 +467,7 @@ class AutoCompleteCoreModel(CoreModel):
         cutoff=None,
         optional_projection=False,
     ):
-        f = f"{cls.search_field}"
+        f = cls.search_field
 
         preoare_qs, projection = cls.readers(request)
         qs = preoare_qs(cls.ac_query(request, query))

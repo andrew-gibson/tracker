@@ -524,7 +524,7 @@ export const append_edit_local_attr = function(selection,observable_data, attr="
                 normal_mode
                     .append("button")
                     .attr("type","button")
-                    .classed("btn btn-link mb-1",true)
+                    .classed("btn btn-link mb-1 text-start",true)
                     .on("click", ()=> ui_state.active = {attr, d : observable_data})
                     .html(title)
                 .select_parent()

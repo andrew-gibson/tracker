@@ -60,8 +60,11 @@ export const project_summary =  project => {
         .call(function(selection){
             const left_sel = selection.select(".card-body .left");
             append_edit_attr(left_sel, observable_data, "name", "Name");
-            append_edit_attr(left_sel, observable_data, "text","Description",{display_attr:"rendered_text"});
-            append_edit_attr(left_sel, observable_data,"lead", "Lead");
+            append_edit_attr(left_sel, observable_data, "status","Status");
+            append_edit_attr(left_sel, observable_data, "text","Description",{display_attr:"text_m"});
+            append_edit_attr(left_sel, observable_data, "short_term_outcomes","Short Term Outcomes",{display_attr:"short_term_outcomes_m"});
+            append_edit_attr(left_sel, observable_data, "long_term_outcomes","Long Term Outcomes",{display_attr:"long_term_outcomes_m"});
+            append_edit_attr(left_sel, observable_data,"leads", "Lead");
             append_edit_attr(left_sel, observable_data,"tags", "Tags");
             append_edit_attr(left_sel, observable_data,"teams", "Teams");
             create_button( selection.select("#new-stream"), 

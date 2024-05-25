@@ -70,7 +70,7 @@ def tag_spec(cls, request):
                 producers.method("can_i_delete", request),
             )
         },
-        lang_field("name"),
+        "name",
         "public",
     ]
 
@@ -87,7 +87,7 @@ def contact_spec(cls, request):
         "name",
         "email",
         {"account" : [__type__, "id","username"]},
-        {"group" : [__type__, "id","name"]},
+        {"group" : [__type__, "id","name_en"]},
     ]
 
 
@@ -124,7 +124,7 @@ def stream_spec(cls, request):
         lang_field("name"),
         "id",
         {"name_count": name_count()},
-        {"project": [__type__, "id", "name"]},
+        {"project": [__type__, "id", lang_field("name")]},
         {"tasks": tasks},
     ]
 
@@ -137,8 +137,12 @@ def project_spec(cls, request):
         "id",
         __type__,
         lang_field("text"),
-        {"rendered_text": render_markdown(f"text_{lang()}")},
+        {"text_m": render_markdown(f"text_{lang()}")},
         lang_field("name"),
+        "short_term_outcomes",
+        {"short_term_outcomes_m": render_markdown("short_term_outcomes")},
+        "long_term_outcomes",
+        {"long_term_outcomes_m": render_markdown("long_term_outcomes")},
         {
             "my_project": (
                 qs.include_fields("viewers"),
@@ -165,6 +169,9 @@ def project_spec(cls, request):
                 {"name_count": name_count()},
                 {"tasks": task_spec(Task,request)},
             ],
+        },
+        {
+            "status": [__type__, "id",lang_field("name")],
         },
         {
             "log": [__type__, "id"],
@@ -197,6 +204,6 @@ def projectlogentry_spec(cls, request):
         "id",
         "text",
         {"log": ["id",__type__]},
-        {"rendered_text": render_markdown("text")},
+        {"rendered_text": render_markdown(f"text")},
         "addstamp",
     ]

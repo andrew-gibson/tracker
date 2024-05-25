@@ -44,6 +44,7 @@ from django_lifecycle import (
 )
 
 from . import producers
+from core.lang import  resolve_field_to_current_lang
 
 ''' 
 1- tool for managers
@@ -98,7 +99,7 @@ class ProjectGroupManager(GroupManager):
 class ProjectGroup(Group):
     objects = ProjectGroupManager()
     spec = producers.projectgroup_spec
-    form_fields = ["name",]
+    form_fields = ["name_en",]
 
     class Meta:
         proxy = True
@@ -142,15 +143,12 @@ class Contact(AutoCompleteCoreModel, trigger="@", hex_color="ff006e"):
     spec = producers.contact_spec
     form_fields = ["name", "email"]
 
+    class adminClass(admin.ModelAdmin):
+        list_display = ("name", "email","account")
+        list_editable = ("email","account")
+
     def can_i_delete(self, request):
         return request.user.is_staff
-
-    class adminClass(admin.ModelAdmin):
-        list_display = (
-            "id",
-            "name",
-        )
-        search_fields = ("name",)
 
     group = ForeignKey(ProjectGroup, blank=True,on_delete=PROTECT, related_name="contacts")
     name = CharField(max_length=255)
@@ -206,9 +204,17 @@ class EXCompetency(AutoCompleteCoreModel, trigger="`", hex_color="2c6e49"):
 
 
 @add_to_admin
-class ProjectStatus(CoreModel):
+class ProjectStatus(AutoCompleteCoreModel, hex_color="8e6bc7"):
 
     form_fields = ["name_en"]
+
+    class Meta:
+        verbose_name_plural = "Statuses"
+        verbose_name = "Status"
+
+    class adminClass(admin.ModelAdmin):
+        list_display = ("id", "name_en")
+        list_editable = ("name_en",)
 
     @classmethod
     def user_filter(cls, request):
@@ -226,7 +232,7 @@ class ProjectStatus(CoreModel):
 @add_to_admin
 class Tag(AutoCompleteCoreModel, trigger="#", hex_color="ffbe0b"):
 
-    class aVdminClass(admin.ModelAdmin):
+    class adminClass(admin.ModelAdmin):
         list_display = ("id", "name", "public", "group")
         list_editable = ("name", "public", "group")
         list_filter = ("public", "group")
@@ -260,9 +266,11 @@ class Project(AutoCompleteNexus, AutoCompleteCoreModel, trigger="^", hex_color="
     class _Form(RequestForm):
         class Meta:
             fields = [
-                "name",
+                "name_en",
+                "name_fr",
                 "parent_project",
-                "text",
+                "text_en",
+                "text_fr",
                 "private",
             ]
 
@@ -421,14 +429,15 @@ class Stream(AutoCompleteCoreModel, trigger="~", hex_color="036666"):
         if query == "":
             q = Q()
         elif query.endswith(" "):
-            q = Q(**{"name__iexact": query.strip()})
+            name = resolve_field_to_current_lang("name")
+            q = Q(**{f"{name}__iexact": query.strip()})
         else:
             q = Q(name__icontains=query) | Q(project__name__icontains=query)
 
         return cls.user_filter(request).filter(q).distinct()
 
     def __str__(self):
-        return f"{self.pk}-{self.name}"
+        return f"{self.pk}-{self.name_en}"
 
     project = ForeignKey(Project, on_delete=CASCADE, related_name="streams")
     project_default = BooleanField(default=False)
