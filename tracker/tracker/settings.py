@@ -59,7 +59,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "core",
     "project",
-    "rules",
+    #"rules",
     #"debug_toolbar",
 ]
 
@@ -77,6 +77,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "project.middleware.add_project_user_middleware",
     #"debug_toolbar.middleware.DebugToolbarMiddleware",
 ]
 

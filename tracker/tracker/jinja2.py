@@ -54,11 +54,6 @@ def url_translate(context):
     return translated_url
 
 
-@pass_context
-def crispy(context, form):
-    return render_crispy_form(form, context=context)
-
-
 def random_id():
     letters = string.ascii_lowercase
     return "".join(random.choice(letters) for i in range(20))
@@ -86,7 +81,6 @@ def environment(**options):
             "static": static,
             "url": reverse,
             "random_id": random_id,
-            "crispy": crispy,
             "len": len,
             "url_translate": url_translate,
             "_": _,

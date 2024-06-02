@@ -4,6 +4,16 @@
     {%endfor%}
 </div>
 
+<a class="dropdown-item" 
+   hx-put="{{url("core:main", kwargs={ "m" : "project.Settings", "pk" : settings.id})}}" 
+   hx-vals='{"hide_done" : {%if settings.hide_done%}false{%else%}true{%endif%} }'
+   hx-swap="none"
+   hx-headers='{"json-response" : true}'
+   hx-on::after-request="window.reset_ui('reloadTasks')"
+   hx-swap-oob="true"
+   id="settings-completed" >
+    {%if settings.hide_done%} Show All {%else%} Hide Completed {%endif%}
+</a>
 
 <script type="module">
 import {task_summaries} from "{{ static('task_summary.js') }}";
@@ -17,13 +27,3 @@ _.chain({{dumps(insts)|safe}})
 </script>
 
 
-<a class="dropdown-item" 
-   hx-put="{{url("core:main", kwargs={ "m" : "project.Settings", "pk" : settings.id})}}" 
-   hx-vals='{"hide_done" : {%if settings.hide_done%}false{%else%}true{%endif%} }'
-   hx-swap="none"
-   hx-headers='{"json-response" : true}'
-   hx-on::after-request="window.reset_ui('reloadTasks')"
-   hx-swap-oob="true"
-   id="settings-completed" >
-    {%if settings.hide_done%} Show All {%else%} Hide Completed {%endif%}
-</a>

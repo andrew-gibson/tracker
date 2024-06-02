@@ -106,6 +106,7 @@ def model_info(request):
 @api.post_get("create_from_parsed/<str:m>/<str:attr>/")
 def create_from_parsed(request, m, attr, suppress_links=""):
     model = get_model_or_404(m, test=lambda m: issubclass(m, AutoCompleteNexus))
+    attr = model.localize_field(attr)
     ctx = {"attr": attr, "m": m, "params": request.GET.urlencode(), "model": model}
     if request.method == "POST":
         parse_payload = model.parse_text(request)

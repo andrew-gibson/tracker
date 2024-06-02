@@ -34,7 +34,8 @@ export const project_summary = project => {
                 .setup_htmx()
                 .html(observable_data.name)
             append_edit_attr(body_sel, observable_data, "status","Status");
-            append_edit_attr(body_sel, observable_data,"text", "Description");
+            append_edit_attr(body_sel, observable_data,"text", "Summary");
+            append_edit_attr(body_sel, observable_data, "group","Team",{on_change : "reloadProjects"});
             append_edit_attr(body_sel, observable_data,"streams", "Streams",{read_only:true, name_attr:"name_count"});
             append_edit_attr(body_sel, observable_data,"leads", "Leads");
             append_edit_attr(body_sel, observable_data,"tags", "Tags");

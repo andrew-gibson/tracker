@@ -5,8 +5,10 @@ from django.db.models.functions import Concat, Replace
 from django_readers import qs, pairs, projectors, producers, specs
 from core.lang import lang
 
+
 def lang_field(field):
-    return {field : f"{field}_{lang()}"}
+    return {field: f"{field}_{lang()}"}
+
 
 def render_markdown(attr):
     prepare = qs.include_fields(attr)
@@ -17,17 +19,78 @@ def render_markdown(attr):
     return prepare, produce
 
 
+def count(attr):
+    prepare = qs.include_fields(attr)
+
+    def produce(inst):
+        return getattr(inst, attr).count()
+
+    return prepare, produce
+
+
+def programuser_projects():
+    prepare = qs.include_fields(
+        "projects",
+    )
+
+
+def name_count():
+    return (
+        qs.annotate(
+            name_count=Concat(
+                Replace(F(f"name_{lang()}"), Value("_"), Value(" ")),
+                Value(" ("),
+                Count("tasks", filter=Q(tasks__done=False)),
+                Value(")"),
+                output_field=CharField(),
+            )
+        ),
+        producers.attr("name_count"),
+    )
+
+
 __type__ = {"__type__": (qs.noop, producers.attrgetter("_meta.label"))}
 
+def force_project_users_type():
+    ProjectUser = apps.get_model("project.ProjectUser")
 
-def basic_spec(cls,request): 
+    def produce(inst):
+        return  ProjectUser._meta.label
+
+    return qs.noop, produce
+
+
+def basic_spec(cls, request, pk=None):
     return [
         lang_field("name"),
         "id",
         __type__,
     ]
 
-def task_spec(cls,request):
+
+def projectuser_spec(cls, request, pk=None):
+    spec = (
+        "id",
+        "username",
+        {"manages": [
+                __type__,
+                lang_field("name"),
+                "id",
+                {
+                    "users": [
+                        pairs.exclude(pk=request.user.pk),
+                        {"__type__" : force_project_users_type()},
+                        {"name":"username"},
+                        "id",
+                    ]
+                },
+            ]
+        },
+    )
+    return spec
+
+
+def task_spec(cls, request, pk=None):
     return [
         __type__,
         "id",
@@ -45,22 +108,7 @@ def task_spec(cls,request):
     ]
 
 
-def name_count():
-    return  (
-        qs.annotate(
-            name_count=Concat(
-                Replace(F(f"name_{lang()}"), Value("_"), Value(" ")),
-                Value(" ("),
-                Count("tasks", filter=Q(tasks__done=False)),
-                Value(")"),
-                output_field=CharField(),
-            )
-        ),
-        producers.attr("name_count"),
-    )
-
-
-def tag_spec(cls, request):
+def tag_spec(cls, request, pk=None):
     return [
         __type__,
         "id",
@@ -74,7 +122,8 @@ def tag_spec(cls, request):
         "public",
     ]
 
-def contact_spec(cls, request):
+
+def contact_spec(cls, request, pk=None):
     return [
         __type__,
         "id",
@@ -86,39 +135,45 @@ def contact_spec(cls, request):
         },
         "name",
         "email",
-        {"account" : [__type__, "id","username"]},
-        {"group" : [__type__, "id","name_en"]},
+        {"account": [__type__, "id", "username"]},
+        {"group": [__type__, "id", "name_en"]},
     ]
 
 
-
-def projectgroup_spec(cls, request):
-    return [
+def projectgroup_spec(cls, request, pk=None):
+    spec = (
         __type__,
         "id",
+        {"project_count": count("projects")},
         {
             "can_delete": (
                 qs.noop,
                 producers.method("can_i_delete", request),
             )
         },
-        {"projects": [
-            pairs.filter(private=False),
-            "id",
-            lang_field("name"),
-        ]},
-        "name",
-    ]
+        lang_field("name"),
+    )
+    if pk:
+        return spec + (
+            {
+                "projects": [
+                    pairs.filter(private=False),
+                    "id",
+                    lang_field("name"),
+                ]
+            },
+        )
+    return spec
 
 
-def stream_spec(cls, request):
+def stream_spec(cls, request, pk=None):
     settings = cls.settings(request)
     Task = apps.get_model("project.Task")
     if settings["hide_done"]:
         tasks = [pairs.filter(done=False)]
     else:
         tasks = []
-    tasks += [x for x in task_spec(Task,request) if "project" not in x]
+    tasks += [x for x in task_spec(Task, request) if "project" not in x]
     return [
         __type__,
         lang_field("name"),
@@ -129,7 +184,7 @@ def stream_spec(cls, request):
     ]
 
 
-def project_spec(cls, request):
+def project_spec(cls, request, pk=None):
     Stream = apps.get_model("project.Stream")
     ProjectLog = apps.get_model("project.ProjectLog")
     Task = apps.get_model("project.Task")
@@ -156,7 +211,7 @@ def project_spec(cls, request):
                 __type__,
                 lang_field("name"),
                 "id",
-                {"tasks": task_spec(Task,request)},
+                {"tasks": task_spec(Task, request)},
             ],
             to_attr="unassigned_tasks",
         ),
@@ -167,11 +222,14 @@ def project_spec(cls, request):
                 lang_field("name"),
                 "id",
                 {"name_count": name_count()},
-                {"tasks": task_spec(Task,request)},
+                {"tasks": task_spec(Task, request)},
             ],
         },
         {
-            "status": [__type__, "id",lang_field("name")],
+            "group": [__type__, "id", lang_field("name")],
+        },
+        {
+            "status": [__type__, "id", lang_field("name")],
         },
         {
             "log": [__type__, "id"],
@@ -188,22 +246,32 @@ def project_spec(cls, request):
     ]
 
 
-def projectlog_spec(cls, request):
+def projectlog_spec(cls, request, pk=None):
     ProjectLogEntry = apps.get_model("project.ProjectLogEntry")
     return [
         __type__,
-        {"project" : ["id",__type__]},
+        {"project": ["id", __type__]},
         "id",
         {"entries": projectlogentry_spec(ProjectLogEntry, request)},
     ]
 
 
-def projectlogentry_spec(cls, request):
+def projectlogentry_spec(cls, request, pk=None):
     return [
         __type__,
         "id",
         "text",
-        {"log": ["id",__type__]},
+        {"log": ["id", __type__]},
         {"rendered_text": render_markdown(f"text")},
         "addstamp",
+    ]
+
+
+def time_report(cls, request, pk=None):
+    return [
+        __type__,
+        "id",
+        {"user": [__type__, "id", "username"]},
+        "time",
+        "week",
     ]

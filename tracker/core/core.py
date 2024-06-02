@@ -21,10 +21,12 @@ class RequestForm(ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if self.data:
+            self.data._mutable = True
             for field in self._meta.model.bilingual_fields:
                 if field in self.data:
                     self.data[resolve_field_to_current_lang(field)] = self.data[field]
                     del self.data[field]
+            self.data._mutable = False
         # for attr, field in self.fields.items():
         #    setattr(field, "request", self.request)
         #    setattr(field.widget, "request", self.request)
@@ -93,6 +95,15 @@ class CoreModel(LifecycleModelMixin, Model):
             x.replace("_en", "") for x in cls._fields_map.keys() if x.endswith("_en")
         ]
 
+    @classmethod
+    def localize_field(cls,attr):
+        if attr not in cls._fields_map:
+            localized = resolve_field_to_current_lang(attr)
+            if localized not in cls._fields_map: 
+                cls._meta.get_field(localized) # this will raise fieldDoesNotExist
+            return localized
+        return attr
+
     @classproperty
     def _fields_map(cls):
         return {x.name: x.__class__.__name__ for x in cls._meta.get_fields()}
@@ -105,21 +116,26 @@ class CoreModel(LifecycleModelMixin, Model):
         return all_fields
 
     @classmethod
-    def readers(cls, request):
+    def readers(cls, request,pk=None):
         if callable(cls.spec):
-            spec = cls.spec(cls, request)
+            spec = cls.spec(cls, request, pk)
         else:
             spec = cls.spec
         return specs.process(spec)
 
     @classmethod
     def get_projection_by_pk(cls, request, pk):
-        prepare_qs, projection = cls.readers(request)
+        ''' 
+          can't user model.objects.get because need to apply all the 
+          preparing functions to then apply the producers and then the projections 
+        '''
+        prepare_qs, projection = cls.readers(request,pk)
+        qs =  prepare_qs(cls.objects.user_filter(request).filter(pk=pk))
         try:
-            return [
-                (x, projection(x))
-                for x in prepare_qs(cls.objects.user_filter(request).filter(pk=pk))
-            ][0]
+            obj = qs.first()
+            if not obj:
+                raise  cls.DoesNotExist()
+            return obj, projection(obj)
         except cls.DoesNotExist:
             raise Http404("No object matches the given query")
 
@@ -145,7 +161,7 @@ class CoreModel(LifecycleModelMixin, Model):
     def POST(cls, request):
         form = cls.form(request)(request.POST)
         context = {"form": form}
-        preoare_qs, projection = cls.readers(request)
+        preoare_qs, projection = cls.readers(request,pk)
         if form.is_valid():
             inst = form.instance
             # by default associasave()te objects with their creator
@@ -166,16 +182,19 @@ class CoreModel(LifecycleModelMixin, Model):
 
     @classmethod
     def PUT(cls, request, pk):
-        prepare_qs, projection = cls.readers(request)
+        prepare_qs, projection = cls.readers(request,pk)
         inst, inst_dict = cls.get_projection_by_pk(request, pk)
         put = QueryDict(request.body)
         form = cls.form(request)(put, instance=inst)
         context = {"form": form}
         if form.is_valid():
             form.save()
-            obj, context["inst"] = cls.get_projection_by_pk(request, pk)
-            if request.json:
-                return JsonResponse(context["inst"])
+            try:
+                obj, context["inst"] = cls.get_projection_by_pk(request, pk)
+                if request.json:
+                    return JsonResponse(context["inst"])
+            except:
+                return HttpResponse("access lost")
         else:
             context["inst"] = form.instance
             if request.json:
@@ -189,7 +208,7 @@ class CoreModel(LifecycleModelMixin, Model):
 
     @classmethod
     def GET(cls, request, pk=None):
-        prepare_qs, projection = cls.readers(request)
+        prepare_qs, projection = cls.readers(request,pk)
         if pk:
             inst, inst_dict = cls.get_projection_by_pk(request, pk)
             if request.json:
@@ -250,7 +269,6 @@ class CoreModel(LifecycleModelMixin, Model):
             else:
                 q = Q()
             q = q & Q(**q_param)
-            print(q)
             return q
 
     def add_user_and_save(self, request):

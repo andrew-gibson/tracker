@@ -1,13 +1,17 @@
 {% if  standalone %} {% extends "base.html" %} {% endif %}
 
 {% block nav %}
-    {%with navbar=[ "shared/main-link.html"],navdropdown=[ "shared/metadata-link.html","project/project-navdropdown.html"]%}
+    {%with navbar=[],navdropdown=[ "project/project-navdropdown.html"]%}
         {%include "navbar.html"%}
     {%endwith%}
 {%endblock%}
 
-{% block content %}{%with project=inst  %}
-<div id="main-content" >
+{% block sidebar %}
+    {%include "shared/sidebar.html"%}
+{%endblock%}
+
+{% block content %}{%with project=inst %}
+<div id="main-content" hx-swap-oob="true">
     <div id="project{{project.id}}" class="card task p-0">
         <div class="card-body pt-0 pb-0 row">
             <div class="col-6 left ">
@@ -49,13 +53,14 @@
              hx-get="{{_url}}?{{params}}">
         </div>
     {%endwith%}
+
+    <script type="module">
+        import { make_right_dropdown } from "d3-ui";
+        import {project_summary} from "{{ static('task_summary.js') }}";
+        const project = {{dumps(inst)|safe}};
+        project_summary({...project});
+    </script>
 </div>
 
-<script type="module">
-    import { make_right_dropdown } from "d3-ui";
-    import {project_summary} from "{{ static('task_summary.js') }}";
-    const project = {{dumps(inst)|safe}};
-    project_summary({...project} );
-</script>
-{% endwith  %}
-{%endblock%}
+
+{%endwith%} {%endblock%}

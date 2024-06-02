@@ -50,7 +50,9 @@ export const ui_state = mobx.makeAutoObservable({
     reset_ui(e) {
         this.active_elements = [];
         dispose_functions() ;
-        document.dispatchEvent(new Event(e))
+        if (e){
+            document.dispatchEvent(new Event(e))
+        }
     },
 });
 
@@ -182,11 +184,14 @@ const send_model = async model =>{
         f = fetch_recipies.POST;
         url = ui_state.models[model.__type__].main;
     }
+
     const resp = await f(url, 
         new URLSearchParams(obj).toString(), 
         true );
-    const data = await resp.json();
-    Object.assign(model,data);
+    if (resp.status == 200) {
+        const data = await resp.json();
+        Object.assign(model,data);
+    }
 };
 
 const q = async (e)=>{
@@ -230,8 +235,11 @@ const toggle_fk_attr = async (result) => {
         resp = await fetch_recipies.POST(result.url, {},true);
     }
     if (resp.status == 200) {
-        const data = await fetch_recipies.GETjson(model_info.main_pk.replace("__pk__",d.id));
-        d[attr] = data[attr];
+        const obj_refresh_resp = await fetch_recipies.GET(model_info.main_pk.replace("__pk__",d.id));
+        if (obj_refresh_resp.status == 200){
+            const data = await  obj_refresh_resp.json()
+            d[attr] = data[attr];
+        }
         return true;
     } else {
         return false;
@@ -239,19 +247,28 @@ const toggle_fk_attr = async (result) => {
 };
 
 d3.selection.prototype.styles = function(attrs){
-    for ( var key in attrs ){
-      this.node().style[key]  = attrs[key];
+    const ns = this.nodes()
+    for (var i in this.nodes()){
+        for ( var key in attrs ){
+          this.node().style[key]  = attrs[key];
+        }
     }
     return this;
 }
 d3.selection.prototype.attrs = function(attrs){
-    for ( var key in attrs ){
-      this.node().setAttribute(key, attrs[key]);
+    const ns = this.nodes()
+    for (var i in this.nodes()){
+        for ( var key in attrs ){
+          ns[i].setAttribute(key, attrs[key]);
+        }
     }
     return this;
 }
 d3.selection.prototype.setup_htmx = function(){
-    htmx.process(this.node());
+    const ns = this.nodes()
+    for (var i in this.nodes()){
+        htmx.process(ns[i]);
+    }
     return this;
 }
 d3.selection.prototype.select_parent = function(){
@@ -487,12 +504,12 @@ export const append_edit_local_attr = function(selection,observable_data, attr="
                 normal_mode
                     .append("button")
                     .attr("type","button")
-                    .classed("btn btn-link mb-1",true)
+                    .classed("btn btn-link mb-1 w-25 text-start",true)
                     .on("click",()=> ui_state.active = {attr, d : observable_data})
                     .html(title)
                 .select_parent()
                     .append("div")
-                    .classed("me-1",true)
+                    .classed("me-1 w-75 text-end",true)
                     .call(selecion=>{
                         autoRun(()=>selecion.html(observable_data[attr] ))
                     })
@@ -531,18 +548,16 @@ export const append_edit_local_attr = function(selection,observable_data, attr="
                 .select_parent()
                 .call(make_cancel_button)
 
-
-
             } else if (type == "TextField"){
                 normal_mode
                     .append("button")
                     .attr("type","button")
-                    .classed("btn btn-link mb-1 text-start",true)
+                    .classed("btn btn-link mb-1 text-start w-25",true)
                     .on("click", ()=> ui_state.active = {attr, d : observable_data})
                     .html(title)
                 .select_parent()
                     .append("div")
-                    .classed("me-1",true)
+                    .classed("me-1 w-75 text-end",true)
                     .call(selecion=>{
                         autoRun(()=>selecion.html(observable_data[display_attr] ))
                     })

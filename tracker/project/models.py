@@ -43,53 +43,27 @@ from django_lifecycle import (
     BEFORE_UPDATE,
     hook,
 )
-
 from . import producers
-from core.lang import  resolve_field_to_current_lang
+from core.lang import resolve_field_to_current_lang
 
-''' 
-1- tool for managers
-2- employees can ttack hours worked against all the projects that they are assigned to
-    a- can they search up extra projects?
-3-contacts belong to a team
-4-teams (groups) are universal
-5-staff can
-    - more contacts between teams
-    - create new teams
-6 tags 
-    - can be public
-    - mostly belong to a team
-7- Andrew - director    manages: PHDSS part_of: DMIA
-    Hanah - manager      manages: science part_of: PHDSS
-        Robyn            manages:  part_of: science
-    Darren - manager   manages: services part_of: PHDSS
-        Caroline       manages:  part_of: services
-    Jsoh                manages:  part_of: PHDSS
-
-
-'''
 
 class ProjectGroupManager(GroupManager):
 
     def get_queryset(self):
-        return (
-            super()
-            .get_queryset()
-            .filter(app="project")
-        )
+        return super().get_queryset().filter(app="project")
 
-    def user_get(self,request,*args,**kwargs):
+    def user_get(self, request, *args, **kwargs):
         try:
-            return self.get(*args,**kwargs)
+            return self.get(*args, **kwargs)
         except self.model.DoesNotExist:
             raise Http404("cannot find requested object")
 
     def user_filter(self, request):
         return self.filter()
 
-    def user_delete(self,request,*args,**kwargs):
+    def user_delete(self, request, *args, **kwargs):
         try:
-            obj =  self.get(*args,**kwargs)
+            obj = self.get(*args, **kwargs)
             if request.user.is_staff:
                 obj.delete()
             else:
@@ -97,27 +71,30 @@ class ProjectGroupManager(GroupManager):
         except self.model.DoesNotExist:
             raise Http404("cannot find requested object")
 
+
 class ProjectGroup(Group):
     objects = ProjectGroupManager()
     spec = producers.projectgroup_spec
-    form_fields = ["name_en",]
+    form_fields = [
+        "name_en",
+    ]
 
     class Meta:
         proxy = True
 
     @classmethod
     def user_filter(cls, request):
-        return cls.objects.filter(app="project",system=False)
+        return cls.objects.filter(app="project", system=False)
 
     def can_i_delete(self, request):
         return request.user.is_staff
 
-    def add_user(self,request):
+    def add_user(self, request):
         self.save()
 
-    def save(self,*args,**kwargs):
+    def save(self, *args, **kwargs):
         self.app = self.__class__._meta.app_label
-        super().save(*args,**kwargs)
+        super().save(*args, **kwargs)
 
 
 class GroupPrefetcherManager(UserManager):
@@ -131,7 +108,12 @@ class GroupPrefetcherManager(UserManager):
             .prefetch_related("projects")
         )
 
-class ProjectUser(User):
+    def user_filter(self, request):
+        return self.filter(belongs_to = request.user.belongs_to)
+
+
+class ProjectUser(User, CoreModel):
+    spec = producers.projectuser_spec
 
     class Meta:
         proxy = True
@@ -145,22 +127,25 @@ class Contact(AutoCompleteCoreModel, trigger="@", hex_color="ff006e"):
     form_fields = ["name", "email"]
 
     class adminClass(admin.ModelAdmin):
-        list_display = ("name", "email","account")
-        list_editable = ("email","account")
+        list_display = ("name", "email", "account")
+        list_editable = ("email", "account")
 
     def can_i_delete(self, request):
         return request.user.is_staff
 
-    group = ForeignKey(ProjectGroup, blank=True,on_delete=PROTECT, related_name="contacts")
+    group = ForeignKey(
+        ProjectGroup, blank=True, on_delete=PROTECT, related_name="contacts"
+    )
     name = CharField(max_length=255)
     email = EmailField(null=True, blank=True)
     account = OneToOneField(
-        User,
+        ProjectUser,
         null=True,
         blank=True,
         on_delete=SET_NULL,
         related_name="contact",
     )
+
 
 class Settings(CoreModel):
 
@@ -172,11 +157,9 @@ class Settings(CoreModel):
             self.instance.user = self.request.user
             super().save(*args, **kwargs)
 
-    spec = ["hide_done","see_all_projects", "id", producers.__type__]
+    spec = ["hide_done", "see_all_projects", "id", producers.__type__]
     form_fields = ["user", "hide_done"]
-    user = OneToOneField(
-        ProjectUser, on_delete=CASCADE,  blank=True
-    )
+    user = OneToOneField(ProjectUser, on_delete=CASCADE, blank=True)
     hide_done = BooleanField(default=False, blank=True)
     see_all_projects = BooleanField(default=True, blank=True)
     projects_filter = JSONField(db_default="{}")
@@ -189,7 +172,7 @@ class Settings(CoreModel):
 @add_to_admin
 class EXCompetency(AutoCompleteCoreModel, trigger="`", hex_color="2c6e49"):
 
-    form_fields = ["name_en","name_fr"]
+    form_fields = ["name_en", "name_fr"]
 
     @classmethod
     def user_filter(cls, request):
@@ -203,13 +186,13 @@ class EXCompetency(AutoCompleteCoreModel, trigger="`", hex_color="2c6e49"):
 
     spec = producers.basic_spec
     name_en = CharField(max_length=300, unique=True)
-    name_fr = CharField(max_length=300, null=True,blank=True)
+    name_fr = CharField(max_length=300, null=True, blank=True)
 
 
 @add_to_admin
 class ProjectStatus(AutoCompleteCoreModel, hex_color="8e6bc7"):
 
-    form_fields = ["name_en","name_fr"]
+    form_fields = ["name_en", "name_fr"]
 
     class Meta:
         verbose_name_plural = "Statuses"
@@ -231,7 +214,8 @@ class ProjectStatus(AutoCompleteCoreModel, hex_color="8e6bc7"):
 
     spec = producers.basic_spec
     name_en = CharField(max_length=300, unique=True)
-    name_fr = CharField(max_length=300, null=True,blank=True)
+    name_fr = CharField(max_length=300, null=True, blank=True)
+
 
 @add_to_admin
 class Tag(AutoCompleteCoreModel, trigger="#", hex_color="ffbe0b"):
@@ -257,15 +241,25 @@ class Tag(AutoCompleteCoreModel, trigger="#", hex_color="ffbe0b"):
     def __str__(self):
         return self.name
 
-    group = ForeignKey(ProjectGroup, blank=True,on_delete=PROTECT, related_name="tags")
+    group = ForeignKey(ProjectGroup, blank=True, on_delete=PROTECT, related_name="tags")
     name = CharField(max_length=100)
     public = BooleanField(db_default=False)
 
 
-
 @add_to_admin
-class Project(AutoCompleteNexus, AutoCompleteCoreModel, trigger="^", hex_color="8338ec"):
+class Project(
+    AutoCompleteNexus, AutoCompleteCoreModel, trigger="^", hex_color="8338ec"
+):
     spec = producers.project_spec
+
+    class Meta:
+        ordering = ("name_en",)
+
+    class adminClass(admin.ModelAdmin):
+        list_display = ("id", "name_en", "group", "status")
+        list_editable = ("name_en", "group", "status")
+        list_filter = ("status", "group")
+        search_fields = ("name_en",)
 
     class _Form(RequestForm):
         class Meta:
@@ -285,13 +279,13 @@ class Project(AutoCompleteNexus, AutoCompleteCoreModel, trigger="^", hex_color="
             ].queryset.exclude(pk=self.instance.pk)
             self.fields["parent_project"].widget.attrs["class"] = "form-control"
 
-        def save(self,*args,**kwargs):
+        def save(self, *args, **kwargs):
             ## ensure if project has been set to private, use the request.user to set the private owner
             if self.cleaned_data["private"]:
                 self.instance.private_owner = self.request.user
             else:
                 self.instance.private_owner = None
-            super().save(*args,**kwargs)
+            super().save(*args, **kwargs)
 
     @classmethod
     def get_autocompletes(cls, excludes=None):
@@ -302,12 +296,13 @@ class Project(AutoCompleteNexus, AutoCompleteCoreModel, trigger="^", hex_color="
     @classmethod
     def user_filter(cls, request):
         filters = cls.get_filters(request)
+        project_user = ProjectUser.objects.get(pk=request.user.pk)
         return (
-            cls.objects
-              .filter(group__in=request.user.groups.all())
-              .filter(filters)
-              .exclude(Q(private=True) & ~Q(private_owner=request.user))  
-        )
+            cls.objects.filter(group__in=request.user.groups.all())
+            .filter(filters)
+            .exclude(Q(private=True) & ~Q(private_owner=request.user))
+            | project_user.projects.all()
+        ).distinct()
 
     @hook(AFTER_CREATE)
     def add_default_stream(self):
@@ -319,12 +314,12 @@ class Project(AutoCompleteNexus, AutoCompleteCoreModel, trigger="^", hex_color="
         return self.streams.get(project_default=True)
 
     def __str__(self):
-        return f'{self.pk}-{self.name_en}'
-
+        return f"{self.pk}-{self.name_en}"
 
     def am_i_viewer(self, request):
         return {
-            "selected": request.user in self.viewers.all() or self.group in request.user.groups.all(),
+            "selected": request.user in self.viewers.all()
+            or self.group in request.user.groups.all(),
             "url": reverse(
                 "core:toggle_link",
                 kwargs={
@@ -337,11 +332,13 @@ class Project(AutoCompleteNexus, AutoCompleteCoreModel, trigger="^", hex_color="
             ),
         }
 
-    group = ForeignKey(ProjectGroup, blank=True,on_delete=PROTECT, related_name="projects")
-    status = ForeignKey(ProjectStatus,blank=True,on_delete=SET_NULL,null=True)
+    group = ForeignKey(
+        ProjectGroup, blank=True, on_delete=PROTECT, related_name="projects"
+    )
+    status = ForeignKey(ProjectStatus, blank=True, on_delete=SET_NULL, null=True)
     addstamp = DateTimeField(null=True)
     name_en = CharField(max_length=255)
-    name_fr = CharField(max_length=255,null=True,blank=True)
+    name_fr = CharField(max_length=255, null=True, blank=True)
     text_en = TextField(blank=True, null=True)
     text_fr = TextField(blank=True, null=True)
     parent_project = ForeignKey(
@@ -355,10 +352,16 @@ class Project(AutoCompleteNexus, AutoCompleteCoreModel, trigger="^", hex_color="
     teams = ManyToManyField(ProjectGroup, related_name="projects_supporting")
     tags = ManyToManyField(Tag)
     private = BooleanField(db_default=False)
-    private_owner = ForeignKey(ProjectUser, related_name="private_projects",null=True, blank=True,on_delete=SET_NULL)
+    private_owner = ForeignKey(
+        ProjectUser,
+        related_name="private_projects",
+        null=True,
+        blank=True,
+        on_delete=SET_NULL,
+    )
     viewers = ManyToManyField(ProjectUser, related_name="projects", blank=True)
-    short_term_outcomes = TextField(blank=True, null=True) 
-    long_term_outcomes = TextField(blank=True, null=True) 
+    short_term_outcomes = TextField(blank=True, null=True)
+    long_term_outcomes = TextField(blank=True, null=True)
 
 
 class ProjectLog(CoreModel):
@@ -367,10 +370,10 @@ class ProjectLog(CoreModel):
 
     @classmethod
     def user_filter(cls, request):
-       filters = cls.get_filters(request)
-       return cls.objects.filter(project__group__in=request.user.groups.all()).filter(
+        filters = cls.get_filters(request)
+        return cls.objects.filter(project__group__in=request.user.groups.all()).filter(
             filters
-       )
+        )
 
     @property
     def id(self):
@@ -393,9 +396,17 @@ class ProjectLogEntry(CoreModel):
             log__project__group__in=request.user.groups.all()
         ).filter(filters)
 
+    def can_i_delete(self, request):
+        return request.user == self.user
+
+    def add_user_and_save(self, request):
+        self.user = request.user
+        self.save()
+
     text = TextField(blank=True)
     addstamp = DateTimeField(auto_now_add=True)
     editstamp = DateTimeField(auto_now=True)
+    user = ForeignKey(ProjectUser, on_delete=CASCADE, related_name="log_entries")
     log = ForeignKey(ProjectLog, on_delete=CASCADE, related_name="entries")
 
 
@@ -447,7 +458,7 @@ class Stream(AutoCompleteCoreModel, trigger="~", hex_color="036666"):
     project = ForeignKey(Project, on_delete=CASCADE, related_name="streams")
     project_default = BooleanField(default=False)
     name_en = CharField(max_length=300)
-    name_fr = CharField(max_length=300,null=True, blank=True)
+    name_fr = CharField(max_length=300, null=True, blank=True)
 
 
 class Task(CoreModel, AutoCompleteNexus):
@@ -543,13 +554,13 @@ class Task(CoreModel, AutoCompleteNexus):
         else:
             self.order = 1
 
-    order = PositiveIntegerField(null=True)
+    order = PositiveIntegerField(null=True, blank=True)
     project = ForeignKey(Project, on_delete=CASCADE, related_name="tasks")
     stream = ForeignKey(Stream, on_delete=PROTECT, blank=True, related_name="tasks")
     start_date = DateField(default=date.today, blank=True, null=True)
     target_date = DateField(blank=True, null=True)
     name_en = CharField(max_length=255)
-    name_fr = CharField(max_length=255, null=True,blank=True)
+    name_fr = CharField(max_length=255, null=True, blank=True)
     text_en = TextField(blank=True, null=True)
     text_fr = TextField(blank=True, null=True)
     lead = ForeignKey(Contact, on_delete=SET_NULL, null=True, blank=True)
@@ -565,7 +576,21 @@ class Task(CoreModel, AutoCompleteNexus):
 
 class TimeReport(CoreModel):
 
-    user = ForeignKey("core.User", null=True, on_delete=SET_NULL)
+    spec = producers.time_report
+
+    form_fields = [
+        "user",
+        "projexc",
+        "time",
+        "week",
+    ]
+
+    @classmethod
+    def user_filter(cls, request):
+        filters = cls.get_filters(request)
+        return cls.objects.filter(user=request.user).filter(filters)
+
+    user = ForeignKey(ProjectUser, null=True, on_delete=SET_NULL)
     project = ForeignKey(Project, on_delete=CASCADE)
     time = DecimalField(max_digits=5, decimal_places=1)
     week = DateField()

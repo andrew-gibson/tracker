@@ -39,18 +39,18 @@ const render_leads_menu = async (attr,model)=>{
     const _render = ()=>{
        d3.select(`#${attr}-header`)
          .classed("fw-bold text-white",f[attr])
-         .classed("text-muted",!f[attr])
+         .classed("text-white-50",!f[attr])
        d3.select(`#${attr}-dropdown`)
             .selectAll("li")
             .data(data,d=>d.id)
             .join("li")
             .attr("class","list-group-item")
-            .classed("active", d=> d.id == f[attr])
+            .classed("bg-primary", d=> d.id == f[attr])
             .selectAll("button")
             .data(d=>[d],d=>d.id)
             .join("button")
             .attr("class","btn btn-link text-nowrap")
-            .classed("text-white", d=> d.id == f[attr])
+            .classed("text-bg-primary", d=> d.id == f[attr])
             .html(d=>d.name)
             .on("click",e=>{
                const data = d3.select(e.target).datum();

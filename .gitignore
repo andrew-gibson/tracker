@@ -8,7 +8,7 @@ __pycache__/
 
 # Distribution / packaging
 tracker/static/admin/*
-tracker/static/bootstrap*/*
+tracker/static/*bootstrap*/*
 tracker/static/debug_toolbar/*
 tracker/static/django_extensions/*
 *min*

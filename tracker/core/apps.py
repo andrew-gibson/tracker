@@ -17,7 +17,7 @@ class CoreConfig(AppConfig):
 
             user_groups_field = get_user_model()._meta.get_field(f"{related_name_to_group}s")
             user_groups_query = f"{related_name_to_group}__{user_groups_field.related_query_name()}"
-            user_groups_query = "custom_group_set__user"
+            user_groups_query = "custom_group_set__users"
             return Permission.objects.filter(**{user_groups_query: user_obj})
 
         ModelBackend._get_group_permissions = _get_group_permissions

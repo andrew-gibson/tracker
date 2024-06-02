@@ -1,26 +1,22 @@
 {% if  standalone %} {% extends "base.html" %} {% endif %}
 
 {% block nav %}
-    {%with navbar=[ "shared/main-link.html"],navdropdown=[]%}
+    {%with navbar=[],navdropdown=[]%}
         {%include "navbar.html"%}
     {%endwith%}
 {%endblock%}
 
 
 {% block content %}
-<div id="main-content" >
+<div id="main-content" hx-swap-oob="true">
     <div class="row">
         <div hx-trigger="load, reloadTags from:document" 
              hx-get="{{url("core:main", kwargs={ "m" : "project.Tag"})}}"
-             class="col-3">
+             class="col-6">
         </div>
         <div hx-trigger="load, reloadContacts from:document" 
              hx-get="{{url("core:main", kwargs={ "m" : "project.Contact"})}}"
-             class="col-3">
-        </div>
-        <div hx-trigger="load, reloadTeams from:document" 
-             hx-get="{{url("core:main", kwargs={ "m" : "project.ProjectGroup"})}}"
-             class="col-3">
+             class="col-6">
         </div>
     </div>
 </div>

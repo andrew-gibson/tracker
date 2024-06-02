@@ -32,4 +32,14 @@ body {
 .fade-me-out.htmx-swapping.highlight-fade {
   background: #dc3545;
 }
-
+.sidebar {
+    position: -webkit-sticky;
+    position: sticky;
+    top: 5rem;
+    display: block !important;
+    height: calc(100vh - 6rem);
+    padding-left: .25rem;
+    margin-left: -.25rem;
+    overflow-y: auto;
+    scrollbar-width: none;
+  }
