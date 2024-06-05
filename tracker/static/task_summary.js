@@ -1,4 +1,3 @@
-
 import  { append_edit_attr,ui_state, make_right_dropdown,autoRun, is_null,create_button, inplace_char_edit} from "d3-ui";
 
 export const task_state = mobx.makeAutoObservable({
@@ -48,8 +47,8 @@ export const task_state = mobx.makeAutoObservable({
     },
 });
 
-autoRun(()=>{
-    if (ui_state.active == null) {
+mobx.autorun(()=>{
+    if (ui_state.attr == null) {
         task_state.redraw = true;
     }
 })
@@ -114,7 +113,7 @@ export const task_summaries = tasks=>{
                             })
            });
 
-            autoRun(()=>{
+            autoRun(selection.node(),()=>{
                 task_state.redraw
                 body_sel.html("")
                 _.each([["text","Notes",""],

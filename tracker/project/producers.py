@@ -136,7 +136,7 @@ def contact_spec(cls, request, pk=None):
         "name",
         "email",
         {"account": [__type__, "id", "username"]},
-        {"group": [__type__, "id", "name_en"]},
+        {"group": [__type__, "id", lang_field("name")]},
     ]
 
 

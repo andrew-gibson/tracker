@@ -1,1 +1,40 @@
-<div> {{inst.name}} </div>
+{% if  standalone %} {% extends "base.html" %} {% endif %}
+
+
+{% block content%}
+<div id="main-content" class="row" hx-swap-oob="true">
+    <div class="card">
+          <div class="card-header">Projects</div>
+          <ul class="list-group list-group-flush">
+          </ul>
+    </div>
+
+    <script type="module" >
+        import fetch_recipies from "fetch-recipies";
+        import {ui_state, inplace_char_edit, create_button,append_edit_attr} from "d3-ui";
+        const project_group = {{dumps(inst)|safe}};
+
+        const render_projects = async (projects)=>{
+            d3.select("#projects ul")
+              .selectAll("li.list-group-item")
+              .data(projects,d=>d.id)
+              .join("li")
+              .attr("class","list-group-item")
+              .selectAll("a.project-link")
+              .data(d=>[d],d=>d.id)
+              .join("a")
+              .attr( "class", "btn btn-link project-link")
+              .attrs({
+                "hx-replace-url":"true",
+                "hx-swap":"outerHTML",
+                "hx-target" : "#main-content",
+              })
+              .attr("hx-get",d=>ui_state.models["project.Project"].main_pk.replace("__pk__", d.id))
+              .html(d=>d.name)
+              .setup_htmx()
+        };
+        refresh_groups();
+    </script>
+</div>
+{%endblock%}
+

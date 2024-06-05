@@ -6,18 +6,26 @@
     {%endwith%}
 {%endblock%}
 
+{% block sidebar %}
+    {%include "shared/sidebar.html"%}
+{%endblock%}
 
 {% block content %}
 <div id="main-content" hx-swap-oob="true">
     <div class="row">
         <div hx-trigger="load, reloadTags from:document" 
              hx-get="{{url("core:main", kwargs={ "m" : "project.Tag"})}}"
-             class="col-6">
+             class="col-4">
         </div>
         <div hx-trigger="load, reloadContacts from:document" 
              hx-get="{{url("core:main", kwargs={ "m" : "project.Contact"})}}"
-             class="col-6">
+             class="col-4">
         </div>
+        <div hx-trigger="load, reloadTeams from:document" 
+             hx-get="{{url("core:main", kwargs={ "m" : "project.ProjectGroup"})}}"
+             class="col-4">
+        </div>
+
     </div>
 </div>
 {% endblock %}

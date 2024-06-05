@@ -82,6 +82,7 @@ class ProjectGroup(Group):
     class Meta:
         proxy = True
 
+
     @classmethod
     def user_filter(cls, request):
         return cls.objects.filter(app="project", system=False)
@@ -96,6 +97,9 @@ class ProjectGroup(Group):
         self.app = self.__class__._meta.app_label
         super().save(*args, **kwargs)
 
+    def add_user_and_save(self,request):
+        self.save()
+        request.project_user.groups.add(self)
 
 class GroupPrefetcherManager(UserManager):
     use_for_related_fields = True

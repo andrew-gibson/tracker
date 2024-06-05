@@ -2,40 +2,73 @@ import fetch_recipies from "fetch-recipies";
 import "d3";
 import 'lo-dash';
 
+//mobx.spy(event=>{
+//    console.log(event)
+//})
+
 
 const inactive = {attr:"", d: {id:null}, search_results : []};
-export const ui_state = mobx.makeAutoObservable({
-    _active : inactive,
-    get active (){
-      return this._active;
-    },
-    set active (val){
-       this._active = {search_results : [], ...val};
-    },
-    active_elements : [],
-    models: await (await fetch_recipies.GET("/core/model_info/")).json(),
-    active_model_info (){
-       return this.models[this.active.d.__type__];
-    },
-    attr_type (){
-       return this.active_model_info().fields[this.active.attr];
-    },
+const models =  await (await fetch_recipies.GET("/core/model_info/")).json()
+class UIState {
+    _attr = ""
+    _d = {id:null}
+    _search_results = []
+
+    constructor(){
+        mobx.makeAutoObservable(this,{deep:true })
+        this.active_elements = [];
+        _.each(this.models,m=>{
+             m.filters = {};
+        });
+        this.models = models
+    }
+    get attr (){
+      return this._attr;
+    }
+
+    set attr(val){
+        this._attr = val
+    }
+
+    get d (){
+      return this._d;
+    }
+
+    set d(val){
+        this._d = val
+    }
+
+    get search_results (){
+      return this._search_results;
+    }
+
+    set search_results (val){
+      return this._search_results = val;
+    }
+
+    get active_model_info (){
+       return this.models[this._d.__type__];
+    }
+
+    get attr_type (){
+       return this.active_model_info.fields[this.attr];
+    }
+
     is_fk (type){
-       type = type || this.attr_type()
+       type = type || this.attr_type
        return  ["ManyToOneRel", "ManyToManyField", "ForeignKey","OneToOneRel"].includes(type);
-    },
-    make_id (active=null){
-        active = active ? active : this.active;
-        if (!active) {
-            return "";
-        }
-        const id =  active.d.id ?  active.d.id : "-new-";
-        return  `${active.d.__type__.replace(".","-")}-${id}-${active.attr}-`
-    },
+    }
+
+    make_id (__type__, id, attr){
+        return  `${__type__.replace(".","-")}-${id}-${attr}-`
+    }
+
     ids (active=null){
-        const id = this.make_id(active);
-        if (!id){
-            return {};
+        var id
+        if (active) {
+            id = this.make_id(active.d.__type__, active.d.id || "-new-", active.attr);
+        } else if (this.attr){
+            id = this.make_id(this.d.__type__, this.d.id || "-new-", this.attr);
         }
         return {
             normal : `${id}normal`,
@@ -43,33 +76,41 @@ export const ui_state = mobx.makeAutoObservable({
             insert_input : `${id}input`,
             insert_label : `${id}input_label`,
         }
-    },
+    }
     reset_active (e){
-        this.active = inactive;
-    },
+        const temp_new_state = new UIState()
+        this.search_results =  temp_new_state.search_results
+        this.attr =  temp_new_state.attr
+        this.d =  temp_new_state.d
+    }
     reset_ui(e) {
         this.active_elements = [];
-        dispose_functions() ;
+        _dispose_functions.dispose() ;
         if (e){
             document.dispatchEvent(new Event(e))
         }
-    },
-});
-
-_.each(ui_state.models,m=>{
-     m.filters = {}
-})
-window.reset_ui =   _.bind(ui_state.reset_ui, ui_state);
+    }
+}
+export const ui_state = new UIState()
+const reset_ui = e=>{
+  ui_state.reset_ui(e)
+}  
+const reset_active = e=>{
+   ui_state.reset_active(e)
+}
+window.reset_ui = reset_ui;
 window.__uistate = ui_state;
-const reset_active = _.bind(ui_state.reset_active, ui_state);
-
 const handler = e => {
    if ("hx-replace-url" in e.target.attributes){
        window.reset_ui("HxReplaceURL");
    }
 }
 
-d3.select(document).on("htmx:beforeRequest",handler)
+d3.select(document)
+    .on("htmx:beforeRequest",handler)
+    .on("htmx:beforeSwap",e=>{
+    })
+
         
 document.body.addEventListener('htmx:configRequest', (event) => {
   const elt = event.detail.elt;
@@ -79,12 +120,46 @@ document.body.addEventListener('htmx:configRequest', (event) => {
   }
 });
 
+const _dispose_functions = {
+    funcs : [],
+    dispose(){
+        _.each(this._dispose_functions, ob=>ob.func());
+        this.funcs = []
+    },
+    get_node_ancestors(node){
+        const path = []
+        while(node) {
+            path.push(node)
+            element = node.parentElement
+        }
+        return path;
+    },
+    remove_node(node){
+        const to_be_removed = [];
+        _.each(this.funcs, ({node,func})=>{
+            const ancestors = this.get_node_ancestors(node);
+            if (ancestors.includes(e.detail.target)){
+               func();
+               to_be_removed.push(func)
+            }
+        });
+        this.funcs = _.filter(this.funcs,d=> !to_be_removed.includes(d.func))
+    }
+};
+
+
+export const autoRun = (node, func)=>{
+    _dispose_functions.funcs.push(
+        {node,func:mobx.autorun(func)}
+    );
+};
+
 mobx.reaction(
-    ()=>[ui_state.active.attr, ui_state.active.d.id],
+    ()=>[ui_state.attr, ui_state.d.id],
     ()=>{
         d3.selectAll(".editor-insert").classed("d-none",true);
         d3.selectAll(".editor-normal").classed("d-none",false);
-        if (ui_state.active.attr){
+        if (ui_state.attr){
             const ids = ui_state.ids()
             d3.select(`#${ids.insert}`).classed("d-none",false);
             d3.select(`#${ids.normal}`).classed("d-none",true);
@@ -94,27 +169,8 @@ mobx.reaction(
             if (ui_state.is_fk()){
                 q();
             }
-    } 
+        } 
 });
-
-
-const _dispose_functions = [];
-
-export const dispose_functions = ()=>{
-    _.each(_dispose_functions, f=>f());
-};
-
-export const autoRun = (func)=>{
-    _dispose_functions.push(
-      mobx.autorun(func)
-    );
-}
-
-export const reaction = (data, func)=>{
-    _dispose_functions.push(
-      mobx.reaction(data,func)
-    );
-}
 
 
 const isarray = Array.isArray;
@@ -195,9 +251,10 @@ const send_model = async model =>{
 };
 
 const q = async (e)=>{
-    if (ui_state.active && ui_state.is_fk()){
+    if (ui_state.attr != "" && ui_state.is_fk()){
         let current_pks;
-        const { attr ,  d } = ui_state.active;
+        const  attr  = ui_state.attr;
+        const  d  = ui_state.d;
         const q = _.isUndefined(e) ? "" :  e.target.value;
         if (isarray(d[attr])) {
             current_pks = _.map(d[attr],x=>x.id);
@@ -211,7 +268,7 @@ const q = async (e)=>{
 
         const resp = await fetch_recipies.GET(url, true );
         const data = await resp.json();
-        ui_state.active.search_results = _.chain(data.results)
+        ui_state.search_results = _.chain(data.results)
                                   .each(_d=>{
                                      _d.selected =  current_pks.includes(_d.id)
                                   })
@@ -226,8 +283,9 @@ const q = async (e)=>{
 const debounced_q = _.debounce(q,250);
 
 const toggle_fk_attr = async (result) => {
-    const { attr ,  d } = ui_state.active;
-    const model_info =  ui_state.active_model_info();
+    const  attr  = ui_state.attr;
+    const  d  = ui_state.d;
+    const model_info =  ui_state.active_model_info;
     let resp;
     if (result.selected){
         resp = await fetch_recipies.DELETE(result.url);
@@ -333,12 +391,12 @@ export const create_button = function(selection,make_observable_data, attr="",ti
         .on("keyup",function(e) {
             keyup_esc(reset_active)(e)
             keyup_enter(e=>{
-                ui_state.active.d[attr] =  e.target.value;
-                send_model(ui_state.active.d);
+                ui_state.d[attr] =  e.target.value;
+                send_model(ui_state.d);
                 reset_active(e)
                 this.value = "";
                 if (on_change){
-                    _.delay(ui_state.reset_ui, 100, on_change)
+                    _.delay(reset_ui, 100, on_change)
                 }
             })(e)
         })
@@ -353,9 +411,8 @@ export const create_button = function(selection,make_observable_data, attr="",ti
         .classed("btn btn-sm btn-light p-1 m-1",true)
         .on("click", () => {
             d3.select(`#${ids.insert_input}`).node().value = "";
-            ui_state.active = {
-                attr, 
-                d: make_observable_data()}
+            ui_state.d = make_observable_data();
+            ui_state.attr = attr;
         })
         .html(title)
 };
@@ -389,12 +446,12 @@ export const inplace_char_edit = function(selection,
                 send_model(observable_data);
                 reset_active(e)
                 if (on_change){
-                    _.delay(ui_state.reset_ui, 100, on_change)
+                    _.delay(reset_ui, 100, on_change)
                 }
             })(e)
         })
         .call(selecion=>{
-            autoRun(()=>selecion.node().value = observable_data[attr])
+            autoRun(selection.node(),()=>selecion.node().value = observable_data[attr])
         })
         .select_parent()
         .call(make_cancel_button)
@@ -405,9 +462,12 @@ export const inplace_char_edit = function(selection,
         .attr("id",ids.normal)
         .append("button")
         .classed(`btn ${btn_class} p-1 m-1`,true)
-        .on("click", () => ui_state.active = {attr, d:observable_data})
+        .on("click", () => {
+            ui_state.attr = attr;
+            ui_state.d = observable_data
+        })
         .call(selecion=>{
-            autoRun(()=>selecion.html(observable_data[display_attr] || "+"))
+            autoRun(selection.node(),()=>selecion.html(observable_data[display_attr] || "+"))
         });
 
 }
@@ -425,6 +485,10 @@ export const append_edit_local_attr = function(selection,observable_data, attr="
     const {on_change,display_attr=attr} = options;
     const type = ui_state.models[observable_data.__type__].fields[attr]
     const ids = ui_state.ids({attr,d:observable_data})
+    const set_active = e=>{
+         ui_state.d = observable_data
+         ui_state.attr = attr 
+    }
 
     const sel = selection
         .append("div")
@@ -466,11 +530,11 @@ export const append_edit_local_attr = function(selection,observable_data, attr="
                             observable_data[attr] = e.target.checked;
                             send_model(observable_data);
                             if (on_change){
-                                _.delay(ui_state.reset_ui, 100, on_change)
+                                _.delay(reset_ui, 100, on_change)
                             }
                         })
                         .call(selecion=>{
-                            autoRun(()=>selecion.node().checked=observable_data[attr] )
+                            autoRun(selection.node(),()=>selecion.node().checked=observable_data[attr] )
                         });
 
             } else if (type == "DateField"){
@@ -479,7 +543,7 @@ export const append_edit_local_attr = function(selection,observable_data, attr="
                     .append("button")
                     .attr("type","button")
                     .classed("btn btn-link mb-1",true)
-                    .on("click",()=> ui_state.active = {attr, d : observable_data})
+                    .on("click",set_active)
                     .html(title)
                 .select_parent()
                 .select_parent()
@@ -489,13 +553,13 @@ export const append_edit_local_attr = function(selection,observable_data, attr="
                     .attr("type","date")
                     .classed("form-control ps-2 pe-0",true)
                     .call(selecion=>{
-                        autoRun(()=>selecion.node().value = observable_data[attr] )
+                        autoRun(selection.node(),()=>selecion.node().value = observable_data[attr] )
                     })
                     .on("change", e => {
                         observable_data[attr] = e.target.value;
                         send_model(observable_data);
                         if (on_change){
-                            _.delay(ui_state.reset_ui, 100, on_change)
+                            _.delay(reset_ui, 100, on_change)
                         }
                     })
 
@@ -505,13 +569,13 @@ export const append_edit_local_attr = function(selection,observable_data, attr="
                     .append("button")
                     .attr("type","button")
                     .classed("btn btn-link mb-1 w-25 text-start",true)
-                    .on("click",()=> ui_state.active = {attr, d : observable_data})
+                    .on("click",set_active)
                     .html(title)
                 .select_parent()
                     .append("div")
                     .classed("me-1 w-75 text-end",true)
                     .call(selecion=>{
-                        autoRun(()=>selecion.html(observable_data[attr] ))
+                        autoRun(selection.node(),()=>selecion.html(observable_data[attr] ))
                     })
 
                 insert_mode
@@ -537,13 +601,13 @@ export const append_edit_local_attr = function(selection,observable_data, attr="
                             observable_data[attr] = e.target.value;
                             send_model(observable_data);
                             if (on_change){
-                                _.delay(ui_state.reset_ui, 100, on_change)
+                                _.delay(reset_ui, 100, on_change)
                             }
                             reset_active(e)
                         })(e)
                     })
                     .call(selection =>{
-                        autoRun(()=>selection.attr("value",observable_data[attr] ))
+                        autoRun(selection.node(), ()=>selection.attr("value",observable_data[attr] ))
                     })
                 .select_parent()
                 .call(make_cancel_button)
@@ -553,13 +617,13 @@ export const append_edit_local_attr = function(selection,observable_data, attr="
                     .append("button")
                     .attr("type","button")
                     .classed("btn btn-link mb-1 text-start w-25",true)
-                    .on("click", ()=> ui_state.active = {attr, d : observable_data})
+                    .on("click", set_active)
                     .html(title)
                 .select_parent()
                     .append("div")
                     .classed("me-1 w-75 text-end",true)
-                    .call(selecion=>{
-                        autoRun(()=>selecion.html(observable_data[display_attr] ))
+                    .call(selection=>{
+                        autoRun(selection.node(), ()=>selection.html(observable_data[display_attr] ))
                     })
 
                 insert_mode
@@ -589,7 +653,7 @@ export const append_edit_local_attr = function(selection,observable_data, attr="
                     .call(selection =>{
                         const content =  observable_data[attr] || "1. \n2. \n3. ";
                         const element =  selection.node();
-                        autoRun(()=>{
+                        autoRun(selection.node(),()=>{
                           selection.node().value = observable_data[attr];
                         })
                         const editor =  new TinyMDE.Editor({content, element});
@@ -609,7 +673,7 @@ export const append_edit_local_attr = function(selection,observable_data, attr="
                             observable_data[attr] = input.value;
                             send_model(observable_data);
                             if (on_change){
-                                _.delay(ui_state.reset_ui, 100, on_change)
+                                _.delay(reset_ui, 100, on_change)
                             }
                             reset_active()
                         })
@@ -633,6 +697,10 @@ export const append_edit_fk = function(selection,
     const sel = selection
         .append("div")
         .classed(`mb-1 `, true)
+    const set_active = e=>{
+         ui_state.d = observable_data
+         ui_state.attr = attr 
+    }
 
     if (!read_only) {
         const insert_mode = sel
@@ -675,12 +743,12 @@ export const append_edit_fk = function(selection,
             .append("ul")
             .classed("list-group list-group-horizontal border-top border-bottom",true)
             .call( selection=>{
-                reaction( ()=> ui_state.active.search_results.length,
-                    ()=>{
-                    if (ui_state.active.d.id == observable_data.id && ui_state.active.attr == attr){
+                autoRun(selection.node(),  ()=>{
+                    ui_state.search_results.length
+                    if (ui_state.d.id == observable_data.id && ui_state.attr == attr){
                         selection
                             .selectAll("li")
-                            .data(ui_state.active.search_results, d=> d.id )
+                            .data(ui_state.search_results, d=> d.id )
                             .join("li")
                             .classed("list-group-item d-flex p-1 me-1 border-0  align-items-stretch",true)
                             .selectAll("span.result-container")
@@ -696,7 +764,7 @@ export const append_edit_fk = function(selection,
                                 if (await toggle_fk_attr(d)){
                                     ui_state.reset_active();
                                     if (on_change ){
-                                        _.delay(ui_state.reset_ui, 100, on_change)
+                                        _.delay(reset_ui, 100, on_change)
                                     }
                                 }
                             })
@@ -752,7 +820,7 @@ export const append_edit_fk = function(selection,
                 .append("button")
                 .attr("type","button")
                 .classed("btn btn-link mb-1",true)
-                .on("click", ( e, d ) => ui_state.active = {attr, d:observable_data})
+                .on("click", set_active)
                 .html(title)
 
             }
@@ -765,7 +833,7 @@ export const append_edit_fk = function(selection,
             "scrollbar-width":"none",
         })
         .call(selection=>{
-            autoRun(()=>{
+            autoRun(selection.node(),()=>{
                 selection
                     .selectAll("li")
                     .data(force_list(observable_data[attr]))

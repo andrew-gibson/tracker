@@ -161,7 +161,7 @@ class CoreModel(LifecycleModelMixin, Model):
     def POST(cls, request):
         form = cls.form(request)(request.POST)
         context = {"form": form}
-        preoare_qs, projection = cls.readers(request,pk)
+        preoare_qs, projection = cls.readers(request)
         if form.is_valid():
             inst = form.instance
             # by default associasave()te objects with their creator
@@ -273,7 +273,7 @@ class CoreModel(LifecycleModelMixin, Model):
 
     def add_user_and_save(self, request):
         if "group" in self.model_info["fields"]:
-            self.group = request.user.main_group
+            self.group = request.user.belongs_to
         self.save()
 
 

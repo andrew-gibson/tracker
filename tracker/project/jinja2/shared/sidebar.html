@@ -47,10 +47,12 @@ _.chain(urls)
 const redraw = ()=> {
     const projects = d3.select("#sidebar")
       .on("click", e=>{
-         d3.select("#main-content").html("");
-         current_url = d3.select(e.target).datum().url;
-         ui_state.reset_ui(false);
-         redraw();
+         if (e.target.tagName == "A") {
+             d3.select("#main-content").html("");
+             current_url = d3.select(e.target).datum().url;
+             ui_state.reset_ui(false);
+             redraw();
+         }
       })
       .selectAll("div")
       .data(urls,d=>d.html)

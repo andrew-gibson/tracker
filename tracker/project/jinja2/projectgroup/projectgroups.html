@@ -1,84 +1,50 @@
-{% if  standalone %} {% extends "base.html" %} {% endif %}
-
-
-{% block content%}
-<div id="main-content" class="row">
-    <div class="col-4" id="teams">
-        <div class="card">
-          <div class="card-header">Team </div>
-          <ul class="list-group list-group-flush">
-          </ul>
-        </div>
-    </div>
-    <div class='col-8' id="projects">
-        <div class="card">
-          <div class="card-header">Projects</div>
-          <ul class="list-group list-group-flush">
-          </ul>
-        </div>
+<div id="teams">
+    <div class="card">
+      <div class="card-header"> </div>
+      <ul class="list-group list-group-flush">
+      </ul>
     </div>
 </div>
 
 <script type="module">
-    import fetch_recipies from "fetch-recipies";
     import {ui_state, inplace_char_edit, create_button,append_edit_attr} from "d3-ui";
-    var active = -1;
+    const teams = {{dumps(insts)|safe}};
+    const observable_data =   mobx.makeAutoObservable({teams});
 
-    const refresh_groups = async ()=>{
-        const teams = await  fetch_recipies.GETjson(ui_state.models["project.ProjectGroup"].main);
-        if (teams.length && active==-1){
-            active = teams[0].id;
-        }
-        if (active!=-1){
-            _.find(teams,d=>d.id==active).active = true
-            render_groups(teams);
-            const single_group = await fetch_recipies.GETjson(ui_state.models["project.ProjectGroup"].main_pk.replace("__pk__", active));
-            if (single_group.project_count){
-                render_projects(single_group.projects);
+    create_button( d3.select("#teams .card-header"), 
+                  ()=>mobx.makeAutoObservable({name:"",__type__:"project.ProjectGroup"}),
+                  "name",
+                  "+ Team",
+                {on_change : "reloadTeams"})
+
+    d3.select("#teams ul")
+      .selectAll("li.list-group-item")
+      .data(observable_data.teams,d=>d.id)
+      .join("li")
+      .classed("list-group-item ",true)
+      .each(function(d){
+
+          const hx_args =  {
+              "hx-delete" : ui_state.models["project.ProjectGroup"].main_pk.replace("__pk__", d.id),
+              "hx-on::after-request"  :  "document.dispatchEvent(new Event('reloadTeams'))",
+              "hx-swap" : "none",
+          }
+          const sel = d3.select(this).append("div").classed("d-flex align-items-middle justify-content-between",true);
+
+          if (d.can_delete){
+              inplace_char_edit(sel, d, "name", "Name",{display_attr : "name"});
+               sel
+                .append("button")    
+                    .attr("type","button")
+                    .classed("btn btn-outline-danger p-1 m-1",true)
+                    .html("X")
+                    .attrs(window.delete_modal.attrs)
+                    .on("click", e=>{
+                        window.delete_modal(hx_args);
+                    })
+                //append_edit_attr(d3.select(this).append("div"), d, "public", "Public" );
+            } else {
+               sel.html(d.name)
             }
-        }
-    }
-
-    const render_groups = async (teams)=>{
-        d3.select("#teams ul")
-          .selectAll("li.list-group-item")
-          .data(teams,d=>d.id)
-          .join("li")
-          .attr("class","list-group-item")
-          .classed("active",d=>{
-              return d.active
-          })
-          .selectAll("a")
-          .data(d=>[d],d=>d.id)
-          .join("a")
-          .attr( "class", "btn btn-link")
-          .classed("text-white",d=>d.active)
-          .html(d=>`${d.name}  (${d.project_count})`)
-          .on("click",(e,d)=>{
-              active = d.id;
-              refresh_groups();
-          });
-    };
-    const render_projects = async (projects)=>{
-        d3.select("#projects ul")
-          .selectAll("li.list-group-item")
-          .data(projects,d=>d.id)
-          .join("li")
-          .attr("class","list-group-item")
-          .selectAll("a.project-link")
-          .data(d=>[d],d=>d.id)
-          .join("a")
-          .attr( "class", "btn btn-link project-link")
-          .attrs({
-            "hx-replace-url":"true",
-            "hx-swap":"outerHTML",
-            "hx-target" : "#main-content",
-          })
-          .attr("hx-get",d=>ui_state.models["project.Project"].main_pk.replace("__pk__", d.id))
-          .html(d=>d.name)
-          .setup_htmx()
-    };
-    refresh_groups();
+      })
 </script>
-{%endblock%}
-
