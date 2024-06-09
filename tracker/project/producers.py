@@ -51,11 +51,21 @@ def name_count():
 
 __type__ = {"__type__": (qs.noop, producers.attrgetter("_meta.label"))}
 
+
 def force_project_users_type():
     ProjectUser = apps.get_model("project.ProjectUser")
 
     def produce(inst):
-        return  ProjectUser._meta.label
+        return ProjectUser._meta.label
+
+    return qs.noop, produce
+
+
+def force_project_group_type():
+    ProjectGroup = apps.get_model("project.ProjectGroup")
+
+    def produce(inst):
+        return ProjectGroup._meta.label
 
     return qs.noop, produce
 
@@ -72,15 +82,23 @@ def projectuser_spec(cls, request, pk=None):
     spec = (
         "id",
         "username",
-        {"manages": [
+        {
+            "belongs_to": [
+                {"__type__": force_project_users_type()},
+                lang_field("name"),
+                "id",
+            ]
+        },
+        {
+            "manages": [
                 __type__,
                 lang_field("name"),
                 "id",
                 {
                     "users": [
                         pairs.exclude(pk=request.user.pk),
-                        {"__type__" : force_project_users_type()},
-                        {"name":"username"},
+                        {"__type__": force_project_users_type()},
+                        {"name": "username"},
                         "id",
                     ]
                 },
@@ -114,7 +132,7 @@ def tag_spec(cls, request, pk=None):
         "id",
         {
             "can_delete": (
-                qs.include_fields("group"),
+                qs.pipe(qs.include_fields("group"), qs.select_related("group")),
                 producers.method("can_i_delete", request),
             )
         },
@@ -158,8 +176,15 @@ def projectgroup_spec(cls, request, pk=None):
             {
                 "projects": [
                     pairs.filter(private=False),
+                    __type__,
                     "id",
                     lang_field("name"),
+                    {
+                        "viewers": (
+                            qs.prefetch_related("viewers"),
+                            producers.method("am_i_viewer", request),
+                        )
+                    },
                 ]
             },
         )
@@ -200,7 +225,7 @@ def project_spec(cls, request, pk=None):
         {"long_term_outcomes_m": render_markdown("long_term_outcomes")},
         {
             "my_project": (
-                qs.include_fields("viewers"),
+                qs.prefetch_related("viewers"),
                 producers.method("am_i_viewer", request),
             )
         },
@@ -243,6 +268,14 @@ def project_spec(cls, request, pk=None):
         {
             "tags": [__type__, "name", "id"],
         },
+    ]
+
+
+def min_project_spec(cls, request, pk=None):
+    return [
+        "id",
+        __type__,
+        lang_field("name"),
     ]
 
 

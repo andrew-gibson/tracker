@@ -7,12 +7,11 @@
 import fetch_recipies from "fetch-recipies";
 import {ui_state} from "d3-ui";
 var current_url =  "{{request.path}}" ;
-const team_info =  await fetch_recipies.GETjson(ui_state.models["project.ProjectUser"].main_pk.replace("__pk__",{{request.user.pk}}));
 const urls = _.filter([
     {
      url : "{{url("project:main")}}" ,
      html : "My Projects",
-     children  : await  fetch_recipies.GETjson(ui_state.models["project.Project"].main),
+     children  : await  fetch_recipies.GETjson(ui_state.models["project.MinProject"].main),
     },
     {
      url : "{{url("project:main")}}" ,
@@ -22,7 +21,7 @@ const urls = _.filter([
     {
       url : false,
       html: "Team",
-      children : team_info.manages ? team_info.manages.users  : false
+      children : ui_state.current_user.manages ? ui_state.current_user.manages.users  : false
     },
     {
      url : false, 

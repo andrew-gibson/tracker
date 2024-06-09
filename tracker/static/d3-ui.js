@@ -6,22 +6,33 @@ import 'lo-dash';
 //    console.log(event)
 //})
 
-
+const models = await (await fetch_recipies.GET("/core/model_info/")).json()    
+const current_user = await (await fetch_recipies.GET(models["project.ProjectUser"].main)).json()
 const inactive = {attr:"", d: {id:null}, search_results : []};
-const models =  await (await fetch_recipies.GET("/core/model_info/")).json()
 class UIState {
     _attr = ""
     _d = {id:null}
     _search_results = []
+    _user = {}
 
     constructor(){
         mobx.makeAutoObservable(this,{deep:true })
         this.active_elements = [];
+        this.models = models;
+        this.current_user = current_user;
         _.each(this.models,m=>{
              m.filters = {};
         });
-        this.models = models
     }
+
+    get user (){
+      return this._user;
+    }
+
+    set user(val){
+        this._user = val
+    }
+
     get attr (){
       return this._attr;
     }
@@ -283,24 +294,26 @@ const q = async (e)=>{
 const debounced_q = _.debounce(q,250);
 
 const toggle_fk_attr = async (result) => {
-    const  attr  = ui_state.attr;
-    const  d  = ui_state.d;
-    const model_info =  ui_state.active_model_info;
     let resp;
     if (result.selected){
         resp = await fetch_recipies.DELETE(result.url);
     } else {
         resp = await fetch_recipies.POST(result.url, {},true);
     }
-    if (resp.status == 200) {
-        const obj_refresh_resp = await fetch_recipies.GET(model_info.main_pk.replace("__pk__",d.id));
-        if (obj_refresh_resp.status == 200){
-            const data = await  obj_refresh_resp.json()
-            d[attr] = data[attr];
+    if (ui_state.attr){
+        const  attr  = ui_state.attr;
+        const  d  = ui_state.d;
+        const model_info =  ui_state.active_model_info;
+        if (resp.status == 200) {
+            const obj_refresh_resp = await fetch_recipies.GET(model_info.main_pk.replace("__pk__",d.id));
+            if (obj_refresh_resp.status == 200){
+                const data = await  obj_refresh_resp.json()
+                d[attr] = data[attr];
+            }
+            return true;
+        } else {
+            return false;
         }
-        return true;
-    } else {
-        return false;
     }
 };
 
@@ -417,6 +430,22 @@ export const create_button = function(selection,make_observable_data, attr="",ti
         .html(title)
 };
 
+export const fk_toggle = function(selection, result, attr="",options={}){
+
+ selection
+    .append("div")
+    .classed("form-check form-switch",true)
+        .append("input")
+        .attr("type","checkbox")
+        .attr("role","switch")
+        .attr("role",attr)
+        .attr("selected",d=>d.selected)
+        .style("font-size","1.5em")
+        .classed("form-check-input",true)
+        .on("change",e=>{
+            toggle_fk_attr(result) 
+        });
+};
 
 export const inplace_char_edit = function(selection,
                                     observable_data, 

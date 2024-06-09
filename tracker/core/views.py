@@ -142,6 +142,8 @@ def parse_for_links(request, m, attr):
     ]
 )
 def toggle_link(request, m1, pk1, m2, pk2, attr=""):
+    import pdb
+    pdb.set_trace()
     model1 = get_model_or_404(m1)
     model2 = get_model_or_404(m2)
     obj1, _ = model1.get_projection_by_pk(request, pk1)

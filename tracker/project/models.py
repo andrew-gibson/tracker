@@ -6,7 +6,7 @@ from itertools import product
 
 import dateparser
 from core.core import AutoCompleteNexus, AutoCompleteCoreModel, RequestForm, CoreModel
-from core.models import Group, User
+from core.models import Group, User,  GroupPrefetcherManager
 
 from core.utils import add_to_admin, classproperty, render
 
@@ -82,7 +82,6 @@ class ProjectGroup(Group):
     class Meta:
         proxy = True
 
-
     @classmethod
     def user_filter(cls, request):
         return cls.objects.filter(app="project", system=False)
@@ -90,12 +89,10 @@ class ProjectGroup(Group):
     def can_i_delete(self, request):
         return request.user.is_staff
 
-    def add_user(self, request):
-        self.save()
-
     def save(self, *args, **kwargs):
         self.app = self.__class__._meta.app_label
         super().save(*args, **kwargs)
+
 
     def add_user_and_save(self,request):
         self.save()
@@ -113,16 +110,18 @@ class GroupPrefetcherManager(UserManager):
         )
 
     def user_filter(self, request):
-        return self.filter(belongs_to = request.user.belongs_to)
+        return self.filter(pk=request.user.pk)
+
+    def can_i_delete(self):
+        return False
 
 
 class ProjectUser(User, CoreModel):
+    objects = GroupPrefetcherManager()
     spec = producers.projectuser_spec
 
     class Meta:
         proxy = True
-
-    objects = GroupPrefetcherManager()
 
 
 @add_to_admin
@@ -322,14 +321,14 @@ class Project(
 
     def am_i_viewer(self, request):
         return {
-            "selected": request.user in self.viewers.all()
+            "selected": request.user in [self.viewers.all()]
             or self.group in request.user.groups.all(),
             "url": reverse(
                 "core:toggle_link",
                 kwargs={
                     "m1": self._meta.label,
                     "pk1": self.id,
-                    "m2": Contact._meta.label,
+                    "m2": ProjectUser._meta.label,
                     "pk2": request.user.id,
                     "attr": "viewers",
                 },
@@ -367,6 +366,15 @@ class Project(
     short_term_outcomes = TextField(blank=True, null=True)
     long_term_outcomes = TextField(blank=True, null=True)
 
+class MinProject(Project):
+    spec = producers.min_project_spec
+
+    class Meta:
+        proxy = True
+
+    @classmethod
+    def user_filter(cls, request):
+        return  Project.user_filter(request)
 
 class ProjectLog(CoreModel):
     spec = producers.projectlog_spec

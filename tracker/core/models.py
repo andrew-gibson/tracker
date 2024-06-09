@@ -33,6 +33,11 @@ permissions_related_name = "custom_group_set" if group_model_name == "Group" els
 # This class has been copied from django.contrib.auth.models.Group
 # The only additional thing set is abstract=True in meta
 # This class should not be updated unless replacing it with a new version from django.contrib.auth.models.Group
+class PrefetchParentsManager(GroupManager):
+
+    def get_queryset(self):
+        return super().get_queryset().select_related("parent__parent__parent__parent__parent")
+
 class AbstractGroup(Model):
     name_en = CharField(max_length=150, unique=True)
     name_fr = CharField(max_length=150, unique=True, null=True, blank=True)
@@ -77,6 +82,14 @@ class Group(AbstractGroup, AutoCompleteCoreModel, trigger="*", hex_color="fb5607
     def can_i_delete(self, request):
         return False
 
+    def parents(self):
+        parents = []
+        node = self
+        while node.parent:
+            parents.append(node.parent)
+            node = node.parent
+        return parents
+
     group = None
     parent = ForeignKey(
         "Group", on_delete=CASCADE, related_name="children", null=True, blank=True
@@ -98,13 +111,6 @@ class User(AbstractUser):
     class adminClass(admin.ModelAdmin):
         list_display = ("username", "belongs_to", "manages")
         list_editable = ("belongs_to", "manages", )
-
-    @classmethod
-    def user_filter(cls, request):
-        return cls.objects
-
-    def can_i_delete(self, request):
-        return False
 
     class Meta:
         base_manager_name = "objects"
