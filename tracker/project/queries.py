@@ -3,7 +3,8 @@ from django.apps import apps
 from django.db.models import CharField, Value, Q, Count, CharField, F
 from django.db.models.functions import Concat, Replace
 from django_readers import qs, pairs, projectors, producers, specs
-from core.lang import lang
+from core.lang import lang,resolve_field_to_current_lang
+from . import permissions
 
 
 def lang_field(field):
@@ -28,13 +29,25 @@ def count(attr):
     return prepare, produce
 
 
+def can_delete(user, *attrs):
+    if attrs:
+        prepare = qs.include_fields(*attrs)
+    else:
+        prepare = qs.noop
+
+    def produce(inst):
+        return permissions.good_request(user, "DELETE", inst)
+
+    return prepare, produce
+
+
 def programuser_projects():
     prepare = qs.include_fields(
         "projects",
     )
 
 
-def name_count():
+def name_task_count():
     return (
         qs.annotate(
             name_count=Concat(
@@ -48,26 +61,15 @@ def name_count():
         producers.attr("name_count"),
     )
 
-
 __type__ = {"__type__": (qs.noop, producers.attrgetter("_meta.label"))}
 
-
-def force_project_users_type():
-    ProjectUser = apps.get_model("project.ProjectUser")
-
-    def produce(inst):
-        return ProjectUser._meta.label
-
-    return qs.noop, produce
-
-
-def force_project_group_type():
-    ProjectGroup = apps.get_model("project.ProjectGroup")
+def force_type(model):
+    m = apps.get_model(model)
 
     def produce(inst):
-        return ProjectGroup._meta.label
+        return m._meta.label
 
-    return qs.noop, produce
+    return {"__type__": (qs.noop, produce)}
 
 
 def basic_spec(cls, request, pk=None):
@@ -84,26 +86,27 @@ def projectuser_spec(cls, request, pk=None):
         "username",
         {
             "belongs_to": [
-                {"__type__": force_project_users_type()},
+                force_type("project.ProjectGroup"),
                 lang_field("name"),
                 "id",
             ]
         },
         {
             "manages": [
-                __type__,
+                force_type("project.ProjectGroup"),
                 lang_field("name"),
                 "id",
                 {
                     "users": [
                         pairs.exclude(pk=request.user.pk),
-                        {"__type__": force_project_users_type()},
+                        force_type("project.ProjectUser"),
                         {"name": "username"},
                         "id",
                     ]
                 },
             ]
         },
+        {"groups": ["id", lang_field("name"), force_type("project.ProjectGroup")]},
     )
     return spec
 
@@ -127,15 +130,14 @@ def task_spec(cls, request, pk=None):
 
 
 def tag_spec(cls, request, pk=None):
+    ProjectGroup = apps.get_model("project.ProjectGroup")
     return [
+        (qs.pipe(
+            qs.select_related("group"),
+            ),projectors.noop),
         __type__,
         "id",
-        {
-            "can_delete": (
-                qs.pipe(qs.include_fields("group"), qs.select_related("group")),
-                producers.method("can_i_delete", request),
-            )
-        },
+        {"can_delete": can_delete(request.user, "group")},
         "name",
         "public",
     ]
@@ -143,14 +145,12 @@ def tag_spec(cls, request, pk=None):
 
 def contact_spec(cls, request, pk=None):
     return [
+        (qs.pipe(
+            qs.select_related("group"),
+            ),projectors.noop),
         __type__,
         "id",
-        {
-            "can_delete": (
-                qs.include_fields("group"),
-                producers.method("can_i_delete", request),
-            )
-        },
+        {"can_delete": can_delete(request.user, "group")},
         "name",
         "email",
         {"account": [__type__, "id", "username"]},
@@ -160,16 +160,15 @@ def contact_spec(cls, request, pk=None):
 
 def projectgroup_spec(cls, request, pk=None):
     spec = (
+        (qs.pipe(
+            qs.include_fields("parent","projects"),
+            qs.select_related("parent__parent__parent__parent"),
+
+            ),projectors.noop),
         __type__,
         "id",
-        {"project_count": count("projects")},
-        {
-            "can_delete": (
-                qs.noop,
-                producers.method("can_i_delete", request),
-            )
-        },
         lang_field("name"),
+        {"can_delete": can_delete(request.user)},
     )
     if pk:
         return spec + (
@@ -188,7 +187,13 @@ def projectgroup_spec(cls, request, pk=None):
                 ]
             },
         )
-    return spec
+    else:
+        return spec + (
+        {resolve_field_to_current_lang("name_count") : (
+            qs.noop,
+            producers.attr(resolve_field_to_current_lang("name_count")),
+        )},
+    )
 
 
 def stream_spec(cls, request, pk=None):
@@ -203,7 +208,7 @@ def stream_spec(cls, request, pk=None):
         __type__,
         lang_field("name"),
         "id",
-        {"name_count": name_count()},
+        {"name_count": name_task_count()},
         {"project": [__type__, "id", lang_field("name")]},
         {"tasks": tasks},
     ]
@@ -213,9 +218,17 @@ def project_spec(cls, request, pk=None):
     Stream = apps.get_model("project.Stream")
     ProjectLog = apps.get_model("project.ProjectLog")
     Task = apps.get_model("project.Task")
+    ProjectUser = apps.get_model("project.ProjectUser")
+    sub_qs = ProjectUser.objects.filter(pk=request.user.pk)
     return [
+        (qs.pipe(
+            qs.prefetch_many_to_many_relationship("viewers",related_queryset=sub_qs),
+            qs.include_fields("group"),
+            qs.select_related("group"),
+            ),projectors.noop),
         "id",
         __type__,
+        "private",
         lang_field("text"),
         {"text_m": render_markdown(f"text_{lang()}")},
         lang_field("name"),
@@ -242,11 +255,13 @@ def project_spec(cls, request, pk=None):
         ),
         {
             "streams": [
-                pairs.filter(project_default=False),
+                (qs.pipe(
+                    qs.filter(project_default=False),
+                    ),projectors.noop),
                 __type__,
                 lang_field("name"),
                 "id",
-                {"name_count": name_count()},
+                {"name_count": name_task_count()},
                 {"tasks": task_spec(Task, request)},
             ],
         },
@@ -272,8 +287,16 @@ def project_spec(cls, request, pk=None):
 
 
 def min_project_spec(cls, request, pk=None):
+    ProjectUser = apps.get_model("project.ProjectUser")
+    sub_qs = ProjectUser.objects.filter(pk=request.user.pk)
     return [
+        (qs.pipe(
+            qs.prefetch_many_to_many_relationship("viewers",related_queryset=sub_qs),
+            qs.include_fields("group"),
+            qs.select_related("group"),
+            ),projectors.noop),
         "id",
+        "private",
         __type__,
         lang_field("name"),
     ]

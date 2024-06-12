@@ -19,6 +19,7 @@
         import fetch_recipies from "fetch-recipies";
         import {ui_state, inplace_char_edit, create_button,fk_toggle} from "d3-ui";
         const project_group = {{dumps(inst)|safe}};
+        console.log(project_group)
         d3.select("#projects ul")
           .selectAll("li.list-group-item")
           .data(project_group.projects,d=>d.id)
@@ -41,7 +42,10 @@
                 .html(d=>d.name)
                 .setup_htmx()
 
-              fk_toggle(sel,d.viewers,"viewers")
+
+              if ( !ui_state.user.groups.map(d=>d.id).includes(project_group.id) ){
+                  fk_toggle(sel,d.viewers,"viewers")
+              }
 
           })
 

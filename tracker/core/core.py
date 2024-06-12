@@ -34,36 +34,19 @@ class RequestForm(ModelForm):
         #        setattr(field.a_c, "request", self.request)
         #        setattr(field.widget.a_c, "request", self.request)
 
-
 class CoreManager(Manager):
-
-    def user_get(self, request, *args, **kwargs):
-        try:
-            return self.user_filter(request).get(*args, **kwargs)
-        except self.model.DoesNotExist:
-            raise Http404("cannot find requested object")
 
     def user_filter(self, request):
         if hasattr(self.model, "user_filter"):
             return self.model.user_filter(request)
         return self.filter(group__in=request.user.groups.all())
 
-    def user_delete(self, request, *args, **kwargs):
-        try:
-            obj = self.user_filter(request).get(*args, **kwargs)
-            if getattr(obj, "can_delete", lambda r: True)(request):
-                obj.delete()
-            else:
-                raise Http404("cannot find requested object")
-        except self.model.DoesNotExist:
-            raise Http404("cannot find requested object")
-
-
 class CoreModel(LifecycleModelMixin, Model):
-    class Meta:
-        abstract = True
 
     objects = CoreManager()
+
+    class Meta:
+        abstract = True
 
     @classproperty
     def model_info(cls):
@@ -123,21 +106,31 @@ class CoreModel(LifecycleModelMixin, Model):
             spec = cls.spec
         return specs.process(spec)
 
+    @classproperty
+    def perms(cls):
+        return cls._meta.app_config.permissions
+
     @classmethod
-    def get_projection_by_pk(cls, request, pk):
+    def get_projection_by_pk(cls, request, pk,method=""):
         ''' 
           can't user model.objects.get because need to apply all the 
           preparing functions to then apply the producers and then the projections 
         '''
         prepare_qs, projection = cls.readers(request,pk)
-        qs =  prepare_qs(cls.objects.user_filter(request).filter(pk=pk))
+        #qs =  prepare_qs(cls.objects.user_filter(request).filter(pk=pk))
+        qs =  prepare_qs(cls.objects.filter(pk=pk))
+        method = method or request.method
         try:
             obj = qs.first()
+            assert cls.perms.good_request(request.user,method, obj)
             if not obj:
                 raise  cls.DoesNotExist()
             return obj, projection(obj)
         except cls.DoesNotExist:
             raise Http404("No object matches the given query")
+        except AssertionError:
+            raise Http404("Invaolid permissions")
+
 
     @classproperty
     def _name(cls):
@@ -162,7 +155,7 @@ class CoreModel(LifecycleModelMixin, Model):
         form = cls.form(request)(request.POST)
         context = {"form": form}
         preoare_qs, projection = cls.readers(request)
-        if form.is_valid():
+        if form.is_valid() and cls.perms.good_request(request.user,request.method, form.instance):
             inst = form.instance
             # by default associasave()te objects with their creator
             inst.add_user_and_save(request)
@@ -230,6 +223,7 @@ class CoreModel(LifecycleModelMixin, Model):
                 for p in prepare_qs(cls.objects.user_filter(request)).order_by(
                     *cls._meta.ordering
                 )
+                if cls.perms.good_request(request.user,request.method,p)
             ]
             if request.json:
                 return JsonResponse(insts, safe=False)
@@ -245,7 +239,9 @@ class CoreModel(LifecycleModelMixin, Model):
 
     @classmethod
     def DELETE(cls, request, pk):
-        cls.objects.user_delete(request, pk=pk)
+        obj = get_object_or_404(cls,pk=pk)
+        if cls.perms.good_request(request.user,request.method,obj):
+            obj.delete()
         return HttpResponse("Deleted")
 
     @classmethod

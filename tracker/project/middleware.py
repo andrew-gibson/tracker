@@ -10,7 +10,7 @@ def add_project_user_middleware(get_response):
         # the view (and later middleware) are called.
 
         if not isinstance(request.user,AnonymousUser):
-            request.project_user = ProjectUser.objects.get(pk=request.user.pk)
+            request.project_user = ProjectUser.objects.prefetch_related("groups").get(pk=request.user.pk)
         response = get_response(request)
 
         # Code to be executed for each request/response after

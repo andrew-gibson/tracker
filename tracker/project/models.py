@@ -32,8 +32,12 @@ from django.db.models import (
     Model,
     Manager,
     Q,
+    Value,
+    F,
+    Count,
     TextField,
 )
+from django.db.models.functions import Concat, Replace
 from django.http import QueryDict
 from django.urls import reverse
 from django_lifecycle import (
@@ -43,38 +47,41 @@ from django_lifecycle import (
     BEFORE_UPDATE,
     hook,
 )
-from . import producers
+from . import queries
 from core.lang import resolve_field_to_current_lang
 
 
 class ProjectGroupManager(GroupManager):
 
     def get_queryset(self):
-        return super().get_queryset().filter(app="project")
+        return (
+            super().get_queryset()
+            .filter(app="project")
+            .annotate( name_count_en=Concat(
+                Replace(F("name_en"), Value("_"), Value(" ")),
+                Value(" ("),
+                Count("projects"),
+                Value(")"),
+                output_field=CharField()
+            ))
+            .annotate( name_count_fr=Concat(
+                Replace(F("name_fr"), Value("_"), Value(" ")),
+                Value(" ("),
+                Count("projects"),
+                Value(")"),
+                output_field=CharField()
+            ))
+        )
 
-    def user_get(self, request, *args, **kwargs):
-        try:
-            return self.get(*args, **kwargs)
-        except self.model.DoesNotExist:
-            raise Http404("cannot find requested object")
 
     def user_filter(self, request):
         return self.filter()
 
-    def user_delete(self, request, *args, **kwargs):
-        try:
-            obj = self.get(*args, **kwargs)
-            if request.user.is_staff:
-                obj.delete()
-            else:
-                raise Http404("Cannot delete this object")
-        except self.model.DoesNotExist:
-            raise Http404("cannot find requested object")
 
 
 class ProjectGroup(Group):
     objects = ProjectGroupManager()
-    spec = producers.projectgroup_spec
+    spec = queries.projectgroup_spec
     form_fields = [
         "name_en",
     ]
@@ -86,8 +93,6 @@ class ProjectGroup(Group):
     def user_filter(cls, request):
         return cls.objects.filter(app="project", system=False)
 
-    def can_i_delete(self, request):
-        return request.user.is_staff
 
     def save(self, *args, **kwargs):
         self.app = self.__class__._meta.app_label
@@ -101,40 +106,25 @@ class ProjectGroup(Group):
 class GroupPrefetcherManager(UserManager):
     use_for_related_fields = True
 
-    def get_queryset(self):
-        return (
-            super()
-            .get_queryset()
-            .prefetch_related("groups")
-            .prefetch_related("projects")
-        )
-
     def user_filter(self, request):
         return self.filter(pk=request.user.pk)
 
-    def can_i_delete(self):
-        return False
-
-
 class ProjectUser(User, CoreModel):
     objects = GroupPrefetcherManager()
-    spec = producers.projectuser_spec
+    spec = queries.projectuser_spec
 
     class Meta:
         proxy = True
 
-
 @add_to_admin
 class Contact(AutoCompleteCoreModel, trigger="@", hex_color="ff006e"):
-    spec = producers.contact_spec
+    spec = queries.contact_spec
     form_fields = ["name", "email"]
 
     class adminClass(admin.ModelAdmin):
         list_display = ("name", "email", "account")
         list_editable = ("email", "account")
 
-    def can_i_delete(self, request):
-        return request.user.is_staff
 
     group = ForeignKey(
         ProjectGroup, blank=True, on_delete=PROTECT, related_name="contacts"
@@ -160,7 +150,7 @@ class Settings(CoreModel):
             self.instance.user = self.request.user
             super().save(*args, **kwargs)
 
-    spec = ["hide_done", "see_all_projects", "id", producers.__type__]
+    spec = ["hide_done", "see_all_projects", "id", queries.__type__]
     form_fields = ["user", "hide_done"]
     user = OneToOneField(ProjectUser, on_delete=CASCADE, blank=True)
     hide_done = BooleanField(default=False, blank=True)
@@ -181,13 +171,11 @@ class EXCompetency(AutoCompleteCoreModel, trigger="`", hex_color="2c6e49"):
     def user_filter(cls, request):
         return cls.objects.all()
 
-    def can_i_delete(self, request):
-        return False
 
     def __str__(self):
         return self.name_en
 
-    spec = producers.basic_spec
+    spec = queries.basic_spec
     name_en = CharField(max_length=300, unique=True)
     name_fr = CharField(max_length=300, null=True, blank=True)
 
@@ -209,13 +197,11 @@ class ProjectStatus(AutoCompleteCoreModel, hex_color="8e6bc7"):
     def user_filter(cls, request):
         return cls.objects.all()
 
-    def can_i_delete(self, request):
-        return False
 
     def __str__(self):
         return self.name_en
 
-    spec = producers.basic_spec
+    spec = queries.basic_spec
     name_en = CharField(max_length=300, unique=True)
     name_fr = CharField(max_length=300, null=True, blank=True)
 
@@ -229,7 +215,7 @@ class Tag(AutoCompleteCoreModel, trigger="#", hex_color="ffbe0b"):
         list_filter = ("public", "group")
         search_fields = ("name",)
 
-    spec = producers.tag_spec
+    spec = queries.tag_spec
     form_fields = ["name", "public"]
 
     @classmethod
@@ -238,8 +224,6 @@ class Tag(AutoCompleteCoreModel, trigger="#", hex_color="ffbe0b"):
         q = Q(group__in=request.user.groups.all()) | Q(public=True)
         return cls.objects.filter(q).filter(filters).distinct()
 
-    def can_i_delete(self, request):
-        return self.group in request.user.groups.all()
 
     def __str__(self):
         return self.name
@@ -253,7 +237,7 @@ class Tag(AutoCompleteCoreModel, trigger="#", hex_color="ffbe0b"):
 class Project(
     AutoCompleteNexus, AutoCompleteCoreModel, trigger="^", hex_color="8338ec"
 ):
-    spec = producers.project_spec
+    spec = queries.project_spec
 
     class Meta:
         ordering = ("name_en",)
@@ -299,12 +283,13 @@ class Project(
     @classmethod
     def user_filter(cls, request):
         filters = cls.get_filters(request)
-        project_user = ProjectUser.objects.get(pk=request.user.pk)
+        q1 = Q(group__in=request.user.groups.all())
+        q2 = Q(viewers=request.project_user)
+        q3 =  Q(private=True) & ~Q(private_owner=request.user)
         return (
-            cls.objects.filter(group__in=request.user.groups.all())
+            cls.objects.filter(q1 | q2)
             .filter(filters)
-            .exclude(Q(private=True) & ~Q(private_owner=request.user))
-            | project_user.projects.all()
+            .exclude(q3)
         ).distinct()
 
     @hook(AFTER_CREATE)
@@ -321,7 +306,7 @@ class Project(
 
     def am_i_viewer(self, request):
         return {
-            "selected": request.user in [self.viewers.all()]
+            "selected": request.user in self.viewers.all()
             or self.group in request.user.groups.all(),
             "url": reverse(
                 "core:toggle_link",
@@ -367,7 +352,7 @@ class Project(
     long_term_outcomes = TextField(blank=True, null=True)
 
 class MinProject(Project):
-    spec = producers.min_project_spec
+    spec = queries.min_project_spec
 
     class Meta:
         proxy = True
@@ -377,7 +362,7 @@ class MinProject(Project):
         return  Project.user_filter(request)
 
 class ProjectLog(CoreModel):
-    spec = producers.projectlog_spec
+    spec = queries.projectlog_spec
     form_fields = ["project"]
 
     @classmethod
@@ -395,7 +380,7 @@ class ProjectLog(CoreModel):
 
 
 class ProjectLogEntry(CoreModel):
-    spec = producers.projectlogentry_spec
+    spec = queries.projectlogentry_spec
     form_fields = ["log", "text"]
 
     class Meta:
@@ -407,9 +392,6 @@ class ProjectLogEntry(CoreModel):
         return cls.objects.filter(
             log__project__group__in=request.user.groups.all()
         ).filter(filters)
-
-    def can_i_delete(self, request):
-        return request.user == self.user
 
     def add_user_and_save(self, request):
         self.user = request.user
@@ -424,7 +406,7 @@ class ProjectLogEntry(CoreModel):
 
 @add_to_admin
 class Stream(AutoCompleteCoreModel, trigger="~", hex_color="036666"):
-    spec = producers.stream_spec
+    spec = queries.stream_spec
 
     class Meta:
         ordering = ("id",)
@@ -474,7 +456,7 @@ class Stream(AutoCompleteCoreModel, trigger="~", hex_color="036666"):
 
 
 class Task(CoreModel, AutoCompleteNexus):
-    spec = producers.task_spec
+    spec = queries.task_spec
 
     class Meta:
         ordering = ["done", "order", "start_date"]
@@ -588,7 +570,7 @@ class Task(CoreModel, AutoCompleteNexus):
 
 class TimeReport(CoreModel):
 
-    spec = producers.time_report
+    spec = queries.time_report
 
     form_fields = [
         "user",

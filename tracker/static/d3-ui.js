@@ -19,7 +19,7 @@ class UIState {
         mobx.makeAutoObservable(this,{deep:true })
         this.active_elements = [];
         this.models = models;
-        this.current_user = current_user;
+        this._user = current_user[0];
         _.each(this.models,m=>{
              m.filters = {};
         });
@@ -27,10 +27,6 @@ class UIState {
 
     get user (){
       return this._user;
-    }
-
-    set user(val){
-        this._user = val
     }
 
     get attr (){
@@ -439,7 +435,9 @@ export const fk_toggle = function(selection, result, attr="",options={}){
         .attr("type","checkbox")
         .attr("role","switch")
         .attr("role",attr)
-        .attr("selected",d=>d.selected)
+        .call(sel=>{
+            sel.node().checked = result.selected 
+        })
         .style("font-size","1.5em")
         .classed("form-check-input",true)
         .on("change",e=>{

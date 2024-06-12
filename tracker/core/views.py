@@ -20,6 +20,7 @@ from django.http import (
     HttpResponse,
     HttpResponseBadRequest,
     JsonResponse,
+    Http404,
 )
 from django.shortcuts import get_object_or_404, aget_object_or_404, redirect, render
 from django.urls import reverse
@@ -142,18 +143,26 @@ def parse_for_links(request, m, attr):
     ]
 )
 def toggle_link(request, m1, pk1, m2, pk2, attr=""):
-    import pdb
-    pdb.set_trace()
     model1 = get_model_or_404(m1)
     model2 = get_model_or_404(m2)
-    obj1, _ = model1.get_projection_by_pk(request, pk1)
-    obj2, _ = model2.get_projection_by_pk(request, pk2)
-    if request.method == "POST":
-        link_or_404(obj1, obj2, attr)
-    if request.method == "DELETE":
-        unlink_or_404(obj1, obj2, attr)
-    projection = model1.readers(request)[1]
-    return JsonResponse(projection(obj1))
+    obj1 = get_object_or_404(model1, pk=pk1)
+    obj2 = get_object_or_404(model2, pk=pk2)
+    try:
+        assert model1.perms.good_m2m_request(request.user, request.method, obj1,obj2,attr)
+        if request.method == "POST":
+            link_or_404(obj1, obj2, attr)
+            projection = model1.get_projection_by_pk(request,pk1,"GET")[1]
+        if request.method == "DELETE":
+            projection = model1.get_projection_by_pk(request,pk1,"GET")[1]
+            unlink_or_404(obj1, obj2, attr)
+            #we might no longer have access to the original object, so manually 
+            #remove obj2 
+            if not getattr(obj1,attr):
+                projection[attr] = [x for x in projection[attr] if x["id"] != pk2]
+        return JsonResponse(projection)
+    except AssertionError:
+        return Http404("not authorized")
+
 
 
 @api.post(

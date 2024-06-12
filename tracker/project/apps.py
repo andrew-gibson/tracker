@@ -6,6 +6,6 @@ class ProjectConfig(AppConfig):
     name = "project"
     
     def ready(self):
-        from . import rules
-        self.rules = rules
+        from . import permissions
+        self.permissions = permissions
         
