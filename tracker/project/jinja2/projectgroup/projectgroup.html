@@ -1,8 +1,10 @@
-{% if  standalone %} {% extends "base.html" %} {% endif %}
-
+{% if  standalone %} 
+{% extends "base.html" %} 
 {% block sidebar %}
     {%include "shared/sidebar.html"%}
 {%endblock%}
+{% endif %}
+
 
 {% block content%}
 <div id="main-content" class="row" hx-swap-oob="true">
@@ -19,7 +21,7 @@
         import fetch_recipies from "fetch-recipies";
         import {ui_state, inplace_char_edit, create_button,fk_toggle} from "d3-ui";
         const project_group = {{dumps(inst)|safe}};
-        console.log(project_group)
+
         d3.select("#projects ul")
           .selectAll("li.list-group-item")
           .data(project_group.projects,d=>d.id)
@@ -38,13 +40,13 @@
                   "hx-swap":"outerHTML",
                   "hx-target" : "#main-content",
                 })
-                .attr("hx-get",d=>ui_state.models["project.Project"].main_pk.replace("__pk__", d.id))
+                .attr("hx-get",d=>d.__url__)
                 .html(d=>d.name)
                 .setup_htmx()
 
 
               if ( !ui_state.user.groups.map(d=>d.id).includes(project_group.id) ){
-                  fk_toggle(sel,d.viewers,"viewers")
+                  fk_toggle(sel,d.viewers,"viewers",{on_change : "reloadMinProject"})
               }
 
           })

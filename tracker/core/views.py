@@ -239,7 +239,7 @@ def text_ac(request, m, pk, attr):
                 },
             )
 
-        return {**d, "url": url}
+        return {**d, "__url__": url}
 
     return JsonResponse(
         {

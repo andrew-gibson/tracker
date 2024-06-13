@@ -267,6 +267,10 @@ class CoreModel(LifecycleModelMixin, Model):
             q = q & Q(**q_param)
             return q
 
+    @property
+    def url(self):
+        return reverse("core:main", kwargs={"m": self._meta.label, "pk": self.id})
+
     def add_user_and_save(self, request):
         if "group" in self.model_info["fields"]:
             self.group = request.user.belongs_to

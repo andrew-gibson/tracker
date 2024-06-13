@@ -1,138 +1,126 @@
-{% if  standalone %} 
 <div id="sidebar" class="sidebar">
+   <a class="link body-emphasis" hx-get="{{url("project:main")}}" href="#" hx-target="#main-content" hx-replace-url="true">My Projects</a>
+   <div id="my-projects" 
+       hx-trigger="reloadMinProject from:document" 
+       hx-get="{{url("core:main", kwargs={"m" : "project.MinProject"})}}" 
+       hx-swap="none"
+       hx-headers='{"json-response" : "true"}'>
+   </div> 
+   <div class=" mt-2">
+       <a class="link body-emphasis" 
+          hx-get="{{url("project:main")}}" 
+          href="#" 
+          hx-target="#main-content" 
+          hx-replace-url="true">Time Reporting</a>
+    </div>
+
+   <div id="team-header" class="body-emphasis mt-2">Team</div>
+   <div id="team"> 
+   </div> 
+
+   <div class="body-emphasis mt-2">Groups</div>
+   <div id="groups" 
+        hx-trigger="reloadTeams from:document"
+        hx-get="{{url("core:main", kwargs={"m" : "project.ProjectGroup"})}}" 
+       hx-swap="none"
+       hx-headers='{"json-response" : "true"}'> 
+   </div> 
+
+    <a class="link body-emphasis mt-2" hx-get="{{url("project:metadata")}}" href="#" hx-target="#main-content" hx-replace-url="true">Edit Tags / Contacts</a>
 </div>
-{% endif %} 
 
 <script type="module" id="sidebar-js" hx-swap-oob="true">
-import fetch_recipies from "fetch-recipies";
 import {ui_state} from "d3-ui";
-var current_url =  "{{request.path}}" ;
-const urls = _.filter([
-    {
-     url : "{{url("project:main")}}" ,
-     html : "My Projects",
-     children  : await  fetch_recipies.GETjson(ui_state.models["project.MinProject"].main),
-    },
-    {
-     url : "{{url("project:main")}}" ,
-     html : "Time Reporting",
-     children  : [],
-    },
-    {
-      url : false,
-      html: "Team",
-      children : ui_state._user.manages ? ui_state.user.manages.users  : false
-    },
-    {
-     url : false, 
-     html : "Groups",
-     children :  await  fetch_recipies.GETjson(ui_state.models["project.ProjectGroup"].main),
-    },
-    {
-     url :  "{{url("project:metadata")}}", 
-     html : "Edit Tags / Contacts",
-     children : []
-    },
-], d=> d.children !== false);
-
-_.chain(urls)
- .map(d=>d.children)
- .flatten()
- .each(d=>{
-    d.url =  ui_state.models[d.__type__].main_pk.replace("__pk__",d.id);
- })
- .value();
-
-const redraw = ()=> {
-    const projects = d3.select("#sidebar")
+export const sidebar_state = mobx.makeAutoObservable({
+     current_url :  "{{request.path}}",
+     groups : [],
+     projects : [],
+     redraw : 0,
+     team : ui_state.user.manages ? ui_state.user.manages.users : false,
+});
+mobx.reaction(
+    ()=>[sidebar_state.groups.length, sidebar_state.projects.length, sidebar_state.redraw], 
+    ()=>{
+       redraw("#groups",sidebar_state.groups);
+       redraw("#my-projects",sidebar_state.projects);
+       if(sidebar_state.team){
+           redraw("#team",sidebar_state.team);
+       } else {
+          d3.select("#team-header").remove();
+       }
+    });
+// capture all the clicks and don't interere with the htmx click
+d3.select("#sidebar")
       .on("click", e=>{
          if (e.target.tagName == "A") {
              d3.select("#main-content").html("");
-             current_url = d3.select(e.target).datum().url;
+             sidebar_state.current_url = d3.select(e.target).datum().__url__;
              ui_state.reset_ui(false);
-             redraw();
+             sidebar_state.redraw++;
          }
-      })
-      .selectAll("div")
-      .data(urls,d=>d.html)
-      .join("div")
-      .each(function(d){
-         const sel = d3.select(this);
-         if (d.url) {
-             sel.selectAll("a")
-                .data([d])
-                .join("a")
-                .attr("class" , d=> {
-                    if (d.url == current_url){
-                       return "link-primary fw-bold"
-                    }  else {
-                       return "link body-emphasis"
-                    }
-                })
-                .attr("hx-get",d=>d.url ? d.url : "")
-                .attrs({
-                  "href" : "#",
-                  "hx-target":"#main-content",
-                  "hx-replace-url":"true",
-                })
-                .html(d=>d.html)
-                .setup_htmx()
+      });
+const redraw = (id,data)=> {
+  d3.select(id)
+   .selectAll("ul")
+     .data([1])
+     .join("ul")
+     .styles({
+     "padding-left" : "2px",
+     "list-style" : "none",
+     "max-height" : "300px", 
+     "overflow-x" : "hidden", 
+     "overflow-y" : "auto", 
+     "scrollbar-width" : "thin"})
+     .setup_htmx()
+     .selectAll("li")
+     .data(data,d=>d.id)
+     .join("li")
+     .attr("class","pt-2 text-nowrap")
+     .selectAll("span")
+     .data(d=>[d])
+     .join("span")
+     .attr("class" , d=> {
+         if (d.url == sidebar_state.current_url){
+            return "bg-primary text-white p-2 rounded"
          }  else {
-             sel.selectAll("span")
-                .data([d])
-                .join("span")
-                .attr("class" , d=>  "body-emphasis")
-                .html(d=>d.html)
+            return "pt-2"
          }
-
-          sel.selectAll("ul")
-            .data([d])
-            .join("ul")
-            .styles({
-            "padding-left" : "2px",
-            "list-style" : "none",
-            "max-height" : "300px", 
-            "overflow-x" : "hidden", 
-            "overflow-y" : "auto", 
-            "scrollbar-width" : "thin"})
-            .attr("class","mt-2")
-            .selectAll("li")
-            .data(d=>d.children,d=>d.id)
-            .join("li")
-            .attr("class","pt-2 text-nowrap")
-            .selectAll("span")
-            .data(d=>[d])
-            .join("span")
-            .attr("class" , d=> {
-                if (d.url == current_url){
-                   return "bg-primary text-white p-2 rounded"
-                }  else {
-                   return "pt-2"
-                }
-            })
-            .selectAll("a")
-            .data(d=>[d])
-            .join("a")
-            .attr("class" , d=> {
-                if (d.url == current_url){
-                   return "text-white"
-                }  else {
-                   return "link-secondary"
-                }
-            })
-            .classed("text-decoration-none",true)
-            .attr("hx-get",d=>d.url)
-            .style("font-size", "0.8rem")
-            .attrs({
-              "href" : "#",
-              "hx-target":"#main-content",
-              "hx-replace-url":"true",
-            })
-            .setup_htmx()
-            .html(d=>d.name)
-      })
+     })
+     .selectAll("a")
+     .data(d=>[d])
+     .join("a")
+     .attr("class" , d=> {
+         if (d.url == sidebar_state.current_url){
+            return "text-white"
+         }  else {
+            return "link-secondary"
+         }
+     })
+     .classed("text-decoration-none",true)
+     .attr("hx-get",d=>d.__url__)
+     .style("font-size", "0.8rem")
+     .attrs({
+       "href" : "#",
+       "hx-headers":'{"json-response" : "false"}',
+       "hx-target":"#main-content",
+       "hx-replace-url":"true",
+     })
+     .setup_htmx()
+     .html(d=>d.name)
 }
-redraw();
-
+document.body.addEventListener('htmx:afterOnLoad', async event => {
+    const target = event.detail.target;
+    if ( "id" in target.attributes){
+      const data = JSON.parse(await event.detail.xhr.responseText);
+      if (target.attributes["id"].value == "my-projects"){
+          sidebar_state.projects = data
+      }  
+      if (target.attributes["id"].value == "groups"){
+          sidebar_state.groups = data
+      }
+    } 
+})
+document.dispatchEvent(new Event("reloadMinProject"))
+document.dispatchEvent(new Event("reloadTeams"))
 
 </script>

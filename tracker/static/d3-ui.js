@@ -2,10 +2,6 @@ import fetch_recipies from "fetch-recipies";
 import "d3";
 import 'lo-dash';
 
-//mobx.spy(event=>{
-//    console.log(event)
-//})
-
 const models = await (await fetch_recipies.GET("/core/model_info/")).json()    
 const current_user = await (await fetch_recipies.GET(models["project.ProjectUser"].main)).json()
 const inactive = {attr:"", d: {id:null}, search_results : []};
@@ -292,9 +288,9 @@ const debounced_q = _.debounce(q,250);
 const toggle_fk_attr = async (result) => {
     let resp;
     if (result.selected){
-        resp = await fetch_recipies.DELETE(result.url);
+        resp = await fetch_recipies.DELETE(result.__url__);
     } else {
-        resp = await fetch_recipies.POST(result.url, {},true);
+        resp = await fetch_recipies.POST(result.__url__, {},true);
     }
     if (ui_state.attr){
         const  attr  = ui_state.attr;
@@ -427,22 +423,28 @@ export const create_button = function(selection,make_observable_data, attr="",ti
 };
 
 export const fk_toggle = function(selection, result, attr="",options={}){
-
- selection
-    .append("div")
-    .classed("form-check form-switch",true)
-        .append("input")
-        .attr("type","checkbox")
-        .attr("role","switch")
-        .attr("role",attr)
-        .call(sel=>{
-            sel.node().checked = result.selected 
-        })
-        .style("font-size","1.5em")
-        .classed("form-check-input",true)
-        .on("change",e=>{
-            toggle_fk_attr(result) 
-        });
+    const { on_change=null } = options;
+    selection
+       .append("div")
+       .classed("form-check form-switch",true)
+           .append("input")
+           .attr("type","checkbox")
+           .attr("role","switch")
+           .attr("role",attr)
+           .call(sel=>{
+               sel.node().checked = result.selected 
+           })
+           .style("font-size","1.5em")
+           .classed("form-check-input",true)
+           .on("change",async e=>{
+               await toggle_fk_attr(result) 
+               result.selected = e.target.checked
+               if (on_change){
+                   _.delay(()=>{
+                       document.dispatchEvent(new Event(on_change))
+                   },100)
+               }
+           });
 };
 
 export const inplace_char_edit = function(selection,

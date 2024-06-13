@@ -3,6 +3,7 @@ from django.apps import apps
 from django.db.models import CharField, Value, Q, Count, CharField, F
 from django.db.models.functions import Concat, Replace
 from django_readers import qs, pairs, projectors, producers, specs
+from django.urls import reverse
 from core.lang import lang,resolve_field_to_current_lang
 from . import permissions
 
@@ -61,70 +62,81 @@ def name_task_count():
         producers.attr("name_count"),
     )
 
-__type__ = {"__type__": (qs.noop, producers.attrgetter("_meta.label"))}
+__core_info__ = [
+    {"__type__": (qs.noop, producers.attrgetter("_meta.label"))},
+    {"__url__": (qs.noop, producers.attrgetter("url"))},
+]
+
 
 def force_type(model):
     m = apps.get_model(model)
 
-    def produce(inst):
+    def produce1(inst):
         return m._meta.label
 
-    return {"__type__": (qs.noop, produce)}
+    def produce2(inst):
+        return reverse("core:main", kwargs={"m": model, "pk": inst.id})
+
+    return [
+      {"__type__": (qs.noop, produce1)},
+      {"__url__": (qs.noop, produce2)},
+    ]
 
 
 def basic_spec(cls, request, pk=None):
     return [
         lang_field("name"),
         "id",
-        __type__,
+        *__core_info__,
     ]
 
 
 def projectuser_spec(cls, request, pk=None):
     spec = (
+        *__core_info__,
         "id",
         "username",
         {
             "belongs_to": [
-                force_type("project.ProjectGroup"),
+                *force_type("project.ProjectGroup"),
                 lang_field("name"),
                 "id",
             ]
         },
         {
             "manages": [
-                force_type("project.ProjectGroup"),
+                *force_type("project.ProjectGroup"),
                 lang_field("name"),
                 "id",
                 {
                     "users": [
                         pairs.exclude(pk=request.user.pk),
-                        force_type("project.ProjectUser"),
+                        *force_type("project.ProjectUser"),
                         {"name": "username"},
                         "id",
                     ]
                 },
             ]
         },
-        {"groups": ["id", lang_field("name"), force_type("project.ProjectGroup")]},
+        {"groups": ["id", lang_field("name"), *force_type("project.ProjectGroup")]},
     )
     return spec
 
 
 def task_spec(cls, request, pk=None):
     return [
-        __type__,
+        *__core_info__,
         "id",
         "order",
         lang_field("text"),
         lang_field("name"),
-        {"project": [__type__, "id", lang_field("name")]},
-        {"stream": [__type__, "id", lang_field("name")]},
+        {"project": [*__core_info__, "id", lang_field("name")]},
+        {"stream": [*__core_info__, "id", lang_field("name")]},
         "start_date",
         "target_date",
-        {"lead": [__type__, "id", "name"]},
-        {"teams": [__type__, "id", lang_field("name")]},
-        {"competency": [__type__, "id", lang_field("name")]},
+        {"lead": [*__core_info__, "id", "name"]},
+        {"teams": [*__core_info__, "id", lang_field("name")]},
+        {"competency": [*__core_info__, "id", lang_field("name")]},
         "done",
     ]
 
@@ -135,7 +147,7 @@ def tag_spec(cls, request, pk=None):
         (qs.pipe(
             qs.select_related("group"),
             ),projectors.noop),
-        __type__,
+        *__core_info__,
         "id",
         {"can_delete": can_delete(request.user, "group")},
         "name",
@@ -148,13 +160,13 @@ def contact_spec(cls, request, pk=None):
         (qs.pipe(
             qs.select_related("group"),
             ),projectors.noop),
-        __type__,
+        *__core_info__,
         "id",
         {"can_delete": can_delete(request.user, "group")},
         "name",
         "email",
-        {"account": [__type__, "id", "username"]},
-        {"group": [__type__, "id", lang_field("name")]},
+        {"account": [*__core_info__, "id", "username"]},
+        {"group": [*__core_info__, "id", lang_field("name")]},
     ]
 
 
@@ -165,7 +177,7 @@ def projectgroup_spec(cls, request, pk=None):
             qs.select_related("parent__parent__parent__parent"),
 
             ),projectors.noop),
-        __type__,
+        *__core_info__,
         "id",
         lang_field("name"),
         {"can_delete": can_delete(request.user)},
@@ -175,7 +187,7 @@ def projectgroup_spec(cls, request, pk=None):
             {
                 "projects": [
                     pairs.filter(private=False),
-                    __type__,
+                    *__core_info__,
                     "id",
                     lang_field("name"),
                     {
@@ -205,11 +217,11 @@ def stream_spec(cls, request, pk=None):
         tasks = []
     tasks += [x for x in task_spec(Task, request) if "project" not in x]
     return [
-        __type__,
+        *__core_info__,
         lang_field("name"),
         "id",
         {"name_count": name_task_count()},
-        {"project": [__type__, "id", lang_field("name")]},
+        {"project": [*__core_info__, "id", lang_field("name")]},
         {"tasks": tasks},
     ]
 
@@ -227,7 +239,7 @@ def project_spec(cls, request, pk=None):
             qs.select_related("group"),
             ),projectors.noop),
         "id",
-        __type__,
+        *__core_info__,
         "private",
         lang_field("text"),
         {"text_m": render_markdown(f"text_{lang()}")},
@@ -246,7 +258,7 @@ def project_spec(cls, request, pk=None):
             "streams",
             [
                 pairs.filter(project_default=True),
-                __type__,
+                *__core_info__,
                 lang_field("name"),
                 "id",
                 {"tasks": task_spec(Task, request)},
@@ -258,7 +270,7 @@ def project_spec(cls, request, pk=None):
                 (qs.pipe(
                     qs.filter(project_default=False),
                     ),projectors.noop),
-                __type__,
+                *__core_info__,
                 lang_field("name"),
                 "id",
                 {"name_count": name_task_count()},
@@ -266,22 +278,22 @@ def project_spec(cls, request, pk=None):
             ],
         },
         {
-            "group": [__type__, "id", lang_field("name")],
+            "group": [*__core_info__, "id", lang_field("name")],
         },
         {
-            "status": [__type__, "id", lang_field("name")],
+            "status": [*__core_info__, "id", lang_field("name")],
         },
         {
-            "log": [__type__, "id"],
+            "log": [*__core_info__, "id"],
         },
         {
-            "leads": [__type__, "name", "id"],
+            "leads": [*__core_info__, "name", "id"],
         },
         {
-            "teams": [__type__, lang_field("name"), "id"],
+            "teams": [*__core_info__, lang_field("name"), "id"],
         },
         {
-            "tags": [__type__, "name", "id"],
+            "tags": [*__core_info__, "name", "id"],
         },
     ]
 
@@ -297,7 +309,7 @@ def min_project_spec(cls, request, pk=None):
             ),projectors.noop),
         "id",
         "private",
-        __type__,
+        *__core_info__,
         lang_field("name"),
     ]
 
@@ -305,8 +317,8 @@ def min_project_spec(cls, request, pk=None):
 def projectlog_spec(cls, request, pk=None):
     ProjectLogEntry = apps.get_model("project.ProjectLogEntry")
     return [
-        __type__,
-        {"project": ["id", __type__]},
+        *__core_info__,
+        {"project": ["id", *__core_info__]},
         "id",
         {"entries": projectlogentry_spec(ProjectLogEntry, request)},
     ]
@@ -314,10 +326,10 @@ def projectlog_spec(cls, request, pk=None):
 
 def projectlogentry_spec(cls, request, pk=None):
     return [
-        __type__,
+        *__core_info__,
         "id",
         "text",
-        {"log": ["id", __type__]},
+        {"log": ["id", *__core_info__]},
         {"rendered_text": render_markdown(f"text")},
         "addstamp",
     ]
@@ -325,9 +337,9 @@ def projectlogentry_spec(cls, request, pk=None):
 
 def time_report(cls, request, pk=None):
     return [
-        __type__,
+        *__core_info__,
         "id",
-        {"user": [__type__, "id", "username"]},
+        {"user": [*__core_info__, "id", "username"]},
         "time",
         "week",
     ]

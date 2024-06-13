@@ -150,7 +150,7 @@ class Settings(CoreModel):
             self.instance.user = self.request.user
             super().save(*args, **kwargs)
 
-    spec = ["hide_done", "see_all_projects", "id", queries.__type__]
+    spec = ["hide_done", "see_all_projects", "id", *queries.__core_info__]
     form_fields = ["user", "hide_done"]
     user = OneToOneField(ProjectUser, on_delete=CASCADE, blank=True)
     hide_done = BooleanField(default=False, blank=True)
@@ -308,7 +308,7 @@ class Project(
         return {
             "selected": request.user in self.viewers.all()
             or self.group in request.user.groups.all(),
-            "url": reverse(
+            "__url__": reverse(
                 "core:toggle_link",
                 kwargs={
                     "m1": self._meta.label,
