@@ -8,7 +8,7 @@
    </div> 
    <div class=" mt-2">
        <a class="link body-emphasis" 
-          hx-get="{{url("project:main")}}" 
+          hx-get="{{url("project:timereporting")}}" 
           href="#" 
           hx-target="#main-content" 
           hx-replace-url="true">Time Reporting</a>
@@ -54,7 +54,9 @@ d3.select("#sidebar")
       .on("click", e=>{
          if (e.target.tagName == "A") {
              d3.select("#main-content").html("");
-             sidebar_state.current_url = d3.select(e.target).datum().__url__;
+             if (d3.select(e.target).datum()) {
+                 sidebar_state.current_url = d3.select(e.target).datum().__url__;
+             } 
              ui_state.reset_ui(false);
              sidebar_state.redraw++;
          }
@@ -111,11 +113,12 @@ const redraw = (id,data)=> {
 document.body.addEventListener('htmx:afterOnLoad', async event => {
     const target = event.detail.target;
     if ( "id" in target.attributes){
-      const data = JSON.parse(await event.detail.xhr.responseText);
       if (target.attributes["id"].value == "my-projects"){
+          const data = JSON.parse(await event.detail.xhr.responseText);
           sidebar_state.projects = data
       }  
       if (target.attributes["id"].value == "groups"){
+          const data = JSON.parse(await event.detail.xhr.responseText);
           sidebar_state.groups = data
       }
     } 

@@ -16,6 +16,7 @@ from django.http import (
 from django.shortcuts import get_object_or_404
 from django.urls import reverse
 from text.translate import gettext_lazy as _
+from .time_utils import  get_last_n_weeks
 
 api = API(namespace="project", session={})
 
@@ -37,6 +38,17 @@ def metadata(request):
         "shared/metadata.html",
         {
             "standalone": not request.htmx,
+        },
+    )
+
+@api.get("timereporting/")
+def timereporting(request):
+    return render(
+        request,
+        "timereport/timereports.html",
+        {
+            "standalone": not request.htmx,
+            "weeks" : get_last_n_weeks(20),
         },
     )
 

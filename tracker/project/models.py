@@ -1,7 +1,7 @@
 import re
 import sys
 import uuid
-from datetime import date
+from datetime import date, datetime, timedelta
 from itertools import product
 
 import dateparser
@@ -45,6 +45,7 @@ from django_lifecycle import (
     BEFORE_CREATE,
     BEFORE_DELETE,
     BEFORE_UPDATE,
+    BEFORE_SAVE,
     hook,
 )
 from . import queries
@@ -112,6 +113,11 @@ class GroupPrefetcherManager(UserManager):
 class ProjectUser(User, CoreModel):
     objects = GroupPrefetcherManager()
     spec = queries.projectuser_spec
+
+    @hook(BEFORE_SAVE)
+    def force_no_password_no_active(self):
+        if not self.password:
+            self.is_active = False
 
     class Meta:
         proxy = True
@@ -285,11 +291,12 @@ class Project(
         filters = cls.get_filters(request)
         q1 = Q(group__in=request.user.groups.all())
         q2 = Q(viewers=request.project_user)
-        q3 =  Q(private=True) & ~Q(private_owner=request.user)
+        q3 = None
+        q4 =  Q(private=True) & ~Q(private_owner=request.user)
         return (
             cls.objects.filter(q1 | q2)
             .filter(filters)
-            .exclude(q3)
+            .exclude(q4)
         ).distinct()
 
     @hook(AFTER_CREATE)
@@ -583,6 +590,10 @@ class TimeReport(CoreModel):
     def user_filter(cls, request):
         filters = cls.get_filters(request)
         return cls.objects.filter(user=request.user).filter(filters)
+
+    @hook(BEFORE_SAVE)
+    def force_start_of_week(self):
+        self.week = self.week - timedelta(days=self.week.weekday())
 
     user = ForeignKey(ProjectUser, null=True, on_delete=SET_NULL)
     project = ForeignKey(Project, on_delete=CASCADE)

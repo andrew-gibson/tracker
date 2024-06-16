@@ -1,13 +1,61 @@
-<div>
+{% if  standalone %} 
+{% extends "base.html" %} 
+{% block sidebar %}
+    {%include "shared/sidebar.html"%}
+{%endblock%}
+{% endif %}
 
+{% block nav %}
+    {%with navbar=[],navdropdown=[]%}
+        {%include "navbar.html"%}
+    {%endwith%}
+{%endblock%}
+
+{% block content%}
+<div id="main-content" hx-swap-oob="true">
+    <div class="col-3"  id="weeks">
+        <div class="btn-group-vertical" role="group" id="weeks-list">
+        </div>
+    </div>
+    <div class="col-9 border-start"  id="timereporting">
+    </div>
+
+
+
+    <script type="module">
+    import fetch_recipies from "fetch-recipies";
+    import {ui_state,autoRun} from "d3-ui";   
+    const weeks = {{dumps(weeks)|safe}};
+    export const timereport_state = mobx.makeAutoObservable({
+         active :  _.first(weeks).week_start,
+    });
+    const projects =  await (await fetch_recipies.GET(ui_state.models["project.Project"].main)).json();
+    const logs = {{dumps(insts)|safe}};
+    const draw_weeks = ()=>{
+        d3.select("#weeks-list")
+          .selectAll("button")
+          .data(weeks)
+          .join("button")
+          .attr("class","btn text-nowrap")
+          .classed("btn-primary",d=>d.week_start == timereport_state.week_start)
+          .classed("btn-light",,d=>d.week_start != timereport_state.week_start)
+          .attr("type","button")
+          .on("click",d=>{
+               timereport_state.active = d.week_start;
+          })
+          .html(d=>d.name)
+    };
+    const draw_timereporting =  ()=>{
+        d3.select("#timereporting")
+
+
+    };
+    const reset = ()=>{
+        autoRun(draw_weeks);
+
+    };
+    
+
+    </script>
 </div>
-
-
-
-<script type="module">
-import {ui_state} from "d3-ui";   
-const projects =  await (await fetch_recipies.GET(ui_state.models["project.Project"].main)).json();
-const logs = {{dumps(insts)|safe}};
-
-
-</script>
+{%endblock%}

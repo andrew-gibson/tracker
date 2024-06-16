@@ -1,14 +1,14 @@
-{% if  standalone %} {% extends "base.html" %} {% endif %}
+{% if  standalone %} 
+{% extends "base.html" %} 
+{% block sidebar %}
+    {%include "shared/sidebar.html"%}
+{%endblock%}
+{% endif %}
 
 {% block nav %}
     {%with navbar=["project/filters.html"],navdropdown=["projectgroup/projectgroup-link.html",  "timereport/timereport-link.html","shared/metadata-link.html"]%}
         {%include "navbar.html"%}
     {%endwith%}
-{%endblock%}
-
-
-{% block sidebar %}
-    {%include "shared/sidebar.html"%}
 {%endblock%}
 
 {% block content%}
