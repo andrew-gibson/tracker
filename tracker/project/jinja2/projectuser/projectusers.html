@@ -1,4 +1,4 @@
-<div id="contacts">
+<div id="users">
     <div class="card">
       <div class="card-header"> </div>
       <ul class="list-group list-group-flush">
@@ -8,29 +8,29 @@
 
 <script type="module">
     import {ui_state, inplace_char_edit, create_button,append_edit_attr} from "d3-ui";
-    const contacts = {{dumps(insts)|safe}};
-    const observable_data =   mobx.makeAutoObservable({contacts});
+    const users = {{dumps(insts)|safe}};
+    const observable_data =   mobx.makeAutoObservable({users});
 
-    create_button( d3.select("#contacts .card-header"), 
-                  ()=>mobx.makeAutoObservable({name:"",__type__:"project.Contact"}),
+    create_button( d3.select("#users .card-header"), 
+                  ()=>mobx.makeAutoObservable({name:"",__type__:"project.ProjectUser"}),
                   "name",
-                  "+ Contact",
-                {on_change : "reloadContacts"})
+                  "+ User",
+                {on_change : "reloadProjectUsers"})
 
-    d3.select("#contacts ul")
+    d3.select("#users ul")
       .selectAll("li.list-group-item")
-      .data(observable_data.contacts,d=>d.id)
+      .data(observable_data.users,d=>d.id)
       .join("li")
       .attr("class","list-group-item ")
       .each(function(d){
           const hx_args =  {
-              "hx-delete" : ui_state.models["project.Contact"].main_pk.replace("__pk__", d.id),
-              "hx-on::after-request"  :  "window.reset_ui('reloadContacts')",
+              "hx-delete" : ui_state.models["project.ProjectUser"].main_pk.replace("__pk__", d.id),
+              "hx-on::after-request"  :  "window.reset_ui('reloadProjectUsers')",
               "hx-swap" : "none",
           }
           const sel = d3.select(this);
           const top_row = sel.append("div").attr("class"," d-flex align-items-middle justify-content-between")
-          inplace_char_edit(top_row, d, "name", "Name",{display_attr : "name"});
+          inplace_char_edit(top_row, d, "username", "Name",{display_attr : "username"});
           top_row
             .append("button")    
                 .attr("type","button")
@@ -40,6 +40,6 @@
                 .on("click", e=>{
                     window.delete_modal(hx_args);
                 })
-           append_edit_attr(sel, d, "group", "Group");
+           append_edit_attr(sel, d, "belongs_to", "Group");
       })
 </script>

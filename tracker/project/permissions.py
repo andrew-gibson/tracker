@@ -23,17 +23,20 @@ def good_request(user, method,obj):
             # return group info to all users
             return True
 
-        case [models.ProjectUser() | models.EXCompetency() | models.ProjectStatus(), "POST" | "PUT" | "DELETE"]:
+        case [models.EXCompetency() | models.ProjectStatus(), "POST" | "PUT" | "DELETE"]:
             #don't allow any projectuser, competency or status alterations through this app
             return False
 
+        case  [models.ProjectUser() ,"POST" | "PUT" | "DELETE"]:
+            # only for users who manage a group in the reporting chain
+            return user.manages in [obj.belongs_to, *obj.belongs_to.parents ]
+
         case [models.ProjectUser(), "GET"]:
             # only return user info to the request user
-            return user == obj
+            return (  user.manages in [obj,*obj.belongs_to.parents]
+                      or  user.belongs_to == obj.belongs_to
+                    )
 
-        case [models.Contact(), "POST" | "PUT" | "DELETE" | "GET"]:
-            # only contact alterations are allowed by the group members
-            return obj.group in user.groups.all()
 
         case [models.Tag(), "POST" | "PUT" | "DELETE"]:
             # only tag alterations are allowed by the group members

@@ -148,8 +148,6 @@ def toggle_link(request, m1, pk1, m2, pk2, attr=""):
     obj1 = get_object_or_404(model1, pk=pk1)
     obj2 = get_object_or_404(model2, pk=pk2)
     try:
-        import pdb
-        pdb.set_trace()
         assert model1.perms.good_m2m_request(request.user, request.method, obj1,obj2,attr)
         if request.method == "POST":
             link_or_404(obj1, obj2, attr)
@@ -216,7 +214,10 @@ def text_ac(request, m, pk, attr):
     model = get_model_or_404(m, test=lambda m: issubclass(m, (AutoCompleteCoreModel,)))
     obj = get_object_or_404(model.objects.user_filter(request), pk=pk)
     f = model._meta.get_field(attr)
-    related_model = f.related_model
+    if hasattr(model, "proxy_map") and attr in model.proxy_map:
+        related_model = model.proxy_map[attr]
+    else:
+        related_model = f.related_model
 
     def projection(d):
         if d.get("new", False):

@@ -17,8 +17,8 @@
              hx-get="{{url("core:main", kwargs={ "m" : "project.Tag"})}}"
              class="col-4">
         </div>
-        <div hx-trigger="load, reloadContacts from:document" 
-             hx-get="{{url("core:main", kwargs={ "m" : "project.Contact"})}}"
+        <div hx-trigger="load, reloadProjectUsers from:document" 
+             hx-get="{{url("core:main", kwargs={ "m" : "project.ProjectUser"})}}"
              class="col-4">
         </div>
         <div hx-trigger="load, reloadTeams from:document" 

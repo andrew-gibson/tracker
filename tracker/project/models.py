@@ -108,11 +108,15 @@ class GroupPrefetcherManager(UserManager):
     use_for_related_fields = True
 
     def user_filter(self, request):
-        return self.filter(pk=request.user.pk)
+        return self.filter()
 
-class ProjectUser(User, CoreModel):
+@add_to_admin
+class ProjectUser(User, AutoCompleteCoreModel, trigger="@", hex_color="ff006e"):
     objects = GroupPrefetcherManager()
     spec = queries.projectuser_spec
+    proxy_map = {
+        "belongs_to" : ProjectGroup
+    }
 
     @hook(BEFORE_SAVE)
     def force_no_password_no_active(self):
@@ -121,29 +125,6 @@ class ProjectUser(User, CoreModel):
 
     class Meta:
         proxy = True
-
-@add_to_admin
-class Contact(AutoCompleteCoreModel, trigger="@", hex_color="ff006e"):
-    spec = queries.contact_spec
-    form_fields = ["name", "email"]
-
-    class adminClass(admin.ModelAdmin):
-        list_display = ("name", "email", "account")
-        list_editable = ("email", "account")
-
-
-    group = ForeignKey(
-        ProjectGroup, blank=True, on_delete=PROTECT, related_name="contacts"
-    )
-    name = CharField(max_length=255)
-    email = EmailField(null=True, blank=True)
-    account = OneToOneField(
-        ProjectUser,
-        null=True,
-        blank=True,
-        on_delete=SET_NULL,
-        related_name="contact",
-    )
 
 
 class Settings(CoreModel):
@@ -158,7 +139,7 @@ class Settings(CoreModel):
 
     spec = ["hide_done", "see_all_projects", "id", *queries.__core_info__]
     form_fields = ["user", "hide_done"]
-    user = OneToOneField(ProjectUser, on_delete=CASCADE, blank=True)
+    user = OneToOneField(ProjectUser, on_delete=CASCADE, blank=True, related_name="+")
     hide_done = BooleanField(default=False, blank=True)
     see_all_projects = BooleanField(default=True, blank=True)
     projects_filter = JSONField(db_default="{}")
@@ -343,7 +324,7 @@ class Project(
         blank=True,
         related_name="sub_projects",
     )
-    leads = ManyToManyField(Contact, blank=True)
+    leads = ManyToManyField(ProjectUser, blank=True)
     teams = ManyToManyField(ProjectGroup, related_name="projects_supporting")
     tags = ManyToManyField(Tag)
     private = BooleanField(db_default=False)
@@ -564,7 +545,7 @@ class Task(CoreModel, AutoCompleteNexus):
     name_fr = CharField(max_length=255, null=True, blank=True)
     text_en = TextField(blank=True, null=True)
     text_fr = TextField(blank=True, null=True)
-    lead = ForeignKey(Contact, on_delete=SET_NULL, null=True, blank=True)
+    lead = ForeignKey(ProjectUser, on_delete=SET_NULL, null=True, blank=True)
     teams = ManyToManyField(ProjectGroup, blank=True)
     addstamp = DateTimeField(auto_now_add=True)
     editstamp = DateTimeField(auto_now=True)
