@@ -354,7 +354,7 @@ class AutoCompleteNexus:
         for name in results:
             filter_qs = Q(**ac_filters.get(name, {}))
             results[name]["results"] = [
-                [term, results[name]["model"].ac(request, term, filter_qs=filter_qs)]
+                [term, results[name]["model"].ac(request, term, cls,filter_qs=filter_qs)]
                 for term in results[name]["search_terms"]
             ]
             trigger = results[name]["trigger"]
@@ -488,7 +488,7 @@ class AutoCompleteCoreModel(CoreModel):
         return f
 
     @classmethod
-    def ac_query(cls, request, query):
+    def ac_query(cls, request, query,requestor):
         f = cls.search_field
         if query == "":
             q = Q()
@@ -503,7 +503,8 @@ class AutoCompleteCoreModel(CoreModel):
     def ac(
         cls,
         request,
-        query="",
+        query,
+        requestor,
         variant=None,
         filter_qs=None,
         cutoff=None,
@@ -512,7 +513,7 @@ class AutoCompleteCoreModel(CoreModel):
         f = cls.search_field
 
         preoare_qs, projection = cls.readers(request)
-        qs = preoare_qs(cls.ac_query(request, query))
+        qs = preoare_qs(cls.ac_query(request, query,requestor))
 
         if filter_qs:
             qs = qs.filter(filter_qs)

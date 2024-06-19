@@ -157,6 +157,13 @@ export const autoRun = (node, func)=>{
     );
 };
 
+export const reaction = (node, test_fun, func)=>{
+    _dispose_functions.funcs.push(
+        {node,func:mobx.reaction(test_fun,func)}
+    );
+};
+
+
 mobx.reaction(
     ()=>[ui_state.attr, ui_state.d.id],
     ()=>{

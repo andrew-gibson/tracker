@@ -20,6 +20,14 @@ from django.conf import settings
 from django.contrib import admin
 from django.contrib.auth import REDIRECT_FIELD_NAME
 from django.contrib.auth.decorators import login_required, permission_required
+from django.db.models import (
+        ManyToOneRel,
+        OneToOneRel,
+        ForeignKey,
+        ManyToManyField,
+        OneToOneField,
+)
+
 from django.forms.models import ModelChoiceField
 from django.http import Http404, HttpResponse, HttpResponseBadRequest
 from django.shortcuts import render as _render
@@ -31,6 +39,25 @@ from text.translate import gettext_lazy as _
 from tracker.jinja2 import encode_get_param, decode_get_params
 
 ALLOWED_TAGS = ["li", "ol", "ul", "p", "br", "span"]
+
+
+def is_local_relation(f):
+    return isinstance(f,(ForeignKey, ManyToManyField,OneToOneField))
+
+def is_non_local_relation(f):
+    return isinstance(f, (ManyToOneRel, OneToOneRel))
+
+def non_local_relations(m):
+    return [
+        x.name for x in m._meta.get_fields()
+        if is_non_local_relation(x)
+    ]
+
+def local_relations(m):
+    return [
+        x.name for x in m._meta.get_fields()
+        if is_local_relation(x)
+    ]
 
 
 class AdminForm(forms.ModelForm):

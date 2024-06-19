@@ -7,8 +7,9 @@ def good_m2m_request(user, method,obj1,obj2,attr):
             # allow a user to add itself as a viewer of a project normally outside its group
             return obj2.pk == user.pk
         case _:
-            # default to usual permission access to each individual object
-            return  good_request(user,method,obj1) and good_request(user,method,obj2)
+            # default to seeing if user has permission to post to the first object
+            # and can read the linked object
+            return  good_request(user,"POST",obj1) and good_request(user,"GET",obj2)
 
 
 def good_request(user, method,obj):

@@ -5,6 +5,18 @@
        hx-get="{{url("core:main", kwargs={"m" : "project.MinProject"})}}" 
        hx-swap="none"
        hx-headers='{"json-response" : "true"}'>
+       <div class="placeholder-glow">
+           <div class="col-12 placeholder placeholder-xs"></div>
+           <div class="col-12 placeholder placeholder-xs"></div>
+           <div class="col-12 placeholder placeholder-xs"></div>
+           <div class="col-12 placeholder placeholder-xs"></div>
+           <div class="col-12 placeholder placeholder-xs"></div>
+           <div class="col-12 placeholder placeholder-xs"></div>
+           <div class="col-12 placeholder placeholder-xs"></div>
+           <div class="col-12 placeholder placeholder-xs"></div>
+           <div class="col-12 placeholder placeholder-xs"></div>
+           <div class="col-12 placeholder placeholder-xs"></div>
+        </div>
    </div> 
    <div class=" mt-2">
        <a class="link body-emphasis" 
@@ -24,6 +36,17 @@
         hx-get="{{url("core:main", kwargs={"m" : "project.ProjectGroup"})}}" 
        hx-swap="none"
        hx-headers='{"json-response" : "true"}'> 
+       <div class="placeholder-glow">
+           <div class="col-12 placeholder placeholder-xs"></div>
+           <div class="col-12 placeholder placeholder-xs"></div>
+           <div class="col-12 placeholder placeholder-xs"></div>
+           <div class="col-12 placeholder placeholder-xs"></div>
+           <div class="col-12 placeholder placeholder-xs"></div>
+           <div class="col-12 placeholder placeholder-xs"></div>
+           <div class="col-12 placeholder placeholder-xs"></div>
+           <div class="col-12 placeholder placeholder-xs"></div>
+        </div>
+
    </div> 
 
     <a class="link body-emphasis mt-2" hx-get="{{url("project:metadata")}}" href="#" hx-target="#main-content" hx-replace-url="true">Edit Tags / Users</a>
@@ -63,6 +86,7 @@ d3.select("#sidebar")
       });
 const redraw = (id,data)=> {
   d3.select(id)
+   .html("")
    .selectAll("ul")
      .data([1])
      .join("ul")

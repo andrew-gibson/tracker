@@ -63,6 +63,7 @@ def name_task_count():
     )
 
 __core_info__ = [
+    "id",
     {"__type__": (qs.noop, producers.attrgetter("_meta.label"))},
     {"__url__": (qs.noop, producers.attrgetter("url"))},
 ]
@@ -86,7 +87,6 @@ def force_type(model):
 def basic_spec(cls, request, pk=None):
     return [
         lang_field("name"),
-        "id",
         *__core_info__,
     ]
 
@@ -94,8 +94,8 @@ def basic_spec(cls, request, pk=None):
 def projectuser_spec(cls, request, pk=None):
     spec = (
         *__core_info__,
-        "id",
         "username",
+        {"name":"username"},
         {
             "belongs_to": [
                 *force_type("project.ProjectGroup"),
@@ -126,17 +126,16 @@ def projectuser_spec(cls, request, pk=None):
 def task_spec(cls, request, pk=None):
     return [
         *__core_info__,
-        "id",
         "order",
         lang_field("text"),
         lang_field("name"),
-        {"project": [*__core_info__, "id", lang_field("name")]},
-        {"stream": [*__core_info__, "id", lang_field("name")]},
+        {"project": [*__core_info__, lang_field("name")]},
+        {"stream": [*__core_info__, lang_field("name"),]},
         "start_date",
         "target_date",
-        {"lead": [*__core_info__, "id", "name"]},
-        {"teams": [*__core_info__, "id", lang_field("name")]},
-        {"competency": [*__core_info__, "id", lang_field("name")]},
+        {"lead": [*__core_info__, "username"]},
+        {"teams": [*__core_info__,  lang_field("name")]},
+        {"competency": [*__core_info__, lang_field("name")]},
         "done",
     ]
 
@@ -148,7 +147,6 @@ def tag_spec(cls, request, pk=None):
             qs.select_related("group"),
             ),projectors.noop),
         *__core_info__,
-        "id",
         {"can_delete": can_delete(request.user, "group")},
         "name",
         "public",
@@ -161,12 +159,11 @@ def contact_spec(cls, request, pk=None):
             qs.select_related("group"),
             ),projectors.noop),
         *__core_info__,
-        "id",
         {"can_delete": can_delete(request.user, "group")},
         "name",
         "email",
-        {"account": [*__core_info__, "id", "username"]},
-        {"group": [*__core_info__, "id", lang_field("name")]},
+        {"account": [*__core_info__, "username"]},
+        {"group": [*__core_info__, lang_field("name")]},
     ]
 
 
@@ -178,7 +175,6 @@ def projectgroup_spec(cls, request, pk=None):
 
             ),projectors.noop),
         *__core_info__,
-        "id",
         lang_field("name"),
         {"can_delete": can_delete(request.user)},
     )
@@ -188,7 +184,6 @@ def projectgroup_spec(cls, request, pk=None):
                 "projects": [
                     pairs.filter(private=False),
                     *__core_info__,
-                    "id",
                     lang_field("name"),
                     {
                         "viewers": (
@@ -219,9 +214,8 @@ def stream_spec(cls, request, pk=None):
     return [
         *__core_info__,
         lang_field("name"),
-        "id",
         {"name_count": name_task_count()},
-        {"project": [*__core_info__, "id", lang_field("name")]},
+        {"project": [*__core_info__, lang_field("name")]},
         {"tasks": tasks},
     ]
 
@@ -238,29 +232,32 @@ def project_spec(cls, request, pk=None):
             qs.include_fields("group"),
             qs.select_related("group"),
             ),projectors.noop),
-        "id",
         *__core_info__,
         "private",
+
         lang_field("text"),
         {"text_m": render_markdown(f"text_{lang()}")},
+
         lang_field("name"),
+
         "short_term_outcomes",
         {"short_term_outcomes_m": render_markdown("short_term_outcomes")},
         "long_term_outcomes",
         {"long_term_outcomes_m": render_markdown("long_term_outcomes")},
+
         {
             "my_project": (
                 qs.prefetch_related("viewers"),
                 producers.method("am_i_viewer", request),
             )
         },
+
         specs.relationship(
             "streams",
             [
                 pairs.filter(project_default=True),
                 *__core_info__,
                 lang_field("name"),
-                "id",
                 {"tasks": task_spec(Task, request)},
             ],
             to_attr="unassigned_tasks",
@@ -272,28 +269,27 @@ def project_spec(cls, request, pk=None):
                     ),projectors.noop),
                 *__core_info__,
                 lang_field("name"),
-                "id",
                 {"name_count": name_task_count()},
                 {"tasks": task_spec(Task, request)},
             ],
         },
         {
-            "group": [*__core_info__, "id", lang_field("name")],
+            "group": [*__core_info__, lang_field("name")],
         },
         {
-            "status": [*__core_info__, "id", lang_field("name")],
+            "status": [*__core_info__, lang_field("name")],
         },
         {
-            "log": [*__core_info__, "id"],
+            "log": [*__core_info__],
         },
         {
-            "leads": [*__core_info__, "name", "id"],
+            "teams": [*__core_info__, lang_field("name")],
         },
         {
-            "teams": [*__core_info__, lang_field("name"), "id"],
+            "leads": [ *__core_info__, "username", ],
         },
         {
-            "tags": [*__core_info__, "name", "id"],
+            "tags": [*__core_info__, "name"],
         },
     ]
 
@@ -307,7 +303,6 @@ def min_project_spec(cls, request, pk=None):
             qs.include_fields("group"),
             qs.select_related("group"),
             ),projectors.noop),
-        "id",
         "private",
         *__core_info__,
         lang_field("name"),
@@ -318,8 +313,7 @@ def projectlog_spec(cls, request, pk=None):
     ProjectLogEntry = apps.get_model("project.ProjectLogEntry")
     return [
         *__core_info__,
-        {"project": ["id", *__core_info__]},
-        "id",
+        {"project": [ *__core_info__]},
         {"entries": projectlogentry_spec(ProjectLogEntry, request)},
     ]
 
@@ -327,9 +321,8 @@ def projectlog_spec(cls, request, pk=None):
 def projectlogentry_spec(cls, request, pk=None):
     return [
         *__core_info__,
-        "id",
         "text",
-        {"log": ["id", *__core_info__]},
+        {"log": [ *__core_info__]},
         {"rendered_text": render_markdown(f"text")},
         "addstamp",
     ]
@@ -338,8 +331,7 @@ def projectlogentry_spec(cls, request, pk=None):
 def time_report(cls, request, pk=None):
     return [
         *__core_info__,
-        "id",
-        {"user": [*__core_info__, "id", "username"]},
+        {"user": [*__core_info__, "username"]},
         "time",
         "week",
     ]

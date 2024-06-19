@@ -11,6 +11,8 @@ from .utils import (
     render,
     unlink_or_404,
     refetch,
+    non_local_relations,
+    local_relations,
 )
 from django.apps import apps
 from django.contrib.auth import authenticate, login, logout
@@ -157,7 +159,7 @@ def toggle_link(request, m1, pk1, m2, pk2, attr=""):
             unlink_or_404(obj1, obj2, attr)
             #we might no longer have access to the original object, so manually 
             #remove obj2 
-            if not getattr(obj1,attr):
+            if getattr(obj1,attr):
                 projection[attr] = [x for x in projection[attr] if x["id"] != pk2]
         return JsonResponse(projection)
     except AssertionError:
@@ -167,8 +169,8 @@ def toggle_link(request, m1, pk1, m2, pk2, attr=""):
 
 @api.post(
     [
-        "m2m/<str:m1>/<int:pk1>/<str:m2>/",
-        "m2m/<str:m1>/<int:pk1>/<str:m2>/<str:attr>/",
+        "pal/<str:m1>/<int:pk1>/<str:m2>/",
+        "pal/<str:m1>/<int:pk1>/<str:m2>/<str:attr>/",
     ]
 )
 async def post_and_link(request, m1, pk1, m2, attr=""):
@@ -204,15 +206,16 @@ async def post_and_link(request, m1, pk1, m2, attr=""):
         return HttpResponseBadRequest()
 
 
-@api.GET(["text_ac/<str:m>/<int:pk>/<str:attr>/", "text_ac/<str:m>/__pk__/__attr__/"])
+@api.GET(["text_ac/<str:m>/<int:pk>/<str:attr>/", 
+          "text_ac/<str:m>/__pk__/__attr__/"])
 def text_ac(request, m, pk, attr):
     try:
-        filters = json.loads(request.GET.get("filters", "{}"))
         q = request.GET.get("q")
     except:
         return HttpResponseBadRequest("incorrectly formatted GET params")
     model = get_model_or_404(m, test=lambda m: issubclass(m, (AutoCompleteCoreModel,)))
     obj = get_object_or_404(model.objects.user_filter(request), pk=pk)
+    assert attr in local_relations(model) + non_local_relations(model)
     f = model._meta.get_field(attr)
     if hasattr(model, "proxy_map") and attr in model.proxy_map:
         related_model = model.proxy_map[attr]
@@ -249,7 +252,7 @@ def text_ac(request, m, pk, attr):
             "name": f.name,
             "many_to_many": f.many_to_many,
             "results": related_model.ac(
-                request, q, optional_projection=projection, filter_qs=Q(**filters)
+                request, q, obj, optional_projection=projection, 
             ),
         }
     )

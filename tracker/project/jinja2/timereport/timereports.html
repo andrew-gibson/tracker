@@ -24,36 +24,35 @@
 
     <script type="module">
     import fetch_recipies from "fetch-recipies";
-    import {ui_state,autoRun} from "d3-ui";   
+    import {ui_state, reaction} from "d3-ui";   
     const weeks = {{dumps(weeks)|safe}};
     export const timereport_state = mobx.makeAutoObservable({
          active :  _.first(weeks).week_start,
     });
-    const projects =  await (await fetch_recipies.GET(ui_state.models["project.Project"].main)).json();
+    const projects =  await (await fetch_recipies.GET(ui_state.models["project.MinProject"].main)).json();
     const logs = {{dumps(insts)|safe}};
-    const draw_weeks = ()=>{
+    const render = ()=>{
         d3.select("#weeks-list")
           .selectAll("button")
           .data(weeks)
           .join("button")
           .attr("class","btn text-nowrap")
           .classed("btn-primary",d=>d.week_start == timereport_state.week_start)
-          .classed("btn-light",,d=>d.week_start != timereport_state.week_start)
+          .classed("btn-light",d=>d.week_start != timereport_state.week_start)
           .attr("type","button")
           .on("click",d=>{
                timereport_state.active = d.week_start;
           })
           .html(d=>d.name)
-    };
-    const draw_timereporting =  ()=>{
         d3.select("#timereporting")
-
 
     };
     const reset = ()=>{
-        autoRun(draw_weeks);
-
+        reaction(d3.select("#main-content"), 
+                ()=> timereport_state.active.length, 
+                render);
     };
+    reset()
     
 
     </script>

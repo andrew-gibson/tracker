@@ -111,21 +111,24 @@ class GroupPrefetcherManager(UserManager):
         return self.filter()
 
 @add_to_admin
-class ProjectUser(User, AutoCompleteCoreModel, trigger="@", hex_color="ff006e"):
+class ProjectUser(User, AutoCompleteCoreModel, trigger="@", hex_color="ff006e",search_field="username"):
     objects = GroupPrefetcherManager()
     spec = queries.projectuser_spec
     proxy_map = {
         "belongs_to" : ProjectGroup
     }
 
+    class Meta:
+        proxy = True
+
     @hook(BEFORE_SAVE)
     def force_no_password_no_active(self):
         if not self.password:
             self.is_active = False
 
-    class Meta:
-        proxy = True
-
+    @property
+    def blah(self):
+        return reverse("core:main", kwargs={"m": self._meta.label, "pk": self.id})
 
 class Settings(CoreModel):
 
@@ -270,14 +273,15 @@ class Project(
     @classmethod
     def user_filter(cls, request):
         filters = cls.get_filters(request)
-        q1 = Q(group__in=request.user.groups.all())
-        q2 = Q(viewers=request.project_user)
-        q3 = None
-        q4 =  Q(private=True) & ~Q(private_owner=request.user)
+        q1 = Q(group__in=request.user.groups.all())   # basic, you're in the group where the project is hosted
+        q2 = Q(viewers=request.project_user) # you've opted to follow this project
+        q3 = Q(leads=request.project_user) # you've been assinged as the lead of hte project'
+        q4 = Q(timereports__user=request.project_user) # you've entered a time report'
+        q5 =  Q(private=True) & ~Q(private_owner=request.user)
         return (
-            cls.objects.filter(q1 | q2)
+            cls.objects.filter(q1 | q2 | q3 | q4)
             .filter(filters)
-            .exclude(q4)
+            .exclude(q3)
         ).distinct()
 
     @hook(AFTER_CREATE)
@@ -325,7 +329,7 @@ class Project(
         related_name="sub_projects",
     )
     leads = ManyToManyField(ProjectUser, blank=True)
-    teams = ManyToManyField(ProjectGroup, related_name="projects_supporting")
+    teams = ManyToManyField(ProjectGroup, related_name="projects_supporting", blank=True)
     tags = ManyToManyField(Tag)
     private = BooleanField(db_default=False)
     private_owner = ForeignKey(
@@ -423,7 +427,7 @@ class Stream(AutoCompleteCoreModel, trigger="~", hex_color="036666"):
         )
 
     @classmethod
-    def ac_query(cls, request, query):
+    def ac_query(cls, request, query,requestor):
         if query == "":
             q = Q()
         elif query.endswith(" "):
@@ -431,6 +435,9 @@ class Stream(AutoCompleteCoreModel, trigger="~", hex_color="036666"):
             q = Q(**{f"{name}__iexact": query.strip()})
         else:
             q = Q(name__icontains=query) | Q(project__name__icontains=query)
+
+        if isinstance(requestor, Task):
+            q = q & Q(project=requestor.project) 
 
         return cls.user_filter(request).filter(q).distinct()
 
@@ -443,7 +450,7 @@ class Stream(AutoCompleteCoreModel, trigger="~", hex_color="036666"):
     name_fr = CharField(max_length=300, null=True, blank=True)
 
 
-class Task(CoreModel, AutoCompleteNexus):
+class Task(AutoCompleteCoreModel, AutoCompleteNexus):
     spec = queries.task_spec
 
     class Meta:
@@ -467,6 +474,7 @@ class Task(CoreModel, AutoCompleteNexus):
         return cls.objects.filter(project__group__in=request.user.groups.all()).filter(
             filters
         )
+
 
     @classmethod
     def cls_text_scan(cls, text_input, results, triggers):
@@ -536,6 +544,9 @@ class Task(CoreModel, AutoCompleteNexus):
         else:
             self.order = 1
 
+    def __str__(self):
+        return f"{self.pk}-{self.name_en}"
+
     order = PositiveIntegerField(null=True, blank=True)
     project = ForeignKey(Project, on_delete=CASCADE, related_name="tasks")
     stream = ForeignKey(Stream, on_delete=PROTECT, blank=True, related_name="tasks")
@@ -552,8 +563,6 @@ class Task(CoreModel, AutoCompleteNexus):
     competency = ForeignKey(EXCompetency, on_delete=PROTECT, null=True, blank=True)
     done = BooleanField(db_default=False, blank=True)
 
-    def __str__(self):
-        return self.name
 
 
 class TimeReport(CoreModel):
@@ -577,6 +586,6 @@ class TimeReport(CoreModel):
         self.week = self.week - timedelta(days=self.week.weekday())
 
     user = ForeignKey(ProjectUser, null=True, on_delete=SET_NULL)
-    project = ForeignKey(Project, on_delete=CASCADE)
+    project = ForeignKey(Project, on_delete=CASCADE,related_name="timereports")
     time = DecimalField(max_digits=5, decimal_places=1)
     week = DateField()
