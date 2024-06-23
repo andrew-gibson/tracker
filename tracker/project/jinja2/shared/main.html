@@ -1,17 +1,17 @@
 {% if  standalone %} 
-{% extends "base.html" %} 
-{% block sidebar %}
-    {%include "shared/sidebar.html"%}
-{%endblock%}
+    {% extends "base.html" %} 
+    {% block sidebar %}
+        {%include "shared/sidebar.html"%}
+    {%endblock%}
 {% endif %}
 
 {% block nav %}
-    {%with navbar=["project/filters.html"],navdropdown=%[]}
+    {%with navbar=["project/filters.html"],navdropdown=[]%}
         {%include "navbar.html"%}
     {%endwith%}
 {%endblock%}
 
-{% block content%}
+{% block content %}
 <div id="main-content" >
     <div id="smart_input" x-data>
         <p style="font-size: 0.8em" class="text-secondary mb-0">

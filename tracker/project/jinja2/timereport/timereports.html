@@ -13,46 +13,111 @@
 
 {% block content%}
 <div id="main-content" hx-swap-oob="true">
-    <div class="col-3"  id="weeks">
-        <div class="btn-group-vertical" role="group" id="weeks-list">
+    <div class="row">
+        <div class="col-2"  id="weeks">
+            <ul class="list-group" id="weeks-list">
+            </ul>
         </div>
-    </div>
-    <div class="col-9 border-start"  id="timereporting">
+        <div class="col-10 border-start"  id="timereporting">
+        </div>
     </div>
 
 
 
     <script type="module">
     import fetch_recipies from "fetch-recipies";
-    import {ui_state, reaction} from "d3-ui";   
-    const weeks = {{dumps(weeks)|safe}};
-    export const timereport_state = mobx.makeAutoObservable({
-         active :  _.first(weeks).week_start,
+    import {ui_state, reaction,inplace_char_edit} from "d3-ui";   
+    const timereport_state = mobx.makeAutoObservable({
+         active :  "",
+         weeks :  {{dumps(weeks)|safe}},
+         async fetch_timereports (){
+            const filters = this.active ? {week:this.active} : {};
+            const url = ui_state.models["project.TimeReport"].main +`?f=${btoa(JSON.stringify({filters}))}`
+            return await  fetch_recipies.GETjson(url);
+         },
+         async update_weeks(){
+            timereport_state.weeks = await fetch_recipies.GETjson(window.location.href + "?update=True");
+            document.removeEventListener("edit",this.update_weeks);
+            render();
+         },
     });
-    const projects =  await (await fetch_recipies.GET(ui_state.models["project.MinProject"].main)).json();
-    const logs = {{dumps(insts)|safe}};
-    const render = ()=>{
+
+    const projects =  await fetch_recipies.GETjson(ui_state.models["project.MinProject"].main)
+
+    const render = async ()=>{
+        // clear any previously setup d3-ui elements from other selected weeks   
+        ui_state.reset_ui(); 
+        setup_reaction();
+
+        const timereports =  await timereport_state.fetch_timereports();
+
+        const get_or_create = (project) => {
+            return  _.find(timereports, t=>t.project.id === project.id)  ||  mobx.makeAutoObservable({
+                  project,
+                  week : timereport_state.active,
+                  time  : 0,
+                  text:"",
+                  __url__ :   ui_state.models["project.TimeReport"].main,
+                  __type__ : "project.TimeReport"})  
+        }
+
         d3.select("#weeks-list")
-          .selectAll("button")
-          .data(weeks)
-          .join("button")
-          .attr("class","btn text-nowrap")
-          .classed("btn-primary",d=>d.week_start == timereport_state.week_start)
-          .classed("btn-light",d=>d.week_start != timereport_state.week_start)
-          .attr("type","button")
-          .on("click",d=>{
-               timereport_state.active = d.week_start;
+          .selectAll("li")
+          .data(timereport_state.weeks,d=>d.week_start+d.worked)
+          .join("li")
+          .attr("class","list-group-item")
+          .classed("bg-primary",d=>{
+            return d.week_start == timereport_state.active
           })
-          .html(d=>d.name)
+          .classed("bg-light",d=>d.week_start != timereport_state.active)
+          .each(function(d){
+            const sel = d3.select(this)
+            sel.selectAll("div")
+               .data([d],d=>d.week_start+d.worked)
+               .join("div")
+               .attr("class","ms-2 me-auto fw-bold")
+               .html(d.name)
+            sel.selectAll("button")
+               .data([d],d=>d.week_start+d.worked)
+               .join("button")
+               .attr("class", "btn text-nowrap")
+               .classed("btn-success", d=>d.worked >= d.total)
+               .classed("btn-warning", d=>d.worked < d.total)
+               .html(d=>{
+                  1+1
+                  return `${d.worked} / ${d.total}`
+               } )
+               .on("click",function(e){
+                     const d = d3.select(e.target).datum();
+                    timereport_state.active = d.week_start;
+               })
+          })
+
         d3.select("#timereporting")
+          .html("") 
+          .selectAll("div.timereporting-row")
+          .data(projects)
+          .join("div")
+          .attr("class","timereporting-row d-flex justify-content-between align-items-center")
+          .each(function(d){
+                const selection = d3.select(this);
+                const timereport =  get_or_create(d);
+                selection.append("div").attr("class","fw-bold").html(d.name)
+                inplace_char_edit(selection, timereport,"time", "Hours worked",{type:"number"});
+          });
 
     };
-    const reset = ()=>{
+
+    const setup_reaction = () => {
         reaction(d3.select("#main-content"), 
-                ()=> timereport_state.active.length, 
+                ()=> timereport_state.active,
                 render);
+        document.addEventListener("edit",timereport_state.update_weeks)
     };
-    reset()
+
+    setup_reaction();
+    timereport_state.active = _.first(timereport_state.weeks).week_start
+
     
 
     </script>

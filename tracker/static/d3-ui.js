@@ -5,6 +5,14 @@ import 'lo-dash';
 const models = await (await fetch_recipies.GET("/core/model_info/")).json()    
 const current_user = await (await fetch_recipies.GET(models["project.ProjectUser"].main)).json()
 const inactive = {attr:"", d: {id:null}, search_results : []};
+
+const prep_data = observable_data =>{
+    if (!observable_data.id){
+        observable_data.id = "new" + _.random(10000000000000000000)
+    }
+    observable_data.__original__ = _.cloneDeep( {...observable_data})
+}
+
 class UIState {
     _attr = ""
     _d = {id:null}
@@ -69,9 +77,9 @@ class UIState {
     ids (active=null){
         var id
         if (active) {
-            id = this.make_id(active.d.__type__, active.d.id || "-new-", active.attr);
+            id = this.make_id(active.d.__type__, active.d.id , active.attr);
         } else if (this.attr){
-            id = this.make_id(this.d.__type__, this.d.id || "-new-", this.attr);
+            id = this.make_id(this.d.__type__, this.d.id , this.attr);
         }
         return {
             normal : `${id}normal`,
@@ -232,7 +240,7 @@ const observable_to_obj = model=>{
             if (val){
                 obj[x] = val;
             }
-        } else if (x in model){
+        } else if (x in model && !(x == "id" && _.isString(model.id) && model.id.startsWith("new"))){
             obj[x] = model[x] || "";
         }
     }
@@ -256,6 +264,20 @@ const send_model = async model =>{
         true );
     if (resp.status == 200) {
         const data = await resp.json();
+        if ("errors" in data) {
+            //restore the backup from the failed POST/PUT
+            Object.assign(model, model.__original__);
+        } else {
+            //update the data
+            Object.assign(model, data);
+            document.dispatchEvent(new CustomEvent("edit",{detail : {model}}))
+        }
+        // ensure the signal is fired off of the state change
+        ui_state.d = model;
+        // reset the baxkup to the now good data
+        model.__original__ = {...model};
+    } else {
+        const data = await fetch_recipies.GETjson(obj.__url__);
         Object.assign(model,data);
     }
 };
@@ -379,7 +401,8 @@ export const make_right_dropdown = function(selection, call){
 
 export const create_button = function(selection,make_observable_data, attr="",title="" ,options){
 
-    const ids = ui_state.ids({attr,d:make_observable_data() })
+    const observable_data = prep_data(observable_data())
+    const ids = ui_state.ids({attr,d: observable_data() })
     const {on_change} = options;
 
     const sel = selection
@@ -423,7 +446,7 @@ export const create_button = function(selection,make_observable_data, attr="",ti
         .classed("btn btn-sm btn-light p-1 m-1",true)
         .on("click", () => {
             d3.select(`#${ids.insert_input}`).node().value = "";
-            ui_state.d = make_observable_data();
+            ui_state.d = make_observable_data;
             ui_state.attr = attr;
         })
         .html(title)
@@ -460,7 +483,8 @@ export const inplace_char_edit = function(selection,
                                     title="" , 
                                     options={} ){
 
-    const {btn_class="btn-light", on_change=null,input_class="",display_attr=attr} = options;
+    const {btn_class="btn-light", on_change=null,input_class="",display_attr=attr, type="text"} = options;
+    prep_data(observable_data)
     const ids = ui_state.ids({attr,d:observable_data})
 
     const insert_mode = selection
@@ -474,6 +498,7 @@ export const inplace_char_edit = function(selection,
             "name" : attr,
             "data-1p-ignore" : "true",
             "placeholder" : title,
+            type
         })
         .on("keyup",e => {
             keyup_esc(reset_active)(e)
@@ -486,8 +511,8 @@ export const inplace_char_edit = function(selection,
                 }
             })(e)
         })
-        .call(selecion=>{
-            autoRun(selection.node(),()=>selecion.node().value = observable_data[attr])
+        .call(selection=>{
+            autoRun(selection.node(),()=>selection.node().value = observable_data[attr])
         })
         .select_parent()
         .call(make_cancel_button)
@@ -499,17 +524,22 @@ export const inplace_char_edit = function(selection,
         .append("button")
         .classed(`btn ${btn_class} p-1 m-1`,true)
         .on("click", () => {
+            ui_state.d = observable_data;
             ui_state.attr = attr;
-            ui_state.d = observable_data
         })
-        .call(selecion=>{
-            autoRun(selection.node(),()=>selecion.html(observable_data[display_attr] || "+"))
+        .call(selection=>{
+            reaction(selection.node(),
+                    ()=>ui_state.d[attr],
+                    ()=>selection.html(observable_data[display_attr] || "+")
+            )
+            selection.html(observable_data[display_attr] || "+")
         });
 
 }
 
 export const append_edit_attr = function(selection,observable_data, ...args ){
     const type = ui_state.models[observable_data.__type__].fields[args[0]]
+    prep_data(observable_data)
     if (ui_state.is_fk(type)){
         append_edit_fk(selection,observable_data, ...args )
     }  else {
@@ -600,7 +630,7 @@ export const append_edit_local_attr = function(selection,observable_data, attr="
                     })
 
 
-            } else if (type == "CharField" || type == "EmailField"){
+            } else if ([ "CharField" , "EmailField", "DecimalField"].includes(type)){
                 normal_mode
                     .append("button")
                     .attr("type","button")
@@ -611,7 +641,9 @@ export const append_edit_local_attr = function(selection,observable_data, attr="
                     .append("div")
                     .classed("me-1 w-75 text-end",true)
                     .call(selecion=>{
-                        autoRun(selection.node(),()=>selecion.html(observable_data[attr] ))
+                        autoRun(selection.node(),()=>{
+                          selecion.html(observable_data[attr] )
+                        })
                     })
 
                 insert_mode
@@ -630,6 +662,7 @@ export const append_edit_local_attr = function(selection,observable_data, attr="
                         "id": ids.insert_input,
                         "name" : attr,
                         "data-1p-ignore" : "true",
+                        "type" : type ==  "DecimalField"  ? "number" : "text"
                     })
                     .on("keyup",e => {
                         keyup_esc(reset_active)(e)

@@ -332,6 +332,7 @@ def time_report(cls, request, pk=None):
     return [
         *__core_info__,
         {"user": [*__core_info__, "username"]},
+        {"project": [*__core_info__]},
         "time",
         "week",
     ]

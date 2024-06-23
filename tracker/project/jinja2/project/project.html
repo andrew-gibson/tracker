@@ -1,14 +1,20 @@
-{% if  standalone %} {% extends "base.html" %} {% endif %}
+{% if  standalone %} 
+  {% extends "base.html" %} 
+
+  {% block sidebar %}
+      {%include "shared/sidebar.html"%}
+  {%endblock%}
+
+{% endif %}
 
 {% block nav %}
+
     {%with navbar=[],navdropdown=[ "project/project-navdropdown.html"]%}
         {%include "navbar.html"%}
     {%endwith%}
+
 {%endblock%}
 
-{% block sidebar %}
-    {%include "shared/sidebar.html"%}
-{%endblock%}
 
 {% block content %}{%with project=inst %}
 <div id="main-content" hx-swap-oob="true">

@@ -13,6 +13,7 @@ from core.utils import add_to_admin, classproperty, render
 from django.contrib.auth.models import UserManager, GroupManager
 from django.apps import apps
 from django.contrib import admin
+from django.core.validators import MinValueValidator
 from django.db.models import (
     CASCADE,
     PROTECT,
@@ -140,11 +141,12 @@ class Settings(CoreModel):
             self.instance.user = self.request.user
             super().save(*args, **kwargs)
 
-    spec = ["hide_done", "see_all_projects", "id", *queries.__core_info__]
+    spec = ["hide_done", "see_all_projects", "id", "work_hours", *queries.__core_info__]
     form_fields = ["user", "hide_done"]
     user = OneToOneField(ProjectUser, on_delete=CASCADE, blank=True, related_name="+")
     hide_done = BooleanField(default=False, blank=True)
     see_all_projects = BooleanField(default=True, blank=True)
+    work_hours = DecimalField(max_digits=5, decimal_places=1,validators=[MinValueValidator(0)],db_default=37.5)
     projects_filter = JSONField(db_default="{}")
 
     @classmethod
@@ -569,12 +571,19 @@ class TimeReport(CoreModel):
 
     spec = queries.time_report
 
-    form_fields = [
-        "user",
-        "projexc",
+    class _Form(RequestForm):
+        class Meta:
+            fields = [
+        "project",
         "time",
         "week",
     ]
+
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+
+        def save(self, *args, **kwargs):
+            super().save(*args, **kwargs)
 
     @classmethod
     def user_filter(cls, request):
@@ -585,7 +594,12 @@ class TimeReport(CoreModel):
     def force_start_of_week(self):
         self.week = self.week - timedelta(days=self.week.weekday())
 
+    def add_user_and_save(self,request):
+        self.user = request.user
+        self.save()
+
     user = ForeignKey(ProjectUser, null=True, on_delete=SET_NULL)
     project = ForeignKey(Project, on_delete=CASCADE,related_name="timereports")
-    time = DecimalField(max_digits=5, decimal_places=1)
+    time = DecimalField(max_digits=5, decimal_places=1,validators=[MinValueValidator(0)])
+    text = TextField(blank=True)
     week = DateField()

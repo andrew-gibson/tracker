@@ -1,6 +1,6 @@
 <div id="sidebar" class="sidebar">
    <a class="link body-emphasis" hx-get="{{url("project:main")}}" href="#" hx-target="#main-content" hx-replace-url="true">My Projects</a>
-   <div id="my-projects" 
+   <div id="myprojects" 
        hx-trigger="reloadMinProject from:document" 
        hx-get="{{url("core:main", kwargs={"m" : "project.MinProject"})}}" 
        hx-swap="none"
@@ -57,15 +57,15 @@ import {ui_state} from "d3-ui";
 export const sidebar_state = mobx.makeAutoObservable({
      current_url :  "{{request.path}}",
      groups : [],
-     projects : [],
+     myprojects : [],
      redraw : 0,
      team : ui_state.user.manages ? ui_state.user.manages.users : false,
 });
 mobx.reaction(
-    ()=>[sidebar_state.groups.length, sidebar_state.projects.length, sidebar_state.redraw], 
+    ()=>[sidebar_state.groups.length, sidebar_state.myprojects.length, sidebar_state.redraw], 
     ()=>{
        redraw("#groups",sidebar_state.groups);
-       redraw("#my-projects",sidebar_state.projects);
+       redraw("#myprojects",sidebar_state.myprojects);
        if(sidebar_state.team){
            redraw("#team",sidebar_state.team);
        } else {
@@ -137,14 +137,10 @@ const redraw = (id,data)=> {
 document.body.addEventListener('htmx:afterOnLoad', async event => {
     const target = event.detail.target;
     if ( "id" in target.attributes){
-      if (target.attributes["id"].value == "my-projects"){
-          const data = JSON.parse(await event.detail.xhr.responseText);
-          sidebar_state.projects = data
+      if ([ "myprojects", "groups"].includes(target.attributes["id"].value)){
+          const data = JSON.parse( await event.detail.xhr.responseText );
+          sidebar_state[target.attributes["id"].value] = data
       }  
-      if (target.attributes["id"].value == "groups"){
-          const data = JSON.parse(await event.detail.xhr.responseText);
-          sidebar_state.groups = data
-      }
     } 
 })
 document.dispatchEvent(new Event("reloadMinProject"))

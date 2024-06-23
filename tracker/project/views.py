@@ -17,6 +17,7 @@ from django.shortcuts import get_object_or_404
 from django.urls import reverse
 from text.translate import gettext_lazy as _
 from .time_utils import  get_last_n_weeks
+from . import models
 
 api = API(namespace="project", session={})
 
@@ -43,12 +44,20 @@ def metadata(request):
 
 @api.get("timereporting/")
 def timereporting(request):
+    update = bool(request.GET.get("update",False))
+    myreports = models.TimeReport.user_filter(request).all()
+    weeks =  get_last_n_weeks(20)
+    for week in weeks:
+        week["total"] = float(request.project_user.settings(request)["work_hours"])
+        week["worked"] = float(sum(x.time for x in myreports if x.week.strftime("%Y-%m-%d") == week["week_start"]))
+    if update:
+       return JsonResponse(weeks,safe=False) 
     return render(
         request,
         "timereport/timereports.html",
         {
             "standalone": not request.htmx,
-            "weeks" : get_last_n_weeks(20),
+            "weeks" : weeks,
         },
     )
 
