@@ -401,8 +401,9 @@ export const make_right_dropdown = function(selection, call){
 
 export const create_button = function(selection,make_observable_data, attr="",title="" ,options){
 
-    const observable_data = prep_data(observable_data())
-    const ids = ui_state.ids({attr,d: observable_data() })
+    const observable_data = make_observable_data();
+    prep_data(observable_data)
+    const ids = ui_state.ids({attr,d: observable_data });
     const {on_change} = options;
 
     const sel = selection
@@ -446,7 +447,7 @@ export const create_button = function(selection,make_observable_data, attr="",ti
         .classed("btn btn-sm btn-light p-1 m-1",true)
         .on("click", () => {
             d3.select(`#${ids.insert_input}`).node().value = "";
-            ui_state.d = make_observable_data;
+            ui_state.d = observable_data;
             ui_state.attr = attr;
         })
         .html(title)

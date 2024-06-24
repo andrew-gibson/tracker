@@ -41,6 +41,20 @@ from tracker.jinja2 import encode_get_param, decode_get_params
 ALLOWED_TAGS = ["li", "ol", "ul", "p", "br", "span"]
 
 
+def text_search_triggers(m):
+    return {
+            f.name : [f.related_model , f.__text_trigger__]
+            for f in m._meta.get_fields()
+            if hasattr(f,"__text_trigger__") and getattr(f,"__text_trigger__")
+    }
+
+def text_search_relations(m):
+    return {
+            f.name : [f.related_model , f.__search_field__]
+            for f in m._meta.get_fields()
+            if hasattr(f,"__search_field__")
+    }
+
 def is_local_relation(f):
     return isinstance(f,(ForeignKey, ManyToManyField,OneToOneField))
 

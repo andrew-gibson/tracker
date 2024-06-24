@@ -67,7 +67,7 @@ class AbstractGroup(Model):
 
 
 @add_to_admin
-class Group(AbstractGroup, AutoCompleteCoreModel, trigger="*", hex_color="fb5607"):
+class Group(AbstractGroup, AutoCompleteCoreModel):
 
     class adminClass(admin.ModelAdmin):
         list_display = ( "name_en", "system", "app","parent")
@@ -78,7 +78,6 @@ class Group(AbstractGroup, AutoCompleteCoreModel, trigger="*", hex_color="fb5607
     @classmethod
     def user_filter(cls, request):
         return cls.objects.all()
-
 
     @property
     def parents(self):

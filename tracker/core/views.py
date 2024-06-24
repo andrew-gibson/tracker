@@ -106,37 +106,6 @@ def model_info(request):
     )
 
 
-@api.post_get("create_from_parsed/<str:m>/<str:attr>/")
-def create_from_parsed(request, m, attr, suppress_links=""):
-    model = get_model_or_404(m, test=lambda m: issubclass(m, AutoCompleteNexus))
-    attr = model.localize_field(attr)
-    ctx = {"attr": attr, "m": m, "params": request.GET.urlencode(), "model": model}
-    if request.method == "POST":
-        parse_payload = model.parse_text(request)
-        obj = model.save_from_parse(
-            request, parse_payload["results"], attr, parse_payload["remainder"]
-        )
-        return render(
-            request,
-            f"parse_for_links.html",
-            ctx,
-        )
-    return render(
-        request,
-        "parse_for_links.html",
-        ctx,
-    )
-
-
-@api.get("parse_for_links/<str:m>/<str:attr>/")
-def parse_for_links(request, m, attr):
-    model = get_model_or_404(m, test=lambda m: issubclass(m, AutoCompleteNexus))
-    return render(
-        request,
-        f"show_parsed_links.html",
-        {"attr": attr, "m": m.replace(".", "-"), **model.parse_text(request)},
-    )
-
 
 @api.post_delete(
     [
@@ -211,52 +180,81 @@ async def post_and_link(request, m1, pk1, m2, attr=""):
 def text_ac(request, m, pk, attr):
     try:
         q = request.GET.get("q")
+        model = get_model_or_404(m, test=lambda m: issubclass(m, (AutoCompleteCoreModel,)))
+        obj = get_object_or_404(model.objects.user_filter(request), pk=pk)
+        assert attr in local_relations(model) + non_local_relations(model)
+        f = model._meta.get_field(attr)
+        if hasattr(model, "proxy_map") and attr in model.proxy_map:
+            related_model = model.proxy_map[attr]
+        else:
+            related_model = f.related_model
+
+        def projection(d):
+            if d.get("new", False):
+                url = reverse(
+                    "core:post_and_link",
+                    kwargs={
+                        "m1": model._meta.label,
+                        "pk1": pk,
+                        "m2": related_model._meta.label,
+                        "attr": attr,
+                    },
+                )
+            else:
+                url = reverse(
+                    "core:toggle_link",
+                    kwargs={
+                        "m1": model._meta.label,
+                        "pk1": pk,
+                        "m2": related_model._meta.label,
+                        "pk2": d["id"],
+                        "attr": attr,
+                    },
+                )
+
+            return {**d, "__url__": url}
+
+        return JsonResponse(
+            {
+                "name": f.name,
+                "many_to_many": f.many_to_many,
+                "results": related_model.ac(
+                    request, q, obj, f.__search_field__, optional_projection=projection, 
+                ),
+            }
+        )
     except:
         return HttpResponseBadRequest("incorrectly formatted GET params")
-    model = get_model_or_404(m, test=lambda m: issubclass(m, (AutoCompleteCoreModel,)))
-    obj = get_object_or_404(model.objects.user_filter(request), pk=pk)
-    assert attr in local_relations(model) + non_local_relations(model)
-    f = model._meta.get_field(attr)
-    if hasattr(model, "proxy_map") and attr in model.proxy_map:
-        related_model = model.proxy_map[attr]
-    else:
-        related_model = f.related_model
 
-    def projection(d):
-        if d.get("new", False):
-            url = reverse(
-                "core:post_and_link",
-                kwargs={
-                    "m1": model._meta.label,
-                    "pk1": pk,
-                    "m2": related_model._meta.label,
-                    "attr": attr,
-                },
-            )
-        else:
-            url = reverse(
-                "core:toggle_link",
-                kwargs={
-                    "m1": model._meta.label,
-                    "pk1": pk,
-                    "m2": related_model._meta.label,
-                    "pk2": d["id"],
-                    "attr": attr,
-                },
-            )
-
-        return {**d, "__url__": url}
-
-    return JsonResponse(
-        {
-            "name": f.name,
-            "many_to_many": f.many_to_many,
-            "results": related_model.ac(
-                request, q, obj, optional_projection=projection, 
-            ),
-        }
+@api.post_get("create_from_parsed/<str:m>/<str:attr>/")
+def create_from_parsed(request, m, attr, suppress_links=""):
+    model = get_model_or_404(m, test=lambda m: issubclass(m, AutoCompleteNexus))
+    attr = model.localize_field(attr)
+    ctx = {"attr": attr, "m": m, "params": request.GET.urlencode(), "model": model}
+    if request.method == "POST":
+        parse_payload = model.parse_text(request)
+        obj = model.save_from_parse(
+            request, parse_payload["results"], attr, parse_payload["remainder"]
+        )
+        return render(
+            request,
+            f"parse_for_links.html",
+            ctx,
+        )
+    return render(
+        request,
+        "parse_for_links.html",
+        ctx,
     )
 
+@api.get("parse_for_links/<str:m>/<str:attr>/")
+def parse_for_links(request, m, attr):
+    model = get_model_or_404(m, test=lambda m: issubclass(m, AutoCompleteNexus))
+    return render(
+        request,
+        f"show_parsed_links.html",
+        {"attr": attr, "m": m.replace(".", "-"), **model.parse_text(request)},
+    )
 
 @api.GET(["dateparse/"])
 def dateparse(request):

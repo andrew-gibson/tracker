@@ -63,7 +63,7 @@ export const project_summary =  project => {
             append_edit_attr(left_sel, observable_data, "text","Summary",{display_attr:"text_m"});
             append_edit_attr(left_sel, observable_data, "short_term_outcomes","Short Term Outcomes",{display_attr:"short_term_outcomes_m"});
             append_edit_attr(left_sel, observable_data, "long_term_outcomes","Long Term Outcomes",{display_attr:"long_term_outcomes_m"});
-            append_edit_attr(left_sel, observable_data,"leads", "Lead");
+            append_edit_attr(left_sel, observable_data,"leads", "Lead", {name_attr : "username"});
             append_edit_attr(left_sel, observable_data,"tags", "Tags");
             append_edit_attr(left_sel, observable_data,"teams", "Teams");
             create_button( selection.select("#new-stream"), 
@@ -97,7 +97,7 @@ export const task_summaries = tasks=>{
            inplace_char_edit(header_left.append("div").style("width","15%").style("display","inline-block"), observable_data, "order", "Order",{btn_class : "btn-outline-primary", on_change : "reloadTasks", input_class : "w-25"} );
            inplace_char_edit(header_left.append("div").style("width","85%").style("display","inline-block"), observable_data, "name", "Name");
            const delete_hx_args =  {
-                "hx-delete" : ui_state.models["project.Task"].main_pk.replace("__pk__", task.id),
+                "hx-delete" : task.__url__,
                 "hx-on::after-request"  :  "window.reset_ui('reloadTasks')",
                 "hx-swap" : "none",
            }
@@ -106,7 +106,7 @@ export const task_summaries = tasks=>{
                     .append("li")
                         .append("a")    
                             .classed("dropdown-item text-end",true)
-                            .html("Deete")
+                            .html("Delete")
                             .attrs(window.delete_modal.attrs)
                             .on("click", e=>{
                                 window.delete_modal(delete_hx_args);

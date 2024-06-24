@@ -78,14 +78,6 @@ class CoreModel(LifecycleModelMixin, Model):
             x.replace("_en", "") for x in cls._fields_map.keys() if x.endswith("_en")
         ]
 
-    @classmethod
-    def localize_field(cls,attr):
-        if attr not in cls._fields_map:
-            localized = resolve_field_to_current_lang(attr)
-            if localized not in cls._fields_map: 
-                cls._meta.get_field(localized) # this will raise fieldDoesNotExist
-            return localized
-        return attr
 
     @classproperty
     def _fields_map(cls):
@@ -271,6 +263,15 @@ class CoreModel(LifecycleModelMixin, Model):
     def url(self):
         return reverse("core:main", kwargs={"m": self._meta.label, "pk": self.id})
 
+    @classmethod
+    def localize_field(cls,attr):
+        if attr not in cls._fields_map:
+            localized = resolve_field_to_current_lang(attr)
+            if localized not in cls._fields_map: 
+                cls._meta.get_field(localized) # this will raise fieldDoesNotExist
+            return localized
+        return attr
+
     def add_user_and_save(self, request):
         if "group" in self.model_info["fields"]:
             self.group = request.user.belongs_to
@@ -278,6 +279,7 @@ class CoreModel(LifecycleModelMixin, Model):
 
 
 class AutoCompleteNexus:
+
 
     @classmethod
     def find_words_from_trigger(cls, text, trigger, many=True):
@@ -452,33 +454,9 @@ class AutoCompleteNexus:
         return obj
 
 
-triggers = set()
-
-
 class AutoCompleteCoreModel(CoreModel):
     class Meta:
         abstract = True
-
-    def __init_subclass__(
-        cls, trigger=None, hex_color="", search_field="name", **kwargs
-    ):
-        super().__init_subclass__(**kwargs)
-        if hex_color:
-            rgba = f"rgba{tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4)) + (0.3,)}"
-
-            cls.trigger_color = rgba
-            cls.hex_trigger_color = "#" + hex_color
-            cls._search_field = search_field
-            if trigger:
-                cls.text_search_trigger = trigger
-                if cls.text_search_trigger in triggers:
-                    raise Exception(
-                        f"{cls} is trying to register {cls.text_search_trigger} as a trigger, it has already been assigned"
-                    )
-                triggers.add(cls.text_search_trigger)
-
-    def get_autocomplete_triggers(cls):
-        """return the instrcutions for self.search_field"""
 
     @classproperty
     def search_field(cls):
@@ -488,15 +466,13 @@ class AutoCompleteCoreModel(CoreModel):
         return f
 
     @classmethod
-    def ac_query(cls, request, query,requestor):
-        f = cls.search_field
+    def ac_query(cls, request, search_field, query,requestor):
         if query == "":
             q = Q()
         elif query.endswith(" "):
-            q = Q(**{f"{f}__iexact": query.strip()})
+            q = Q(**{f"{search_field}__iexact": query.strip()})
         else:
-            q = Q(**{f"{f}__icontains": query})
-
+            q = Q(**{f"{search_field}__icontains": query})
         return cls.objects.user_filter(request).filter(q).distinct()
 
     @classmethod
@@ -505,15 +481,16 @@ class AutoCompleteCoreModel(CoreModel):
         request,
         query,
         requestor,
+        search_field,
         variant=None,
         filter_qs=None,
         cutoff=None,
         optional_projection=False,
     ):
-        f = cls.search_field
 
+        search_field = cls.localize_field(search_field)
         preoare_qs, projection = cls.readers(request)
-        qs = preoare_qs(cls.ac_query(request, query,requestor))
+        qs = preoare_qs(cls.ac_query(request, search_field, query,requestor))
 
         if filter_qs:
             qs = qs.filter(filter_qs)
@@ -530,6 +507,7 @@ class AutoCompleteCoreModel(CoreModel):
             (len(results) == 0 and query.endswith(" ") or not query.endswith(" "))
             and query.strip() != ""
             and not any(query.lower() == x["name"].lower() for x in results)
+            and cls.perms.good_request(request.user,"POST",cls())  # check if you can actually create a new one
         ):
             # not ending in space -- always create fake new one unless it
             # duplicates i.e. cursor was right at the end of the word
@@ -537,7 +515,7 @@ class AutoCompleteCoreModel(CoreModel):
                 "name": query,
                 "id": -1,
                 "new": True,
-                f: query,
+                search_field : query,
                 "__type__": cls._meta.label,
             }
 

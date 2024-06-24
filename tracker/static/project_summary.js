@@ -7,19 +7,25 @@ export const project_summary = project => {
             const body_sel = selection.select(".card-body");
             const footer_sel = selection.select(".card-footer");
             const header_sel =  selection.select(".card-header");
-            make_right_dropdown(header_sel,dropdown=>{
-            dropdown
-                .append("li")
-                    .append("a")    
-                        .classed("dropdown-item",true)
-                        .attrs({
-                            "hx-delete" : ui_state.models["project.Project"].main_pk.replace("__pk__", project.id),
-                            "hx-on::after-request"  :  "window.reset_ui('reloadProjects')"
-                        })
-                        .html("Deete")
-                        .setup_htmx()
 
-            })
+
+           const delete_hx_args =  {
+                "hx-delete" : project.__url__,
+                "hx-on::after-request"  :  "window.reset_ui('reloadProjects')",
+                "hx-swap" : "none",
+           }
+           make_right_dropdown(header_sel,dropdown=>{
+                dropdown
+                    .append("li")
+                        .append("a")    
+                            .classed("dropdown-item text-end",true)
+                            .html("Delete")
+                            .attrs(window.delete_modal.attrs)
+                            .on("click", e=>{
+                                window.delete_modal(delete_hx_args);
+                            })
+           });
+
             header_sel
                 .append("div")
                 .classed(`mb-1 name-row editor-normal`, true)
@@ -37,7 +43,7 @@ export const project_summary = project => {
             append_edit_attr(body_sel, observable_data,"text", "Summary");
             append_edit_attr(body_sel, observable_data, "group","Team",{on_change : "reloadProjects"});
             append_edit_attr(body_sel, observable_data,"streams", "Streams",{read_only:true, name_attr:"name_count"});
-            append_edit_attr(body_sel, observable_data,"leads", "Leads");
+            append_edit_attr(body_sel, observable_data,"leads", "Leads", {name_attr : "username"});
             append_edit_attr(body_sel, observable_data,"tags", "Tags");
             append_edit_attr(body_sel, observable_data,"teams", "Teams");
 

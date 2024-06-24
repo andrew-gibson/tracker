@@ -3,13 +3,7 @@ import sys
 import uuid
 from datetime import date, datetime, timedelta
 from itertools import product
-
 import dateparser
-from core.core import AutoCompleteNexus, AutoCompleteCoreModel, RequestForm, CoreModel
-from core.models import Group, User,  GroupPrefetcherManager
-
-from core.utils import add_to_admin, classproperty, render
-
 from django.contrib.auth.models import UserManager, GroupManager
 from django.apps import apps
 from django.contrib import admin
@@ -18,18 +12,14 @@ from django.db.models import (
     CASCADE,
     PROTECT,
     SET_NULL,
-    BigAutoField,
     BooleanField,
     CharField,
     DateField,
     DateTimeField,
     EmailField,
     JSONField,
-    OneToOneField,
-    ForeignKey,
     DecimalField,
     PositiveIntegerField,
-    ManyToManyField,
     Model,
     Manager,
     Q,
@@ -49,8 +39,16 @@ from django_lifecycle import (
     BEFORE_SAVE,
     hook,
 )
-from . import queries
 from core.lang import resolve_field_to_current_lang
+from core.core import AutoCompleteNexus, AutoCompleteCoreModel, RequestForm, CoreModel
+from core.models import Group, User,  GroupPrefetcherManager
+from core.utils import add_to_admin, classproperty, render
+from core.fields import (
+    ForeignKey,
+    ManyToManyField,
+    OneToOneField,
+)
+from . import queries
 
 
 class ProjectGroupManager(GroupManager):
@@ -112,7 +110,7 @@ class GroupPrefetcherManager(UserManager):
         return self.filter()
 
 @add_to_admin
-class ProjectUser(User, AutoCompleteCoreModel, trigger="@", hex_color="ff006e",search_field="username"):
+class ProjectUser(User, AutoCompleteCoreModel):
     objects = GroupPrefetcherManager()
     spec = queries.projectuser_spec
     proxy_map = {
@@ -127,9 +125,6 @@ class ProjectUser(User, AutoCompleteCoreModel, trigger="@", hex_color="ff006e",s
         if not self.password:
             self.is_active = False
 
-    @property
-    def blah(self):
-        return reverse("core:main", kwargs={"m": self._meta.label, "pk": self.id})
 
 class Settings(CoreModel):
 
@@ -155,7 +150,7 @@ class Settings(CoreModel):
 
 
 @add_to_admin
-class EXCompetency(AutoCompleteCoreModel, trigger="`", hex_color="2c6e49"):
+class EXCompetency(AutoCompleteCoreModel):
 
     form_fields = ["name_en", "name_fr"]
 
@@ -173,7 +168,7 @@ class EXCompetency(AutoCompleteCoreModel, trigger="`", hex_color="2c6e49"):
 
 
 @add_to_admin
-class ProjectStatus(AutoCompleteCoreModel, hex_color="8e6bc7"):
+class ProjectStatus(AutoCompleteCoreModel):
 
     form_fields = ["name_en", "name_fr"]
 
@@ -199,7 +194,7 @@ class ProjectStatus(AutoCompleteCoreModel, hex_color="8e6bc7"):
 
 
 @add_to_admin
-class Tag(AutoCompleteCoreModel, trigger="#", hex_color="ffbe0b"):
+class Tag(AutoCompleteCoreModel):
 
     class adminClass(admin.ModelAdmin):
         list_display = ("id", "name", "public", "group")
@@ -227,7 +222,7 @@ class Tag(AutoCompleteCoreModel, trigger="#", hex_color="ffbe0b"):
 
 @add_to_admin
 class Project(
-    AutoCompleteNexus, AutoCompleteCoreModel, trigger="^", hex_color="8338ec"
+    AutoCompleteNexus, AutoCompleteCoreModel
 ):
     spec = queries.project_spec
 
@@ -317,7 +312,7 @@ class Project(
     group = ForeignKey(
         ProjectGroup, blank=True, on_delete=PROTECT, related_name="projects"
     )
-    status = ForeignKey(ProjectStatus, blank=True, on_delete=SET_NULL, null=True)
+    status = ForeignKey(ProjectStatus, blank=True, on_delete=SET_NULL, null=True )
     addstamp = DateTimeField(null=True)
     name_en = CharField(max_length=255)
     name_fr = CharField(max_length=255, null=True, blank=True)
@@ -329,10 +324,11 @@ class Project(
         null=True,
         blank=True,
         related_name="sub_projects",
+        text_trigger="^" 
     )
-    leads = ManyToManyField(ProjectUser, blank=True)
+    leads = ManyToManyField(ProjectUser, blank=True,text_trigger="@", search_field="username")
     teams = ManyToManyField(ProjectGroup, related_name="projects_supporting", blank=True)
-    tags = ManyToManyField(Tag)
+    tags = ManyToManyField(Tag, text_trigger="#")
     private = BooleanField(db_default=False)
     private_owner = ForeignKey(
         ProjectUser,
@@ -399,7 +395,7 @@ class ProjectLogEntry(CoreModel):
 
 
 @add_to_admin
-class Stream(AutoCompleteCoreModel, trigger="~", hex_color="036666"):
+class Stream(AutoCompleteCoreModel):
     spec = queries.stream_spec
 
     class Meta:
@@ -429,7 +425,7 @@ class Stream(AutoCompleteCoreModel, trigger="~", hex_color="036666"):
         )
 
     @classmethod
-    def ac_query(cls, request, query,requestor):
+    def ac_query(cls, request, search_field, query,requestor):
         if query == "":
             q = Q()
         elif query.endswith(" "):
@@ -479,7 +475,7 @@ class Task(AutoCompleteCoreModel, AutoCompleteNexus):
 
 
     @classmethod
-    def cls_text_scan(cls, text_input, results, triggers):
+    def cls_text_scan(cls, text_input, results, text_triggers):
         # chops up text_input and looks for combinations which get recognized as dates
 
         # get rid of any extra spaces and then split  by spaces into tokens
@@ -513,7 +509,7 @@ class Task(AutoCompleteCoreModel, AutoCompleteNexus):
 
         # add the extra dictionary to results
         results["targt_date"] = {
-            "trigger": uuid.uuid4().hex,
+            "text_trigger": uuid.uuid4().hex,
             "model_info": {
                 "hex": "90e0ef",
                 "rbga": "rgb(144,224,239)",
@@ -551,18 +547,18 @@ class Task(AutoCompleteCoreModel, AutoCompleteNexus):
 
     order = PositiveIntegerField(null=True, blank=True)
     project = ForeignKey(Project, on_delete=CASCADE, related_name="tasks")
-    stream = ForeignKey(Stream, on_delete=PROTECT, blank=True, related_name="tasks")
+    stream = ForeignKey(Stream, on_delete=PROTECT, blank=True, related_name="tasks", text_trigger="~")
     start_date = DateField(default=date.today, blank=True, null=True)
     target_date = DateField(blank=True, null=True)
     name_en = CharField(max_length=255)
     name_fr = CharField(max_length=255, null=True, blank=True)
     text_en = TextField(blank=True, null=True)
     text_fr = TextField(blank=True, null=True)
-    lead = ForeignKey(ProjectUser, on_delete=SET_NULL, null=True, blank=True)
+    lead = ForeignKey(ProjectUser, on_delete=SET_NULL, null=True, blank=True,text_trigger="@", search_field="username")
     teams = ManyToManyField(ProjectGroup, blank=True)
     addstamp = DateTimeField(auto_now_add=True)
     editstamp = DateTimeField(auto_now=True)
-    competency = ForeignKey(EXCompetency, on_delete=PROTECT, null=True, blank=True)
+    competency = ForeignKey(EXCompetency, on_delete=PROTECT, null=True, blank=True, text_trigger="`")
     done = BooleanField(db_default=False, blank=True)
 
 

@@ -1,7 +1,7 @@
 <div id="{{m}}-{{attr}}-results">
 
     <script type="module">
-    import  {append_edit_fk, append_edit_attr,dispose_functions } from "d3-ui";
+    import  {append_edit_fk, append_edit_attr } from "d3-ui";
     (()=>{
         const data =_.chain({{dumps(results)|safe}})
                    .values()
