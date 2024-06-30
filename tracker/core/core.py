@@ -34,12 +34,14 @@ class RequestForm(ModelForm):
         #        setattr(field.a_c, "request", self.request)
         #        setattr(field.widget.a_c, "request", self.request)
 
+
 class CoreManager(Manager):
 
     def user_filter(self, request):
         if hasattr(self.model, "user_filter"):
             return self.model.user_filter(request)
         return self.filter(group__in=request.user.groups.all())
+
 
 class CoreModel(LifecycleModelMixin, Model):
 
@@ -57,8 +59,8 @@ class CoreModel(LifecycleModelMixin, Model):
             "main_pk": reverse(
                 "core:main", kwargs={"m": cls._meta.label, "pk": 9999}
             ).replace("9999", "__pk__"),
-            "rgba": getattr(cls, "trigger_color", "rgba(21,21,21,0.3))"),
-            "hex": getattr(cls, "hex_trigger_color", "#1a1a1a"),
+            "rgba": getattr(cls, "__rgba__", "rgba(21,21,21,0.3))"),
+            "hex": getattr(cls, "__hex__", "#1a1a1a"),
             "bilingual_fields": cls.bilingual_fields,
         }
 
@@ -78,7 +80,6 @@ class CoreModel(LifecycleModelMixin, Model):
             x.replace("_en", "") for x in cls._fields_map.keys() if x.endswith("_en")
         ]
 
-
     @classproperty
     def _fields_map(cls):
         return {x.name: x.__class__.__name__ for x in cls._meta.get_fields()}
@@ -91,7 +92,7 @@ class CoreModel(LifecycleModelMixin, Model):
         return all_fields
 
     @classmethod
-    def readers(cls, request,pk=None):
+    def readers(cls, request, pk=None):
         if callable(cls.spec):
             spec = cls.spec(cls, request, pk)
         else:
@@ -103,26 +104,25 @@ class CoreModel(LifecycleModelMixin, Model):
         return cls._meta.app_config.permissions
 
     @classmethod
-    def get_projection_by_pk(cls, request, pk,method=""):
-        ''' 
-          can't user model.objects.get because need to apply all the 
-          preparing functions to then apply the producers and then the projections 
-        '''
-        prepare_qs, projection = cls.readers(request,pk)
-        #qs =  prepare_qs(cls.objects.user_filter(request).filter(pk=pk))
-        qs =  prepare_qs(cls.objects.filter(pk=pk))
+    def get_projection_by_pk(cls, request, pk, method=""):
+        """
+        can't user model.objects.get because need to apply all the
+        preparing functions to then apply the producers and then the projections
+        """
+        prepare_qs, projection = cls.readers(request, pk)
+        # qs =  prepare_qs(cls.objects.user_filter(request).filter(pk=pk))
+        qs = prepare_qs(cls.objects.filter(pk=pk))
         method = method or request.method
         try:
             obj = qs.first()
-            assert cls.perms.good_request(request.user,method, obj)
+            assert cls.perms.good_request(request.user, method, obj)
             if not obj:
-                raise  cls.DoesNotExist()
+                raise cls.DoesNotExist()
             return obj, projection(obj)
         except cls.DoesNotExist:
             raise Http404("No object matches the given query")
         except AssertionError:
             raise Http404("Invaolid permissions")
-
 
     @classproperty
     def _name(cls):
@@ -147,7 +147,9 @@ class CoreModel(LifecycleModelMixin, Model):
         form = cls.form(request)(request.POST)
         context = {"form": form}
         preoare_qs, projection = cls.readers(request)
-        if form.is_valid() and cls.perms.good_request(request.user,request.method, form.instance):
+        if form.is_valid() and cls.perms.good_request(
+            request.user, "POST", cls(**form.cleaned_data)
+        ):
             inst = form.instance
             # by default associasave()te objects with their creator
             inst.add_user_and_save(request)
@@ -167,7 +169,7 @@ class CoreModel(LifecycleModelMixin, Model):
 
     @classmethod
     def PUT(cls, request, pk):
-        prepare_qs, projection = cls.readers(request,pk)
+        prepare_qs, projection = cls.readers(request, pk)
         inst, inst_dict = cls.get_projection_by_pk(request, pk)
         put = QueryDict(request.body)
         form = cls.form(request)(put, instance=inst)
@@ -193,7 +195,7 @@ class CoreModel(LifecycleModelMixin, Model):
 
     @classmethod
     def GET(cls, request, pk=None):
-        prepare_qs, projection = cls.readers(request,pk)
+        prepare_qs, projection = cls.readers(request, pk)
         if pk:
             inst, inst_dict = cls.get_projection_by_pk(request, pk)
             if request.json:
@@ -215,7 +217,7 @@ class CoreModel(LifecycleModelMixin, Model):
                 for p in prepare_qs(cls.objects.user_filter(request)).order_by(
                     *cls._meta.ordering
                 )
-                if cls.perms.good_request(request.user,request.method,p)
+                if cls.perms.good_request(request.user, request.method, p)
             ]
             if request.json:
                 return JsonResponse(insts, safe=False)
@@ -231,8 +233,8 @@ class CoreModel(LifecycleModelMixin, Model):
 
     @classmethod
     def DELETE(cls, request, pk):
-        obj = get_object_or_404(cls,pk=pk)
-        if cls.perms.good_request(request.user,request.method,obj):
+        obj = get_object_or_404(cls, pk=pk)
+        if cls.perms.good_request(request.user, request.method, obj):
             obj.delete()
         return HttpResponse("Deleted")
 
@@ -242,33 +244,31 @@ class CoreModel(LifecycleModelMixin, Model):
 
     @classmethod
     def get_filters(cls, request):
-            filters = decode_get_params(request.GET).get("f", {}).get("filters", {})
-            # remove any possible filter terms which might try to alter the
-            # users filter condition
-            q_param = {k: v for k, v in filters.items() if "group" not in k}
-            if "full-text-search" in q_param:
-                val =  q_param["full-text-search"]
-                del q_param["full-text-search"]
-                fts = [ Q(**{f"{k}__icontains": val})
-                        for k, v in cls._fields_map.items()
-                        if v in ["CharField", "TextField"]
-                    ]
-                q = functools.reduce(operator.or_, fts)
-            else:
-                q = Q()
-            q = q & Q(**q_param)
-            return q
+        q_param = decode_get_params(request.GET).get("f", {}).get("filters", {})
+        if "full-text-search" in q_param:
+            val = q_param["full-text-search"]
+            del q_param["full-text-search"]
+            fts = [
+                Q(**{f"{k}__icontains": val})
+                for k, v in cls._fields_map.items()
+                if v in ["CharField", "TextField"]
+            ]
+            q = functools.reduce(operator.or_, fts)
+        else:
+            q = Q()
+        q = q & Q(**q_param)
+        return q
 
     @property
     def url(self):
         return reverse("core:main", kwargs={"m": self._meta.label, "pk": self.id})
 
     @classmethod
-    def localize_field(cls,attr):
+    def localize_field(cls, attr):
         if attr not in cls._fields_map:
             localized = resolve_field_to_current_lang(attr)
-            if localized not in cls._fields_map: 
-                cls._meta.get_field(localized) # this will raise fieldDoesNotExist
+            if localized not in cls._fields_map:
+                cls._meta.get_field(localized)  # this will raise fieldDoesNotExist
             return localized
         return attr
 
@@ -279,7 +279,6 @@ class CoreModel(LifecycleModelMixin, Model):
 
 
 class AutoCompleteNexus:
-
 
     @classmethod
     def find_words_from_trigger(cls, text, trigger, many=True):
@@ -307,9 +306,8 @@ class AutoCompleteNexus:
         return [
             f
             for f in cls._meta.get_fields()
-            if f.related_model
-            and isinstance(f, (Field,))
-            and hasattr(f.related_model, "text_search_trigger")
+            if hasattr(f, "__text_trigger__")
+            and getattr(f, "__text_trigger__")
             and f.name not in excludes
         ]
 
@@ -317,7 +315,7 @@ class AutoCompleteNexus:
     def describe_links(cls, excludes=None):
         autocompletes = ", ".join(
             [
-                f"'{x.related_model.text_search_trigger}' for {x.related_model._meta.verbose_name}"
+                f"'{x.__text_trigger__}' for {x.related_model._meta.verbose_name}"
                 for x in cls.get_autocompletes(excludes=excludes)
             ]
         )
@@ -337,7 +335,8 @@ class AutoCompleteNexus:
         fields = cls.get_autocompletes(exclude)
         results = {
             f.name: {
-                "trigger": f.related_model.text_search_trigger,
+                "trigger": f.__text_trigger__,
+                "search_field": f.__search_field__,
                 "model": f.related_model,
                 "model_info": f.related_model.model_info,
                 "verbose": getattr(
@@ -347,7 +346,7 @@ class AutoCompleteNexus:
                 "name": f.name,
                 "many_to_many": f.many_to_many,
                 "search_terms": cls.find_words_from_trigger(
-                    text_input, f.related_model.text_search_trigger, many=f.many_to_many
+                    text_input, f.__text_trigger__, many=f.many_to_many
                 ),
             }
             for f in fields
@@ -355,8 +354,14 @@ class AutoCompleteNexus:
 
         for name in results:
             filter_qs = Q(**ac_filters.get(name, {}))
+            search_field = results[name]["search_field"]
             results[name]["results"] = [
-                [term, results[name]["model"].ac(request, term, cls,filter_qs=filter_qs)]
+                [
+                    term,
+                    results[name]["model"].ac(
+                        request, term, cls(), search_field, filter_qs=filter_qs
+                    ),
+                ]
                 for term in results[name]["search_terms"]
             ]
             trigger = results[name]["trigger"]
@@ -364,7 +369,7 @@ class AutoCompleteNexus:
                 remainder = remainder.replace(trigger + parsed, "")
 
         cls.cls_text_scan(
-            remainder, results, [x.related_model.text_search_trigger for x in fields]
+            remainder, results, [x.__text_trigger__ for x in fields]
         )  # default is nothing happens, but classes can add extra scanning, for example: dates
 
         # secondd pass through
@@ -466,7 +471,7 @@ class AutoCompleteCoreModel(CoreModel):
         return f
 
     @classmethod
-    def ac_query(cls, request, search_field, query,requestor):
+    def ac_query(cls, request, search_field, query, requestor):
         if query == "":
             q = Q()
         elif query.endswith(" "):
@@ -490,7 +495,7 @@ class AutoCompleteCoreModel(CoreModel):
 
         search_field = cls.localize_field(search_field)
         preoare_qs, projection = cls.readers(request)
-        qs = preoare_qs(cls.ac_query(request, search_field, query,requestor))
+        qs = preoare_qs(cls.ac_query(request, search_field, query, requestor))
 
         if filter_qs:
             qs = qs.filter(filter_qs)
@@ -506,8 +511,10 @@ class AutoCompleteCoreModel(CoreModel):
         if (
             (len(results) == 0 and query.endswith(" ") or not query.endswith(" "))
             and query.strip() != ""
-            and not any(query.lower() == x["name"].lower() for x in results)
-            and cls.perms.good_request(request.user,"POST",cls())  # check if you can actually create a new one
+            and not any(query.lower() == x[search_field].lower() for x in results)
+            and cls.perms.good_request(
+                request.user, "POST", cls()
+            )  # check if you can actually create a new one
         ):
             # not ending in space -- always create fake new one unless it
             # duplicates i.e. cursor was right at the end of the word
@@ -515,7 +522,7 @@ class AutoCompleteCoreModel(CoreModel):
                 "name": query,
                 "id": -1,
                 "new": True,
-                search_field : query,
+                search_field: query,
                 "__type__": cls._meta.label,
             }
 

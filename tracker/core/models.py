@@ -9,16 +9,19 @@ from django.db.models import (
     PROTECT,
     SET_NULL,
     BigAutoField,
-    ManyToManyField,
-    OneToOneField,
     CharField,
     DateTimeField,
-    ForeignKey,
     Model,
     Prefetch,
     TextField,
     BooleanField,
 )
+from core.fields import (
+    ForeignKey,
+    ManyToManyField,
+    OneToOneField,
+)
+
 from django.contrib import admin
 from text.translate import gettext_lazy as _
 from .core import CoreModel, AutoCompleteCoreModel
@@ -88,7 +91,16 @@ class Group(AbstractGroup, AutoCompleteCoreModel):
             node = node.parent
         return parents
 
-    group = None
+    @property
+    def _descendants(self):
+        for child in  self.children.all():
+            yield child
+            yield from child._descendants
+
+    @property
+    def descendants(self):
+        return [self] + list(self._descendants)
+
     parent = ForeignKey(
         "Group", on_delete=CASCADE, related_name="children", null=True, blank=True
     )
@@ -107,7 +119,7 @@ class User(AbstractUser):
     objects = GroupPrefetcherManager()
 
     class adminClass(admin.ModelAdmin):
-        list_display = ("username", "belongs_to", "manages")
+        list_display = ("username", "belongs_to", "manages",)
         list_editable = ("belongs_to", "manages", )
 
     class Meta:
@@ -119,7 +131,7 @@ class User(AbstractUser):
         if self.manages:
             self.groups.add(self.manages)
 
-    belongs_to = ForeignKey(Group, on_delete=PROTECT, related_name="+")
+    belongs_to = ForeignKey(Group, on_delete=PROTECT, related_name="team_members")
     manages = OneToOneField(
         Group, on_delete=PROTECT, related_name="+", null=True, blank=True
     )

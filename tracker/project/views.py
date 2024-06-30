@@ -16,7 +16,7 @@ from django.http import (
 from django.shortcuts import get_object_or_404
 from django.urls import reverse
 from text.translate import gettext_lazy as _
-from .time_utils import  get_last_n_weeks
+from .time_utils import get_last_n_weeks
 from . import models
 
 api = API(namespace="project", session={})
@@ -32,6 +32,7 @@ def main(request):
         },
     )
 
+
 @api.get("metadata/")
 def metadata(request):
     return render(
@@ -42,22 +43,35 @@ def metadata(request):
         },
     )
 
+
+@api.get("whoami/")
+def whoami(request):
+    prepare_qs, projection = models.ProjectUser.readers(request,pk=request.user.pk)
+    prepared_user = prepare_qs(models.ProjectUser.objects.filter(id=request.user.id))
+    return JsonResponse(projection(prepared_user.first()))
+
+
 @api.get("timereporting/")
 def timereporting(request):
-    update = bool(request.GET.get("update",False))
+    update = bool(request.GET.get("update", False))
     myreports = models.TimeReport.user_filter(request).all()
-    weeks =  get_last_n_weeks(20)
+    weeks = get_last_n_weeks(20)
     for week in weeks:
         week["total"] = float(request.project_user.settings(request)["work_hours"])
-        week["worked"] = float(sum(x.time for x in myreports if x.week.strftime("%Y-%m-%d") == week["week_start"]))
+        week["worked"] = float(
+            sum(
+                x.time
+                for x in myreports
+                if x.week.strftime("%Y-%m-%d") == week["week_start"]
+            )
+        )
     if update:
-       return JsonResponse(weeks,safe=False) 
+        return JsonResponse(weeks, safe=False)
     return render(
         request,
         "timereport/timereports.html",
         {
             "standalone": not request.htmx,
-            "weeks" : weeks,
+            "weeks": weeks,
         },
     )
-

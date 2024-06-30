@@ -35,17 +35,13 @@ export const task_state = mobx.makeAutoObservable({
     set redraw (x){
        this._redraw = Math.random();
     },
-    unset_height(task){
-        if (task.__type__ == "project.Task") {
-           d3.select(`#task${task.id} .card-body`).style("height",null)
-        }
-    },
     register (tasks){
         this.tasks = [...this.tasks, ...tasks];
         this.minified_tasks = {add : [...tasks]};
         ui_state.active_elements = [...ui_state.active_elements, ...tasks]
     },
 });
+window.__task_state = task_state;
 
 mobx.autorun(()=>{
     if (ui_state.attr == null) {
@@ -63,9 +59,11 @@ export const project_summary =  project => {
             append_edit_attr(left_sel, observable_data, "text","Summary",{display_attr:"text_m"});
             append_edit_attr(left_sel, observable_data, "short_term_outcomes","Short Term Outcomes",{display_attr:"short_term_outcomes_m"});
             append_edit_attr(left_sel, observable_data, "long_term_outcomes","Long Term Outcomes",{display_attr:"long_term_outcomes_m"});
-            append_edit_attr(left_sel, observable_data,"leads", "Lead", {name_attr : "username"});
+            append_edit_attr(left_sel, observable_data,"lead", "Lead", {name_attr : "username"});
+            append_edit_attr(left_sel, observable_data,"project_manager", "Project Manager", {name_attr : "username"});
+            append_edit_attr(left_sel, observable_data,"project_team", "Project Team", {name_attr : "username"});
             append_edit_attr(left_sel, observable_data,"tags", "Tags");
-            append_edit_attr(left_sel, observable_data,"teams", "Teams");
+            append_edit_attr(left_sel, observable_data,"partners", "Partners");
             create_button( selection.select("#new-stream"), 
                           ()=>mobx.makeAutoObservable({name:"",__type__:"project.Stream",project:observable_data}),
                           "name",
@@ -119,7 +117,7 @@ export const task_summaries = tasks=>{
                 _.each([["text","Notes",""],
                         ["start_date", "Start Date",""],
                         ["target_date","Target Date",""],
-                        ["lead", "Contact",""],
+                        ["lead", "Contact",{name_attr : "username"}],
                         ["teams", "Teams",""],
                         ["competency", "Competency",""],
                         ["stream", "Stream",{on_change : "reloadTasks"}]], 

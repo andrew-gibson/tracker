@@ -15,7 +15,8 @@
 
 {%endblock%}
 
-
+{% if variable is defined %}
+{%endif %}
 {% block content %}{%with project=inst %}
 <div id="main-content" hx-swap-oob="true">
     <div id="project{{project.id}}" class="card task p-0">

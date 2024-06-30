@@ -37,11 +37,12 @@ from django_lifecycle import (
     BEFORE_DELETE,
     BEFORE_UPDATE,
     BEFORE_SAVE,
+    AFTER_SAVE,
     hook,
 )
 from core.lang import resolve_field_to_current_lang
 from core.core import AutoCompleteNexus, AutoCompleteCoreModel, RequestForm, CoreModel
-from core.models import Group, User,  GroupPrefetcherManager
+from core.models import Group, User, GroupPrefetcherManager
 from core.utils import add_to_admin, classproperty, render
 from core.fields import (
     ForeignKey,
@@ -55,29 +56,31 @@ class ProjectGroupManager(GroupManager):
 
     def get_queryset(self):
         return (
-            super().get_queryset()
+            super()
+            .get_queryset()
             .filter(app="project")
-            .annotate( name_count_en=Concat(
-                Replace(F("name_en"), Value("_"), Value(" ")),
-                Value(" ("),
-                Count("projects"),
-                Value(")"),
-                output_field=CharField()
-            ))
-            .annotate( name_count_fr=Concat(
-                Replace(F("name_fr"), Value("_"), Value(" ")),
-                Value(" ("),
-                Count("projects"),
-                Value(")"),
-                output_field=CharField()
-            ))
+            .annotate(
+                name_count_en=Concat(
+                    Replace(F("name_en"), Value("_"), Value(" ")),
+                    Value(" ("),
+                    Count("projects"),
+                    Value(")"),
+                    output_field=CharField(),
+                )
+            )
+            .annotate(
+                name_count_fr=Concat(
+                    Replace(F("name_fr"), Value("_"), Value(" ")),
+                    Value(" ("),
+                    Count("projects"),
+                    Value(")"),
+                    output_field=CharField(),
+                )
+            )
         )
 
-
     def user_filter(self, request):
-        return self.filter()
-
-
+        return self.model.user_filter(request)
 
 class ProjectGroup(Group):
     objects = ProjectGroupManager()
@@ -93,15 +96,27 @@ class ProjectGroup(Group):
     def user_filter(cls, request):
         return cls.objects.filter(app="project", system=False)
 
-
     def save(self, *args, **kwargs):
         self.app = self.__class__._meta.app_label
         super().save(*args, **kwargs)
 
-
-    def add_user_and_save(self,request):
+    def add_user_and_save(self, request):
         self.save()
         request.project_user.groups.add(self)
+
+
+class MyProjectGroup(Group):
+    objects = ProjectGroupManager()
+    spec = queries.projectgroup_spec
+
+    class Meta:
+        proxy = True
+
+    @classmethod
+    def user_filter(cls, request):
+        descendants = request.user.belongs_to.descendants + [request.user.belongs_to]
+        return cls.objects.filter(id__in=[x.id for x in descendants])
+
 
 class GroupPrefetcherManager(UserManager):
     use_for_related_fields = True
@@ -109,16 +124,22 @@ class GroupPrefetcherManager(UserManager):
     def user_filter(self, request):
         return self.filter()
 
+
 @add_to_admin
 class ProjectUser(User, AutoCompleteCoreModel):
     objects = GroupPrefetcherManager()
     spec = queries.projectuser_spec
-    proxy_map = {
-        "belongs_to" : ProjectGroup
-    }
+    proxy_map = {"belongs_to": ProjectGroup}
+
+    form_fields = ["username", "belongs_to"]
 
     class Meta:
         proxy = True
+
+    def add_user_and_save(self, request):
+        # permissions.py enforces that request.user.manages is not null
+        self.belongs_to = request.user.manages
+        self.save()
 
     @hook(BEFORE_SAVE)
     def force_no_password_no_active(self):
@@ -141,7 +162,12 @@ class Settings(CoreModel):
     user = OneToOneField(ProjectUser, on_delete=CASCADE, blank=True, related_name="+")
     hide_done = BooleanField(default=False, blank=True)
     see_all_projects = BooleanField(default=True, blank=True)
-    work_hours = DecimalField(max_digits=5, decimal_places=1,validators=[MinValueValidator(0)],db_default=37.5)
+    work_hours = DecimalField(
+        max_digits=5,
+        decimal_places=1,
+        validators=[MinValueValidator(0)],
+        db_default=37.5,
+    )
     projects_filter = JSONField(db_default="{}")
 
     @classmethod
@@ -157,7 +183,6 @@ class EXCompetency(AutoCompleteCoreModel):
     @classmethod
     def user_filter(cls, request):
         return cls.objects.all()
-
 
     def __str__(self):
         return self.name_en
@@ -183,7 +208,6 @@ class ProjectStatus(AutoCompleteCoreModel):
     @classmethod
     def user_filter(cls, request):
         return cls.objects.all()
-
 
     def __str__(self):
         return self.name_en
@@ -211,7 +235,6 @@ class Tag(AutoCompleteCoreModel):
         q = Q(group__in=request.user.groups.all()) | Q(public=True)
         return cls.objects.filter(q).filter(filters).distinct()
 
-
     def __str__(self):
         return self.name
 
@@ -221,9 +244,7 @@ class Tag(AutoCompleteCoreModel):
 
 
 @add_to_admin
-class Project(
-    AutoCompleteNexus, AutoCompleteCoreModel
-):
+class Project(AutoCompleteNexus, AutoCompleteCoreModel):
     spec = queries.project_spec
 
     class Meta:
@@ -268,23 +289,50 @@ class Project(
         ]
 
     @classmethod
+    def users_projects(cls, project_user):
+        q = Q(viewers=project_user)   # you've opted to follow this project
+        q = q | Q(lead=project_user)  # you've been assinged as the lead of hte project
+        q = q | Q(project_manager=project_user) # you're a project manager for the project
+        q = q | Q(tasks__lead=project_user) # you're the lead on one of the tasks for the project
+        q = q |  Q(timereports__user=project_user)  # you've entered a time report' 
+        if project_user.manages:
+            q = q | Q( group = project_user.manages)  # basic, you're in the group where the project is hosted
+        return q
+
+    @classmethod
+    def private_projects(cls, project_user):
+        return Q(private=True) & ~Q(private_owner=project_user)
+
+    # write email for Sarah to end telling people to fuck off
+    # talk to James about good venue for sharing DMI concept
+
+    @classmethod
     def user_filter(cls, request):
         filters = cls.get_filters(request)
-        q1 = Q(group__in=request.user.groups.all())   # basic, you're in the group where the project is hosted
-        q2 = Q(viewers=request.project_user) # you've opted to follow this project
-        q3 = Q(leads=request.project_user) # you've been assinged as the lead of hte project'
-        q4 = Q(timereports__user=request.project_user) # you've entered a time report'
-        q5 =  Q(private=True) & ~Q(private_owner=request.user)
+        u = request.project_user
         return (
-            cls.objects.filter(q1 | q2 | q3 | q4)
+            cls.objects.filter(cls.users_projects(u))
             .filter(filters)
-            .exclude(q3)
-        ).distinct()
+            .exclude(cls.private_projects(u))
+            .distinct()
+        )
 
     @hook(AFTER_CREATE)
     def add_default_stream(self):
-        self.streams.create(name="New", project_default=True)
+        self.streams.create(name_en="New", name_fr="Nouvelles", project_default=True)
         ProjectLog(project=self).save()
+
+    def add_user_and_save(self, request):
+        try:
+            self.group
+        except self.__class__.group.RelatedObjectDoesNotExist:
+            self.group = request.user.manages or request.user.belongs_to
+        try:
+            self.lead
+        except self.__class__.lead.RelatedObjectDoesNotExist:
+            self.lead =  request.project_user
+        self.save()
+
 
     @property
     def default_stream(self):
@@ -310,9 +358,13 @@ class Project(
         }
 
     group = ForeignKey(
-        ProjectGroup, blank=True, on_delete=PROTECT, related_name="projects"
+        ProjectGroup,
+        blank=True,
+        on_delete=PROTECT,
+        related_name="projects",
+        text_trigger="+",
     )
-    status = ForeignKey(ProjectStatus, blank=True, on_delete=SET_NULL, null=True )
+    status = ForeignKey(ProjectStatus, blank=True, on_delete=SET_NULL, null=True)
     addstamp = DateTimeField(null=True)
     name_en = CharField(max_length=255)
     name_fr = CharField(max_length=255, null=True, blank=True)
@@ -324,10 +376,29 @@ class Project(
         null=True,
         blank=True,
         related_name="sub_projects",
-        text_trigger="^" 
+        text_trigger="^",
     )
-    leads = ManyToManyField(ProjectUser, blank=True,text_trigger="@", search_field="username")
-    teams = ManyToManyField(ProjectGroup, related_name="projects_supporting", blank=True)
+    lead =  ForeignKey(
+        ProjectUser,
+        blank=True,
+        null=True,
+        on_delete=SET_NULL,
+        text_trigger="@", 
+        search_field="username",
+        related_name="projects_i_lead",
+    )                           
+    project_team = ManyToManyField(
+        ProjectUser, blank=True, search_field="username"
+    )
+    project_manager = ForeignKey(
+        ProjectUser,
+        blank=True,
+        null=True,
+        on_delete=SET_NULL,
+        search_field="username",
+        related_name="projects_i_manage",
+    )
+    partners = ManyToManyField(ProjectGroup, blank=True)
     tags = ManyToManyField(Tag, text_trigger="#")
     private = BooleanField(db_default=False)
     private_owner = ForeignKey(
@@ -341,6 +412,7 @@ class Project(
     short_term_outcomes = TextField(blank=True, null=True)
     long_term_outcomes = TextField(blank=True, null=True)
 
+
 class MinProject(Project):
     spec = queries.min_project_spec
 
@@ -349,7 +421,8 @@ class MinProject(Project):
 
     @classmethod
     def user_filter(cls, request):
-        return  Project.user_filter(request)
+        return Project.user_filter(request)
+
 
 class ProjectLog(CoreModel):
     spec = queries.projectlog_spec
@@ -425,7 +498,7 @@ class Stream(AutoCompleteCoreModel):
         )
 
     @classmethod
-    def ac_query(cls, request, search_field, query,requestor):
+    def ac_query(cls, request, search_field, query, requestor):
         if query == "":
             q = Q()
         elif query.endswith(" "):
@@ -435,7 +508,7 @@ class Stream(AutoCompleteCoreModel):
             q = Q(name__icontains=query) | Q(project__name__icontains=query)
 
         if isinstance(requestor, Task):
-            q = q & Q(project=requestor.project) 
+            q = q & Q(project=requestor.project)
 
         return cls.user_filter(request).filter(q).distinct()
 
@@ -472,7 +545,6 @@ class Task(AutoCompleteCoreModel, AutoCompleteNexus):
         return cls.objects.filter(project__group__in=request.user.groups.all()).filter(
             filters
         )
-
 
     @classmethod
     def cls_text_scan(cls, text_input, results, text_triggers):
@@ -547,20 +619,30 @@ class Task(AutoCompleteCoreModel, AutoCompleteNexus):
 
     order = PositiveIntegerField(null=True, blank=True)
     project = ForeignKey(Project, on_delete=CASCADE, related_name="tasks")
-    stream = ForeignKey(Stream, on_delete=PROTECT, blank=True, related_name="tasks", text_trigger="~")
+    stream = ForeignKey(
+        Stream, on_delete=PROTECT, blank=True, related_name="tasks", text_trigger="~"
+    )
     start_date = DateField(default=date.today, blank=True, null=True)
     target_date = DateField(blank=True, null=True)
     name_en = CharField(max_length=255)
     name_fr = CharField(max_length=255, null=True, blank=True)
     text_en = TextField(blank=True, null=True)
     text_fr = TextField(blank=True, null=True)
-    lead = ForeignKey(ProjectUser, on_delete=SET_NULL, null=True, blank=True,text_trigger="@", search_field="username")
+    lead = ForeignKey(
+        ProjectUser,
+        on_delete=SET_NULL,
+        null=True,
+        blank=True,
+        text_trigger="@",
+        search_field="username",
+    )
     teams = ManyToManyField(ProjectGroup, blank=True)
     addstamp = DateTimeField(auto_now_add=True)
     editstamp = DateTimeField(auto_now=True)
-    competency = ForeignKey(EXCompetency, on_delete=PROTECT, null=True, blank=True, text_trigger="`")
+    competency = ForeignKey(
+        EXCompetency, on_delete=PROTECT, null=True, blank=True, text_trigger="`"
+    )
     done = BooleanField(db_default=False, blank=True)
-
 
 
 class TimeReport(CoreModel):
@@ -570,10 +652,10 @@ class TimeReport(CoreModel):
     class _Form(RequestForm):
         class Meta:
             fields = [
-        "project",
-        "time",
-        "week",
-    ]
+                "project",
+                "time",
+                "week",
+            ]
 
         def __init__(self, *args, **kwargs):
             super().__init__(*args, **kwargs)
@@ -590,12 +672,20 @@ class TimeReport(CoreModel):
     def force_start_of_week(self):
         self.week = self.week - timedelta(days=self.week.weekday())
 
-    def add_user_and_save(self,request):
+    @hook(AFTER_SAVE)
+    def if_0_then_delete(self):
+        if self.time == 0:
+            self.delete()
+
+
+    def add_user_and_save(self, request):
         self.user = request.user
         self.save()
 
     user = ForeignKey(ProjectUser, null=True, on_delete=SET_NULL)
-    project = ForeignKey(Project, on_delete=CASCADE,related_name="timereports")
-    time = DecimalField(max_digits=5, decimal_places=1,validators=[MinValueValidator(0)])
+    project = ForeignKey(Project, on_delete=CASCADE, related_name="timereports")
+    time = DecimalField(
+        max_digits=5, decimal_places=1, validators=[MinValueValidator(0)]
+    )
     text = TextField(blank=True)
     week = DateField()

@@ -3,7 +3,7 @@ import "d3";
 import 'lo-dash';
 
 const models = await (await fetch_recipies.GET("/core/model_info/")).json()    
-const current_user = await (await fetch_recipies.GET(models["project.ProjectUser"].main)).json()
+const current_user =  await fetch_recipies.GETjson("/project/whoami/");
 const inactive = {attr:"", d: {id:null}, search_results : []};
 
 const prep_data = observable_data =>{
@@ -23,10 +23,14 @@ class UIState {
         mobx.makeAutoObservable(this,{deep:true })
         this.active_elements = [];
         this.models = models;
-        this._user = current_user[0];
+        this.user = current_user;
         _.each(this.models,m=>{
              m.filters = {};
         });
+    }
+
+    set user (val){
+      return this._user = val;
     }
 
     get user (){
@@ -98,7 +102,10 @@ class UIState {
         this.active_elements = [];
         _dispose_functions.dispose() ;
         if (e){
-            document.dispatchEvent(new Event(e))
+            if (!_.isArray(e)){
+                e = [e]
+            }
+            _.each(e, _e=>document.dispatchEvent(new Event(_e)))
         }
     }
 }
@@ -111,25 +118,24 @@ const reset_active = e=>{
 }
 window.reset_ui = reset_ui;
 window.__uistate = ui_state;
-const handler = e => {
-   if ("hx-replace-url" in e.target.attributes){
-       window.reset_ui("HxReplaceURL");
-   }
-}
-
-d3.select(document)
-    .on("htmx:beforeRequest",handler)
-    .on("htmx:beforeSwap",e=>{
-    })
-
-        
-document.body.addEventListener('htmx:configRequest', (event) => {
+// if info changes about who the user is, then reload
+document.addEventListener('reloadWhoAmI', async event => {
+   ui_state.user = await fetch_recipies.GETjson("/project/whoami/")
+});
+// scan all htmx requests and if they ask for filters, then add them to the url
+document.addEventListener('htmx:configRequest', event => {
   const elt = event.detail.elt;
   if ("data-check-for-filters" in elt.attributes){
       const filters = _.omitBy(ui_state.models[elt.attributes["data-model"].value].filters, _.isUndefined)
       event.detail.path += `?f=${btoa(JSON.stringify({filters}))}`
   }
 });
+// if the url is being replaced, them reset the UI and wipe out all mobX listeners
+document.addEventListener("htmx:beforeRequest",event => {
+   if ("hx-replace-url" in event.target.attributes){
+       reset_ui();
+   }
+})
 
 const _dispose_functions = {
     funcs : [],

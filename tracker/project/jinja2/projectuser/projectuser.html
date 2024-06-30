@@ -1,0 +1,51 @@
+{% if  standalone %} 
+    {% extends "base.html" %} 
+    {% block sidebar %}
+        {%include "shared/sidebar.html"%}
+    {%endblock%}
+{% endif %}
+
+
+{% block content%}
+<div id="main-content" class="row" hx-swap-oob="true">
+    <div class="card col-3" id="projects">
+          <div class="card-header ">
+              <span>Projects</span>
+          </div>
+          <ul class="list-group list-group-flush">
+          </ul>
+    </div>
+
+    <div class="card col-9" id="project">
+
+    </div>
+
+    <script type="module" >
+        import fetch_recipies from "fetch-recipies";
+        import {ui_state, inplace_char_edit, create_button,fk_toggle} from "d3-ui";
+        const project_group = {{dumps(inst)|safe}};
+
+        d3.select("#projects ul")
+          .selectAll("li.list-group-item")
+          .data(project_group.projects,d=>d.id)
+          .join("li")
+          .attr("class","list-group-item p-1")
+          .selectAll("button.project-link")
+          .data(d=>[d],d=>d.id)
+          .join("button")
+          .attr( "class", "btn btn-link project-link text-start p-1")
+          .attrs({
+            "hx-replace-url":"true",
+            "hx-swap":"outerHTML",
+            "hx-target" : "#main-content",
+          })
+          .on("click",d=>{
+
+          })
+          .html(d=>d.name)
+
+    </script>
+</div>
+{%endblock%}
+
+

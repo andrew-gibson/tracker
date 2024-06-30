@@ -132,7 +132,7 @@ def toggle_link(request, m1, pk1, m2, pk2, attr=""):
                 projection[attr] = [x for x in projection[attr] if x["id"] != pk2]
         return JsonResponse(projection)
     except AssertionError:
-        raise  Http404("not authorized")
+        raise Http404("Invaolid permissions")
 
 
 

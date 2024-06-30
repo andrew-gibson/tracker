@@ -13,6 +13,7 @@ def good_m2m_request(user, method, obj1, obj2, attr):
 
 
 def good_request(user, method, obj):
+
     match [obj, method]:
         case [models.ProjectGroup(), "POST" | "PUT" | "DELETE"]:
             # only group alterations are allowed by the group owner
@@ -25,6 +26,9 @@ def good_request(user, method, obj):
             # return group info to all users
             return True
 
+        case [models.MyProjectGroup(), "GET"]:
+            return True
+
         case [
             models.EXCompetency() | models.ProjectStatus(),
             "POST" | "PUT" | "DELETE",
@@ -32,24 +36,39 @@ def good_request(user, method, obj):
             # don't allow any projectuser, competency or status alterations through this app
             return False
 
-        case [models.ProjectUser(), "POST" | "PUT" | "DELETE"]:
+        case [models.ProjectUser(), "POST"] if not obj.id:
+            return user.manages
+
+        case [models.ProjectUser(), "POST"]:
+            return (
+                user.manages == obj.belongs_to
+                or user.manages in obj.belongs_to.parents
+                or user.pk == obj.pk
+            )
+
+        case [models.ProjectUser(), "PUT" | "DELETE"]:
             # only for users who manage a group in the reporting chain
             return user.manages in [obj.belongs_to, *obj.belongs_to.parents]
 
         case [models.ProjectUser(), "GET"]:
             # only return user info to the request user
             return (
-                user.manages in [obj, *obj.belongs_to.parents]
+                user.pk == obj.pk
+                or user.manages in [obj.belongs_to, *obj.belongs_to.parents]
                 or user.belongs_to == obj.belongs_to
             )
 
-        case [models.Tag(), "POST" | "PUT" | "DELETE"]:
+        case [models.Tag(), "POST"]:
             # only tag alterations are allowed by the group members
-            return obj.group in user.groups.all()
+            return True
+
+        case [models.Tag(), "PUT" | "DELETE"]:
+            # only tag alterations are allowed by the group members
+            return obj.group in user.belongs_to.descendants
 
         case [models.Tag(), "GET"]:
             # only tag reads are allowed by the group members except for public tags
-            return (obj.group in user.groups.all()) or obj.public
+            return (obj.group in user.belongs_to.descendants) or obj.public
 
         case [
             models.Stream() | models.Task() | models.ProjectLog(),
@@ -82,13 +101,9 @@ def good_request(user, method, obj):
 def good_project_request(user, method, project):
     if method in ["PUT", "POST", "DELETE"]:
         return (project.private and project.private_owner == user) or (
-            project.group in user.groups.all()
+            project.group in user.belongs_to.descendants
         )
     else:
         return (
-            (project.private and project.private_owner == user)  ## is private owner
-            or (user in project.viewers.all())  ## is viewing the project
-            or (
-                project.group in user.groups.all()
-            )  ## user manages the group which owns the project
-        )
+            project.private and project.private_owner == user
+        ) or not project.private  ## is private owner
