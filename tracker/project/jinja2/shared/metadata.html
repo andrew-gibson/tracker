@@ -17,48 +17,186 @@
 {% block content %}
 <div id="main-content" hx-swap-oob="true">
     <div class="row">
-        <div hx-trigger="load, reloadTags from:document" 
-             hx-get="{{url("core:main", kwargs={ "m" : "project.Tag"})}}"
-             class="col-4">
-           <div class="placeholder-glow">
-               <div class="col-12 placeholder placeholder-lg"></div>
-               <div class="col-12 placeholder "></div>
-               <div class="col-12 placeholder "></div>
-               <div class="col-12 placeholder "></div>
-               <div class="col-12 placeholder "></div>
-               <div class="col-12 placeholder "></div>
-               <div class="col-12 placeholder "></div>
+        <div class="col-4">
+            <div id="tags" >
+                <div class="card" >
+                  <div class="card-header"></div>
+                  <ul class="list-group list-group-flush">
+                   <div class="placeholder-glow">
+                       <div class="col-12 placeholder placeholder-lg"></div>
+                       <div class="col-12 placeholder "></div>
+                       <div class="col-12 placeholder "></div>
+                       <div class="col-12 placeholder "></div>
+                       <div class="col-12 placeholder "></div>
+                       <div class="col-12 placeholder "></div>
+                       <div class="col-12 placeholder "></div>
+                    </div>
+                  </ul>
+                </div>
             </div>
         </div>
-        <div hx-trigger="load, reloadProjectUsers from:document" 
-             hx-get="{{url("core:main", kwargs={ "m" : "project.ProjectUser"})}}"
-             class="col-4">
-           <div class="placeholder-glow">
-               <div class="col-12 placeholder placeholder-lg"></div>
-               <div class="col-12 placeholder "></div>
-               <div class="col-12 placeholder "></div>
-               <div class="col-12 placeholder "></div>
+        <div class="col-4">
+            <div id="users">
+                <div class="card">
+                  <div class="card-header"></div>
+                  <ul class="list-group list-group-flush">
+                   <div class="placeholder-glow">
+                       <div class="col-12 placeholder placeholder-lg"></div>
+                       <div class="col-12 placeholder "></div>
+                       <div class="col-12 placeholder "></div>
+                       <div class="col-12 placeholder "></div>
+                    </div>
+                  </ul>
+                </div>
             </div>
         </div>
-        <div hx-trigger="load, reloadTeams from:document" 
-             hx-get="{{url("core:main", kwargs={ "m" : "project.ProjectGroup"})}}"
-             class="col-4">
-           <div class="placeholder-glow">
-               <div class="col-12 placeholder placeholder-lg"></div>
-               <div class="col-12 placeholder "></div>
-               <div class="col-12 placeholder "></div>
-               <div class="col-12 placeholder "></div>
-               <div class="col-12 placeholder "></div>
-               <div class="col-12 placeholder "></div>
-               <div class="col-12 placeholder "></div>
-               <div class="col-12 placeholder "></div>
-               <div class="col-12 placeholder placeholder-lg"></div>
-               <div class="col-12 placeholder placeholder-lg"></div>
-               <div class="col-12 placeholder placeholder-lg"></div>
+        <div class="col-4">
+            <div id="groups">
+                <div class="card">
+                  <div class="card-header"></div>
+                  <ul class="list-group list-group-flush">
+                       <div class="placeholder-glow">
+                           <div class="col-12 placeholder placeholder-lg"></div>
+                           <div class="col-12 placeholder "></div>
+                           <div class="col-12 placeholder "></div>
+                           <div class="col-12 placeholder "></div>
+                           <div class="col-12 placeholder "></div>
+                           <div class="col-12 placeholder "></div>
+                           <div class="col-12 placeholder "></div>
+                           <div class="col-12 placeholder "></div>
+                        </div>
+                  </ul>
+                </div>
             </div>
         </div>
 
     </div>
+    <script type="module">
+        import {make_delete_button,ui_state, inplace_char_edit, create_button,append_edit_attr, reaction} from "d3-ui";
+        const users_root = d3.select("#main-content #users");
+        const groups_root = d3.select("#main-content #groups");
+        const tags_root = d3.select("#main-content #tags");
+        const on_change = ()=>{
+            ui_state.refresh_model_store("user");
+            ui_state.refresh_model_store("project.ProjectUser");
+        };
+        const on_tag_change = ()=>{
+            ui_state.refresh_model_store("project.Tag");
+        };
+        const _d = d=>[d]
+        const key = d=>d.id;
+        const setup_render = (selection, klass,data)=>{
+            const li = selection.select("ul")
+              .html("")
+              .selectAll("li.list-group-item." + klass)
+              .data(data,d=>d.id)
+              .join("li")
+                  .attr("class","list-group-item " + klass)
+            const name_delete = li
+                  .selectAll("div.name-delete")
+                  .data(d=>[d],d=>d.id)
+                  .join("div")
+                      .attr("class","d-flex align-items-middle justify-content-between name-delete")
+            name_delete.selectAll("div.name").data(_d,key).join("div").attr("class","name")
+            name_delete.selectAll("div.delete").data(_d,key).join("div").attr("class","delete")
+            return {name_delete, li};
+        }
+
+        const tag_render = ()=>{
+          const  {name_delete, li} = setup_render(tags_root,"tags",ui_state.models["project.Tag"].data)
+          li.selectAll("div.public").data(_d,key).join("div").attr("class","public")
+          create_button(tags_root.select(".card-header"),
+                        ()=>mobx.makeAutoObservable({
+                            name:"",
+                            __type__:"project.Tag",
+                              __url__: ui_state.models[ "project.Tag"].main, 
+                            }),
+                            "name",
+                            "+ Tag",
+                        {on_change:on_tag_change});
+          name_delete.selectAll(".name")
+              .each(function(d){
+                    inplace_char_edit(d3.select(this), d, "name", "Name");
+              })
+          name_delete.selectAll(".delete")
+              .each(function(d){ 
+                    make_delete_button( d3.select(this), d, key, "user, project.ProjectUser");
+              });
+          li.selectAll(".public")
+              .each(function(d){ 
+                 append_edit_attr(d3.select(this), d, "public", "Public",{on_change});
+              });
+        }
+
+        const users_render = ()=>{
+            const   {name_delete, li} = setup_render(users_root, "users",ui_state.models["project.ProjectUser"].data)
+            li.selectAll("div.group").data(_d,key).join("div").attr("class","group")
+            create_button( d3.select("#users .card-header"), 
+                          ()=>mobx.makeAutoObservable({
+                              username:"",
+                              belongs_to :  ui_state.models["user"].data.manages,
+                              __type__: "project.ProjectUser", 
+                              __url__: ui_state.models[ "project.ProjectUser"].main, 
+                          }),
+                          "username",
+                          "+ User",
+                        {on_change})
+            name_delete.selectAll(".name")
+                .each(function(d){
+                      inplace_char_edit(d3.select(this), d, "username", "Name",{display_attr : "username"});
+                })
+            name_delete.selectAll(".delete")
+                .each(function(d){ 
+                    make_delete_button( d3.select(this), d, key, "user, project.ProjectUser")
+                });
+            li.selectAll(".group")
+                .each(function(d){ 
+                   append_edit_attr(d3.select(this), d, "belongs_to", "Group",{on_change});
+                });
+        };
+
+        const group_render = ()=>{
+            const   {name_delete, li} = setup_render(groups_root, "group",ui_state.models["user"].data.teams);
+            create_button(groups_root.select(".card-header"), 
+                          ()=>mobx.makeAutoObservable({
+                              username:"",
+                              belongs_to :  ui_state.models["user"].data.manages,
+                              __type__: "project.ProjectGroup", 
+                              __url__: ui_state.models["project.ProjectGroup"].main, 
+                          }),
+                          "username",
+                          "+ Team",
+                          {on_change});
+            name_delete.selectAll(".name")
+                .each(function(d){
+                      inplace_char_edit(d3.select(this), d, "name", "Name");
+                })
+            name_delete.selectAll(".delete")
+                .each(function(d){ 
+                    make_delete_button( d3.select(this), d, key, "user, project.ProjectUser");
+                });
+        };
+        reaction(
+           tags_root,
+           ()=>ui_state.models["project.Tag"].refresh_time,
+           tag_render,
+        );
+        reaction(
+           users_root,
+           ()=>ui_state.models["project.ProjectUser"].refresh_time,
+           users_render,
+        );
+        reaction(
+           groups_root,
+           ()=>ui_state.models["user"].refresh_time,
+           group_render,
+        );
+        ui_state.refresh_model_store("project.ProjectUser");
+        ui_state.refresh_model_store("project.Tag");
+        group_render();
+
+    </script>
 </div>
+
 {% endblock %}
 

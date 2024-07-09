@@ -27,6 +27,7 @@ from django.db.models import (
     F,
     Count,
     TextField,
+    Prefetch,
 )
 from django.db.models.functions import Concat, Replace
 from django.http import QueryDict
@@ -82,6 +83,7 @@ class ProjectGroupManager(GroupManager):
     def user_filter(self, request):
         return self.model.user_filter(request)
 
+
 class ProjectGroup(Group):
     objects = ProjectGroupManager()
     spec = queries.projectgroup_spec
@@ -135,11 +137,16 @@ class ProjectUser(User, AutoCompleteCoreModel):
 
     class Meta:
         proxy = True
+        ordering = ("username",)
 
     def add_user_and_save(self, request):
         # permissions.py enforces that request.user.manages is not null
         self.belongs_to = request.user.manages
         self.save()
+
+    @property
+    def all_my_projects(self):
+        return Project._user_filter(self).distinct()
 
     @hook(BEFORE_SAVE)
     def force_no_password_no_active(self):
@@ -149,6 +156,8 @@ class ProjectUser(User, AutoCompleteCoreModel):
 
 class Settings(CoreModel):
 
+    spec = queries.settings_spec
+
     class _Form(RequestForm):
         class Meta:
             fields = ["hide_done", "id"]
@@ -157,7 +166,6 @@ class Settings(CoreModel):
             self.instance.user = self.request.user
             super().save(*args, **kwargs)
 
-    spec = ["hide_done", "see_all_projects", "id", "work_hours", *queries.__core_info__]
     form_fields = ["user", "hide_done"]
     user = OneToOneField(ProjectUser, on_delete=CASCADE, blank=True, related_name="+")
     hide_done = BooleanField(default=False, blank=True)
@@ -289,37 +297,40 @@ class Project(AutoCompleteNexus, AutoCompleteCoreModel):
         ]
 
     @classmethod
-    def users_projects(cls, project_user):
-        q = Q(viewers=project_user)   # you've opted to follow this project
+    def _user_filter(cls, project_user):
+        q = Q(viewers=project_user)  # you've opted to follow this project
         q = q | Q(lead=project_user)  # you've been assinged as the lead of hte project
-        q = q | Q(project_manager=project_user) # you're a project manager for the project
-        q = q | Q(tasks__lead=project_user) # you're the lead on one of the tasks for the project
-        q = q |  Q(timereports__user=project_user)  # you've entered a time report' 
+        q = q | Q(
+            project_manager=project_user
+        )  # you're a project manager for the project
+        q = q | Q(
+            tasks__lead=project_user
+        )  # you're the lead on one of the tasks for the project
+        q = q | Q(timereports__user=project_user)  # you've entered a time report'
         if project_user.manages:
-            q = q | Q( group = project_user.manages)  # basic, you're in the group where the project is hosted
-        return q
-
-    @classmethod
-    def private_projects(cls, project_user):
-        return Q(private=True) & ~Q(private_owner=project_user)
-
-    # write email for Sarah to end telling people to fuck off
-    # talk to James about good venue for sharing DMI concept
+            q = q | Q(
+                group=project_user.manages
+            )  # basic, you're in the group where the project is hosted
+        return cls.objects.filter(q).exclude(
+            Q(private=True) & ~Q(private_owner=project_user)
+        )
 
     @classmethod
     def user_filter(cls, request):
         filters = cls.get_filters(request)
+        return cls._user_filter(request.project_user).filter(filters).distinct()
+
+    @classmethod
+    def test_post(cls, request):
         u = request.project_user
-        return (
-            cls.objects.filter(cls.users_projects(u))
-            .filter(filters)
-            .exclude(cls.private_projects(u))
-            .distinct()
-        )
+        return cls(group=u.manages or u.belongs_to)
 
     @hook(AFTER_CREATE)
     def add_default_stream(self):
         self.streams.create(name_en="New", name_fr="Nouvelles", project_default=True)
+
+    @hook(AFTER_CREATE)
+    def add_project_log(self):
         ProjectLog(project=self).save()
 
     def add_user_and_save(self, request):
@@ -330,9 +341,8 @@ class Project(AutoCompleteNexus, AutoCompleteCoreModel):
         try:
             self.lead
         except self.__class__.lead.RelatedObjectDoesNotExist:
-            self.lead =  request.project_user
+            self.lead = request.project_user
         self.save()
-
 
     @property
     def default_stream(self):
@@ -378,17 +388,17 @@ class Project(AutoCompleteNexus, AutoCompleteCoreModel):
         related_name="sub_projects",
         text_trigger="^",
     )
-    lead =  ForeignKey(
+    lead = ForeignKey(
         ProjectUser,
         blank=True,
         null=True,
         on_delete=SET_NULL,
-        text_trigger="@", 
+        text_trigger="@",
         search_field="username",
         related_name="projects_i_lead",
-    )                           
+    )
     project_team = ManyToManyField(
-        ProjectUser, blank=True, search_field="username"
+        ProjectUser, blank=True, search_field="username", related_name="+"
     )
     project_manager = ForeignKey(
         ProjectUser,
@@ -411,17 +421,6 @@ class Project(AutoCompleteNexus, AutoCompleteCoreModel):
     viewers = ManyToManyField(ProjectUser, related_name="projects", blank=True)
     short_term_outcomes = TextField(blank=True, null=True)
     long_term_outcomes = TextField(blank=True, null=True)
-
-
-class MinProject(Project):
-    spec = queries.min_project_spec
-
-    class Meta:
-        proxy = True
-
-    @classmethod
-    def user_filter(cls, request):
-        return Project.user_filter(request)
 
 
 class ProjectLog(CoreModel):
@@ -633,6 +632,7 @@ class Task(AutoCompleteCoreModel, AutoCompleteNexus):
         on_delete=SET_NULL,
         null=True,
         blank=True,
+        related_name="my_tasks",
         text_trigger="@",
         search_field="username",
     )
@@ -673,10 +673,9 @@ class TimeReport(CoreModel):
         self.week = self.week - timedelta(days=self.week.weekday())
 
     @hook(AFTER_SAVE)
-    def if_0_then_delete(self):
+    def if_time0_then_delete(self):
         if self.time == 0:
             self.delete()
-
 
     def add_user_and_save(self, request):
         self.user = request.user

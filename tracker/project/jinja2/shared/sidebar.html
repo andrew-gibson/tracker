@@ -1,10 +1,6 @@
 <div id="sidebar" class="sidebar">
    <a class="link body-emphasis" hx-get="{{url("project:main")}}" href="#" hx-target="#main-content" hx-replace-url="true">My Projects</a>
-   <div id="myprojects" 
-       hx-trigger="reloadMinProject from:document, reloadProjects from:document" 
-       hx-get="{{url("core:main", kwargs={"m" : "project.MinProject"})}}" 
-       hx-swap="none"
-       hx-headers='{"json-response" : "true"}'>
+   <div id="myprojects">
        <div class="placeholder-glow">
            <div class="col-12 placeholder placeholder-xs"></div>
            <div class="col-12 placeholder placeholder-xs"></div>
@@ -27,11 +23,7 @@
     </div>
 
    <div id="team-header" class="body-emphasis mt-2">Team</div>
-   <div id="myteam"
-        hx-trigger="reloadProjectUsers from:document"
-        hx-get="{{url("core:main", kwargs={"m" : "project.ProjectUser"})}}" 
-        hx-swap="none"
-        hx-headers='{"json-response" : "true"}'> 
+   <div id="myteam">
        <div class="placeholder-glow">
            <div class="col-12 placeholder placeholder-xs"></div>
            <div class="col-12 placeholder placeholder-xs"></div>
@@ -41,11 +33,7 @@
    </div> 
 
    <div class="body-emphasis mt-2">Groups</div>
-   <div id="groups" 
-        hx-trigger="reloadTeams from:document"
-        hx-get="{{url("core:main", kwargs={"m" : "project.ProjectGroup"})}}" 
-       hx-swap="none"
-       hx-headers='{"json-response" : "true"}'> 
+   <div id="groups"> 
        <div class="placeholder-glow">
            <div class="col-12 placeholder placeholder-xs"></div>
            <div class="col-12 placeholder placeholder-xs"></div>
@@ -60,37 +48,12 @@
     <a class="link body-emphasis mt-2" hx-get="{{url("project:metadata")}}" href="#" hx-target="#main-content" hx-replace-url="true">Edit Tags / Users</a>
 </div>
 
-<script type="module" id="sidebar-js" hx-swap-oob="true">
-import {ui_state} from "d3-ui";
+<script type="module">
+import {ui_state,reaction} from "d3-ui";
 export const sidebar_state = mobx.makeAutoObservable({
      current_url :  "{{request.path}}",
-     groups : [],
-     myprojects : [],
      redraw : 0,
 });
-mobx.reaction(
-    ()=>[sidebar_state.groups.length, sidebar_state.myprojects.length, sidebar_state.redraw,ui_state.user.manages.users], 
-    ()=>{
-       redraw("#groups",sidebar_state.groups);
-       redraw("#myprojects",sidebar_state.myprojects);
-       if(ui_state.user.manages){
-           redraw("#myteam",ui_state.user.manages.team_members);
-       } else {
-          d3.select("#team-header").remove();
-       }
-    });
-// capture all the clicks and don't interere with the htmx click
-d3.select("#sidebar")
-      .on("click", e=>{
-         if (e.target.tagName == "A") {
-             d3.select("#main-content").html("");
-             if (d3.select(e.target).datum()) {
-                 sidebar_state.current_url = d3.select(e.target).datum().__url__;
-             } 
-             ui_state.reset_ui(false);
-             sidebar_state.redraw++;
-         }
-      });
 const redraw = (id,data)=> {
   d3.select(id)
    .html("")
@@ -110,20 +73,20 @@ const redraw = (id,data)=> {
      .join("li")
      .attr("class","pt-2 text-nowrap")
      .selectAll("span")
-     .data(d=>[d])
+     .data(d=>[d],d=>d.id)
      .join("span")
      .attr("class" , d=> {
-         if (d.url == sidebar_state.current_url){
+         if (d.__url__ == sidebar_state.current_url){
             return "bg-primary text-white p-2 rounded"
          }  else {
             return "pt-2"
          }
      })
      .selectAll("a")
-     .data(d=>[d])
+     .data(d=>[d],d=>d.id)
      .join("a")
      .attr("class" , d=> {
-         if (d.url == sidebar_state.current_url){
+         if (d.__url__ == sidebar_state.current_url){
             return "text-white"
          }  else {
             return "link-secondary"
@@ -139,22 +102,44 @@ const redraw = (id,data)=> {
        "hx-replace-url":"true",
      })
      .setup_htmx()
-     .html(d=>d.name)
+     .html(d=>{
+         return d.name
+     })
 }
-document.body.addEventListener('htmx:afterOnLoad', async event => {
-    if (event.detail.requestConfig.headers["json-response"]) {
-        const data = JSON.parse( await event.detail.xhr.responseText );
-        switch (event.detail.requestConfig.triggeringEvent.type){
-            case "reloadMinProject":
-            case "reloadProject":
-                sidebar_state["myprojects"] = data;
-                break;
-            case "reloadTeams":
-                sidebar_state["groups"] = data;
-        }
-    }
-})
-document.dispatchEvent(new Event("reloadMinProject"))
-document.dispatchEvent(new Event("reloadTeams"))
+// don't use d3-ui reaction, since this isn't 
+mobx.reaction(
+    ()=>[ui_state.models["project.ProjectGroup"].refresh_time, 
+         ui_state.models["user"].refresh_time,
+         sidebar_state.redraw,
+    ], 
+    ()=>{
+       redraw("#groups",ui_state.models["project.ProjectGroup"].data);
+       redraw("#myprojects",ui_state.models["user"].data.projects);
+       if(ui_state.models["user"].data.manages){
+           redraw("#myteam",ui_state.models["user"].data.manages.team_members);
+       } else {
+          d3.select("#team-header").remove();
+       }
+    });
+// capture all the clicks and don't interere with the htmx click
+d3.select("#sidebar")
+      .on("click", e=>{
+         if (e.target.tagName == "A") {
+             d3.select("#main-content").html("");
+
+             if (d3.select(e.target).datum()) {
+                 sidebar_state.current_url = d3.select(e.target).datum().__url__;
+             } else if ("hx-get" in e.target.attributes){
+                 sidebar_state.current_url = e.target.attributes["hx-get"].value;
+             }
+             ui_state.reset_ui(false);
+             sidebar_state.redraw++;
+         }
+      });
+if (ui_state.models["project.Project"].data.length == 0){
+     ui_state.refresh_model_store("project.ProjectGroup")
+} else {
+    ui_state.models["user"].refresh_time = Date.now();
+}
 
 </script>

@@ -1,7 +1,6 @@
 import  { append_edit_attr,ui_state, make_right_dropdown, create_button } from "d3-ui";
 
 export const project_summary = project => {
-    const observable_data = mobx.makeAutoObservable( project);
     const root = d3.select(`#project${project.id}`)
         .call(function(selection){
            const body_sel = selection.select(".card-body");
@@ -35,22 +34,22 @@ export const project_summary = project => {
                     "hx-get" : project.__url__,
                 })
                 .setup_htmx()
-                .html(observable_data.name)
-            append_edit_attr(body_sel, observable_data, "status","Status");
-            append_edit_attr(body_sel, observable_data,"text", "Summary");
-            append_edit_attr(body_sel, observable_data, "group","Team",{on_change : "reloadProjects"});
-            append_edit_attr(body_sel, observable_data,"streams", "Streams",{read_only:true, name_attr:"name_count"});
-            append_edit_attr(body_sel, observable_data,"lead", "Lead", {name_attr : "username"});
-            append_edit_attr(body_sel, observable_data,"project_manager", "Project Manager", {name_attr : "username"});
-            append_edit_attr(body_sel, observable_data,"project_team", "Project Team", {name_attr : "username"});
-            append_edit_attr(body_sel, observable_data,"tags", "Tags");
-            append_edit_attr(body_sel, observable_data,"partners", "Partners");
+                .html(project.name)
+            append_edit_attr(body_sel, project, "status","Status");
+            append_edit_attr(body_sel, project,"text", "Summary");
+            append_edit_attr(body_sel, project, "group","Team",{on_change : "reloadProjects"});
+            append_edit_attr(body_sel, project,"streams", "Streams",{read_only:true, name_attr:"name_count"});
+            append_edit_attr(body_sel, project,"lead", "Lead", {name_attr : "username"});
+            append_edit_attr(body_sel, project,"project_manager", "Project Manager", {name_attr : "username"});
+            append_edit_attr(body_sel, project,"project_team", "Project Team", {name_attr : "username"});
+            append_edit_attr(body_sel, project,"tags", "Tags");
+            append_edit_attr(body_sel, project,"partners", "Partners");
 
             footer_sel   
                  .classed("d-flex justify-content-between align-items-center", true)
                  .append("div")
                  .call(function(foodter_sel){
-                    append_edit_attr(foodter_sel, observable_data, "private", "Private");
+                    append_edit_attr(foodter_sel, project, "private", "Private");
                  })
         })
     ui_state.active_elements.push(root)

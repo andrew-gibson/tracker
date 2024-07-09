@@ -1,3 +1,4 @@
+import datetime
 import json
 from core.utils import (
     API,
@@ -22,6 +23,37 @@ from . import models
 api = API(namespace="project", session={})
 
 
+def _whoami(request):
+    prepare_qs, projection = models.ProjectUser.readers(request, pk=request.user.pk)
+    prepared_user = prepare_qs(models.ProjectUser.objects.filter(id=request.user.id))
+    return projection(prepared_user.first())
+
+
+@api.get("whoami/")
+def whoami(request):
+    return JsonResponse(_whoami(request))
+
+
+@api.get("model_info/")
+def model_info(request):
+    resp =          {
+            "user": {
+                "main": "/project/whoami/",
+                "filters": [],
+                "data": _whoami(request),
+                "refresh_time": datetime.datetime.now().timestamp(),
+            },
+            **{
+                m._meta.label: m.model_info(request)
+                for m in apps.get_models()
+                if hasattr(m, "model_info") and m._meta.app_label == "project"
+            },
+        } 
+    return JsonResponse(
+       resp
+    )
+
+
 @api.get("main/")
 def main(request):
     return render(
@@ -42,13 +74,6 @@ def metadata(request):
             "standalone": not request.htmx,
         },
     )
-
-
-@api.get("whoami/")
-def whoami(request):
-    prepare_qs, projection = models.ProjectUser.readers(request,pk=request.user.pk)
-    prepared_user = prepare_qs(models.ProjectUser.objects.filter(id=request.user.id))
-    return JsonResponse(projection(prepared_user.first()))
 
 
 @api.get("timereporting/")

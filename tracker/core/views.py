@@ -95,17 +95,6 @@ def main(request, m="", pk=None):
             return HttpResponseBadRequest()
 
 
-@api.get("model_info/")
-def model_info(request):
-    return JsonResponse(
-        {
-            m._meta.label: m.model_info
-            for m in apps.get_models()
-            if hasattr(m, "model_info")
-        }
-    )
-
-
 
 @api.post_delete(
     [
@@ -128,8 +117,10 @@ def toggle_link(request, m1, pk1, m2, pk2, attr=""):
             unlink_or_404(obj1, obj2, attr)
             #we might no longer have access to the original object, so manually 
             #remove obj2 
-            if getattr(obj1,attr):
+            if isinstance(getattr(obj1,attr),(list,tuple)):
                 projection[attr] = [x for x in projection[attr] if x["id"] != pk2]
+            else:
+                projection.pop(attr)
         return JsonResponse(projection)
     except AssertionError:
         raise Http404("Invaolid permissions")

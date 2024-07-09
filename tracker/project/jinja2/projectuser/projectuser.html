@@ -25,6 +25,7 @@
         import {ui_state, inplace_char_edit, create_button,fk_toggle} from "d3-ui";
         const project_group = {{dumps(inst)|safe}};
 
+
         d3.select("#projects ul")
           .selectAll("li.list-group-item")
           .data(project_group.projects,d=>d.id)

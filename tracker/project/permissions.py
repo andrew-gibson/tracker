@@ -15,6 +15,11 @@ def good_m2m_request(user, method, obj1, obj2, attr):
 def good_request(user, method, obj):
 
     match [obj, method]:
+
+        case [models.ProjectGroup(), "POST"] if not obj.id:
+            # only group alterations are allowed by the group owner
+            return bool(user.manages)
+
         case [models.ProjectGroup(), "POST" | "PUT" | "DELETE"]:
             # only group alterations are allowed by the group owner
             return obj.app == "project" and (user.manages in [obj, *obj.parents])
@@ -37,7 +42,7 @@ def good_request(user, method, obj):
             return False
 
         case [models.ProjectUser(), "POST"] if not obj.id:
-            return user.manages
+            return bool(user.manages)
 
         case [models.ProjectUser(), "POST"]:
             return (
@@ -70,6 +75,15 @@ def good_request(user, method, obj):
             # only tag reads are allowed by the group members except for public tags
             return (obj.group in user.belongs_to.descendants) or obj.public
 
+        case [models.ProjectLog(), "POST"]:
+            # project logs are created automatically
+            return False
+
+        case [models.Stream() | models.Task(), "POST"] if not obj.id:
+            # can a user in general create a blank version of these objects?
+            # return None to indicate that it's depends
+            return None
+
         case [
             models.Stream() | models.Task() | models.ProjectLog(),
             "POST" | "PUT" | "DELETE" | "GET",
@@ -78,7 +92,7 @@ def good_request(user, method, obj):
             return good_project_request(user, method, obj.project)
 
         case [
-            models.Project() | models.MinProject(),
+            models.Project(),
             "POST" | "PUT" | "DELETE" | "GET",
         ]:
             # see good_project_request for descriptions of permissions

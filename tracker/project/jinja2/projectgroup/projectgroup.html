@@ -9,6 +9,7 @@
 {% block content%}
 <div id="main-content" class="row" hx-swap-oob="true">
     <div class="card" id="projects">
+        <div class="fs-4 fw-bold">{{inst.name}}</div>
           <div class="card-header d-flex justify-content-between">
               <span>Projects</span>
               <span>Follow</span>
@@ -19,38 +20,45 @@
 
     <script type="module" >
         import fetch_recipies from "fetch-recipies";
-        import {ui_state, inplace_char_edit, create_button,fk_toggle} from "d3-ui";
-        const project_group = {{dumps(inst)|safe}};
+        import {ui_state, inplace_char_edit, create_button,fk_toggle, reaction} from "d3-ui";
+        const group = {{dumps(inst)|safe}};
+        const on_change = ()=>{
+           ui_state.refresh_model_store("user");
+        };
+        const render = data => {
+            d3.select("#projects ul")
+              .selectAll("li.list-group-item")
+              .data(data.projects,d=>d.id)
+              .join("li")
+              .attr("class","list-group-item d-flex justify-content-between")
+              .each(function(d){
+                 const sel = d3.select(this)
+                 sel.html('');
+                 sel
+                    .selectAll("a.project-link")
+                    .data(d=>[d],d=>d.id)
+                    .join("a")
+                    .attr( "class", "btn btn-link project-link")
+                    .attrs({
+                      "hx-replace-url":"true",
+                      "hx-swap":"outerHTML",
+                      "hx-target" : "#main-content",
+                    })
+                    .attr("hx-get",d=>d.__url__)
+                    .html(d=>d.name)
+                    .setup_htmx()
+                  if ( !ui_state.models["user"].data.projects.map(d=>d.id).includes(group.id) ){
+                      fk_toggle(sel,d.viewers,"viewers",{on_change})
+                  }
 
-        d3.select("#projects ul")
-          .selectAll("li.list-group-item")
-          .data(project_group.projects,d=>d.id)
-          .join("li")
-          .attr("class","list-group-item d-flex justify-content-between")
-          .each(function(d){
-             const sel = d3.select(this)
-              
-             sel
-                .selectAll("a.project-link")
-                .data(d=>[d],d=>d.id)
-                .join("a")
-                .attr( "class", "btn btn-link project-link")
-                .attrs({
-                  "hx-replace-url":"true",
-                  "hx-swap":"outerHTML",
-                  "hx-target" : "#main-content",
-                })
-                .attr("hx-get",d=>d.__url__)
-                .html(d=>d.name)
-                .setup_htmx()
-
-
-              if ( !ui_state.user.groups.map(d=>d.id).includes(project_group.id) ){
-                  fk_toggle(sel,d.viewers,"viewers",{on_change : "reloadMinProject"})
-              }
-
-          })
-
+              })
+        };
+        reaction(
+             d3.select("#projects"),
+             ()=>ui_state.models["{{model_label}}"].refresh_time,
+             ()=> render(group)
+        );
+        ui_state.update_store(group);
     </script>
 </div>
 {%endblock%}

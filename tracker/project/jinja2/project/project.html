@@ -1,22 +1,19 @@
 {% if  standalone %} 
   {% extends "base.html" %} 
-
   {% block sidebar %}
       {%include "shared/sidebar.html"%}
   {%endblock%}
-
 {% endif %}
 
 {% block nav %}
-
     {%with navbar=[],navdropdown=[ "project/project-navdropdown.html"]%}
         {%include "navbar.html"%}
     {%endwith%}
-
 {%endblock%}
 
 {% if variable is defined %}
 {%endif %}
+
 {% block content %}{%with project=inst %}
 <div id="main-content" hx-swap-oob="true">
     <div id="project{{project.id}}" class="card task p-0">

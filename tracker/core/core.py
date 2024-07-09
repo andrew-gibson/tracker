@@ -1,6 +1,7 @@
 import json
 import re
 import operator
+import datetime
 import functools
 
 from django.apps import apps
@@ -22,7 +23,7 @@ class RequestForm(ModelForm):
         super().__init__(*args, **kwargs)
         if self.data:
             self.data._mutable = True
-            for field in self._meta.model.bilingual_fields:
+            for field in self._meta.model.multilingual_fields:
                 if field in self.data:
                     self.data[resolve_field_to_current_lang(field)] = self.data[field]
                     del self.data[field]
@@ -50,19 +51,24 @@ class CoreModel(LifecycleModelMixin, Model):
     class Meta:
         abstract = True
 
-    @classproperty
-    def model_info(cls):
+    @classmethod
+    def model_info(cls, request):
         return {
             "fields": cls.fields_map,
             "search_relation": reverse("core:text_ac", kwargs={"m": cls._meta.label}),
             "main": reverse("core:main", kwargs={"m": cls._meta.label}),
-            "main_pk": reverse(
-                "core:main", kwargs={"m": cls._meta.label, "pk": 9999}
-            ).replace("9999", "__pk__"),
             "rgba": getattr(cls, "__rgba__", "rgba(21,21,21,0.3))"),
             "hex": getattr(cls, "__hex__", "#1a1a1a"),
-            "bilingual_fields": cls.bilingual_fields,
+            "multilingual_fields": cls.multilingual_fields,
+            "POST" : cls.perms.good_request(request.user, "POST", cls.test_post(request)),
+            "filters" : {},
+            "data"  : [],
+            "refresh_time": datetime.datetime.now().timestamp(),
         }
+
+    @classmethod
+    def test_post(cls,request):
+        return cls()
 
     @classmethod
     def settings(cls, request):
@@ -75,7 +81,7 @@ class CoreModel(LifecycleModelMixin, Model):
             return {}
 
     @classproperty
-    def bilingual_fields(cls):
+    def multilingual_fields(cls):
         return [
             x.replace("_en", "") for x in cls._fields_map.keys() if x.endswith("_en")
         ]
@@ -87,7 +93,7 @@ class CoreModel(LifecycleModelMixin, Model):
     @classproperty
     def fields_map(cls):
         all_fields = cls._fields_map
-        for bif in cls.bilingual_fields:
+        for bif in cls.multilingual_fields:
             all_fields[bif] = all_fields[resolve_field_to_current_lang(bif)]
         return all_fields
 
@@ -209,6 +215,7 @@ class CoreModel(LifecycleModelMixin, Model):
                     "form": form,
                     "standalone": not request.htmx,
                     "settings": cls.settings(request),
+                    "model_label" : cls._meta.label,
                 },
             )
         else:
@@ -228,6 +235,7 @@ class CoreModel(LifecycleModelMixin, Model):
                     "insts": insts,
                     "standalone": not request.htmx,
                     "settings": cls.settings(request),
+                    "model_label" : cls._meta.label,
                 },
             )
 
@@ -466,7 +474,7 @@ class AutoCompleteCoreModel(CoreModel):
     @classproperty
     def search_field(cls):
         f = cls._search_field
-        if f in cls.bilingual_fields:
+        if f in cls.multilingual_fields:
             f = resolve_field_to_current_lang(f)
         return f
 

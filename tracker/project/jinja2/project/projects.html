@@ -10,17 +10,6 @@
 import { ui_state, autoRun } from "d3-ui";
 import {project_summary} from "{{ static('project_summary.js') }}";
 import "d3";
-const projects =  {{dumps(insts)|safe}};
-
-_.each(projects, p=> project_summary( p, "true"));
-
-//autoRun(async ()=>{
-//    if (ui_state.active_elements.length == projects.length){
-//       _.each(_.keys(ui_state.models['project.Project'].fields),attr=>{
-//            const classq =  `.${attr}-row.editor-normal`;
-//            const max_height =  _.max(_.map(d3.selectAll(classq).nodes(),n=>n.offsetHeight)) + "px";
-//            d3.selectAll(classq).style("height", max_height);
-//       })
-//    }
-//});
+await ui_state.refresh_model_store("project.Project",{{dumps(insts)|safe}} )
+_.each(ui_state.models["project.Project"].data, p=> project_summary( p, "true"));
 </script>

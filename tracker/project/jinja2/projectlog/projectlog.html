@@ -18,7 +18,7 @@
         .classed("list-group-item",true)
         .each(function(d,i){
            const delete_hx_args =  {
-                "hx-delete" : ui_state.models["project.ProjectLogEntry"].main_pk.replace("__pk__", d.id),
+                "hx-delete" : d.__url__,
                 "hx-on::after-request" : "window.reset_ui('reloadLog')",
                 "hx-swap" : "none",
            }
