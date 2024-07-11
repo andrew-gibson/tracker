@@ -1,3 +1,4 @@
+from functools import lru_cache
 from django.contrib.auth.models import (
     AbstractUser,
     UserManager,
@@ -73,8 +74,8 @@ class AbstractGroup(Model):
 class Group(AbstractGroup, AutoCompleteCoreModel):
 
     class adminClass(admin.ModelAdmin):
-        list_display = ( "name_en", "system", "app","parent")
-        list_editable = ( "system", "app","parent")
+        list_display = ("name_en", "system", "app", "parent")
+        list_editable = ("system", "app", "parent")
         list_filter = ("system", "app")
         search_fields = ("name",)
 
@@ -83,23 +84,38 @@ class Group(AbstractGroup, AutoCompleteCoreModel):
         return cls.objects.all()
 
     @property
-    def parents(self):
-        parents = []
-        node = self
-        while node.parent:
-            parents.append(node.parent)
-            node = node.parent
-        return parents
-
-    @property
-    def _descendants(self):
-        for child in  self.children.all():
-            yield child
-            yield from child._descendants
-
-    @property
+    @lru_cache()
     def descendants(self):
-        return [self] + list(self._descendants)
+        query = f'''
+            WITH RECURSIVE children_cte AS (
+                SELECT id, name_en, name_fr, acronym_en, acronym_fr, system, parent_id
+                FROM {self._meta.db_table}
+                WHERE id = {self.id}
+                UNION ALL
+                SELECT g.id, g.name_en, g.name_fr, g.acronym_en, g.acronym_fr, g.system, g.parent_id
+                FROM {self._meta.db_table} g
+                INNER JOIN children_cte c ON c.id = g.parent_id
+            )
+            SELECT * FROM children_cte;
+        '''
+        return self.__class__.objects.raw(query)
+
+    @property
+    @lru_cache()
+    def parents(self):
+        query = f'''
+            WITH RECURSIVE parents_cte AS (
+                SELECT id, name_en, name_fr, acronym_en, acronym_fr, system, parent_id
+                FROM {self._meta.db_table}
+                WHERE id = {self.id}
+                UNION ALL
+                SELECT g.id, g.name_en, g.name_fr, g.acronym_en, g.acronym_fr, g.system, g.parent_id
+                FROM {self._meta.db_table} g
+                INNER JOIN parents_cte p ON p.parent_id = g.id
+            )
+            SELECT * FROM parents_cte;
+        '''
+        return self.__class__.objects.raw(query)
 
     parent = ForeignKey(
         "Group", on_delete=CASCADE, related_name="children", null=True, blank=True
@@ -119,8 +135,15 @@ class User(AbstractUser):
     objects = GroupPrefetcherManager()
 
     class adminClass(admin.ModelAdmin):
-        list_display = ("username", "belongs_to", "manages",)
-        list_editable = ("belongs_to", "manages", )
+        list_display = (
+            "username",
+            "belongs_to",
+            "manages",
+        )
+        list_editable = (
+            "belongs_to",
+            "manages",
+        )
 
     class Meta:
         base_manager_name = "objects"

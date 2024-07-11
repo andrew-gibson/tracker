@@ -121,21 +121,14 @@ mobx.reaction(
           d3.select("#team-header").remove();
        }
     });
-// capture all the clicks and don't interere with the htmx click
-d3.select("#sidebar")
-      .on("click", e=>{
-         if (e.target.tagName == "A") {
-             d3.select("#main-content").html("");
 
-             if (d3.select(e.target).datum()) {
-                 sidebar_state.current_url = d3.select(e.target).datum().__url__;
-             } else if ("hx-get" in e.target.attributes){
-                 sidebar_state.current_url = e.target.attributes["hx-get"].value;
-             }
-             ui_state.reset_ui(false);
-             sidebar_state.redraw++;
-         }
-      });
+
+document.addEventListener("htmx:beforeRequest",event => {
+   if ("hx-replace-url" in event.target.attributes){
+         sidebar_state.current_url =  event.target.attributes["hx-get"].value
+         sidebar_state.redraw++;
+   }
+})
 if (ui_state.models["project.Project"].data.length == 0){
      ui_state.refresh_model_store("project.ProjectGroup")
 } else {

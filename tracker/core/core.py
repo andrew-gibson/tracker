@@ -216,6 +216,7 @@ class CoreModel(LifecycleModelMixin, Model):
                     "standalone": not request.htmx,
                     "settings": cls.settings(request),
                     "model_label" : cls._meta.label,
+                    "target" : request.headers.get("hx-target",None),
                 },
             )
         else:
@@ -236,6 +237,7 @@ class CoreModel(LifecycleModelMixin, Model):
                     "standalone": not request.htmx,
                     "settings": cls.settings(request),
                     "model_label" : cls._meta.label,
+                    "target" : request.headers.get("hx-target",None),
                 },
             )
 

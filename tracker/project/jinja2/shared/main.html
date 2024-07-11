@@ -12,7 +12,7 @@
 {%endblock%}
 
 {% block content %}
-<div id="main-content" >
+<div id="main-content" hx-swap-oob=true>
     <div id="smart_input" x-data>
         <p style="font-size: 0.8em" class="text-secondary mb-0">
             {{models["project.Project"].describe_links()}}

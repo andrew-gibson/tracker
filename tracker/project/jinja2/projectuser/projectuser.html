@@ -16,15 +16,16 @@
           </ul>
     </div>
 
-    <div class="card col-9" id="project">
+    <div class="card col-9">
+        <div  id="main-sub-content">
 
+        </div>
     </div>
 
     <script type="module" >
         import fetch_recipies from "fetch-recipies";
-        import {ui_state, inplace_char_edit, create_button,fk_toggle} from "d3-ui";
+        import {ui_state, inplace_char_edit} from "d3-ui";
         const project_group = {{dumps(inst)|safe}};
-
 
         d3.select("#projects ul")
           .selectAll("li.list-group-item")
@@ -36,14 +37,16 @@
           .join("button")
           .attr( "class", "btn btn-link project-link text-start p-1")
           .attrs({
-            "hx-replace-url":"true",
-            "hx-swap":"outerHTML",
-            "hx-target" : "#main-content",
+            "hx-target" : "#main-sub-content",
           })
-          .on("click",d=>{
-
-          })
+          .attr("hx-get",d=>d.__url__)
+          .setup_htmx()
           .html(d=>d.name)
+
+        document.addEventListener("htmx:swapError",event => {
+            console.log(event)
+        })
+
 
     </script>
 </div>

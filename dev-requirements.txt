@@ -5,4 +5,4 @@ pip-autoremove
 pytest-django
 Faker
 gnureadline
-django-debug-toolbar
+django-silk

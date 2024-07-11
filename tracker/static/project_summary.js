@@ -44,7 +44,6 @@ export const project_summary = project => {
             append_edit_attr(body_sel, project,"project_team", "Project Team", {name_attr : "username"});
             append_edit_attr(body_sel, project,"tags", "Tags");
             append_edit_attr(body_sel, project,"partners", "Partners");
-
             footer_sel   
                  .classed("d-flex justify-content-between align-items-center", true)
                  .append("div")

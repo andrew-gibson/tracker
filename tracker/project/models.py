@@ -116,8 +116,7 @@ class MyProjectGroup(Group):
 
     @classmethod
     def user_filter(cls, request):
-        descendants = request.user.belongs_to.descendants + [request.user.belongs_to]
-        return cls.objects.filter(id__in=[x.id for x in descendants])
+        return cls.objects.filter(id__in=[x.id for x in request.project_user.belongs_to.descendants])
 
 
 class GroupPrefetcherManager(UserManager):

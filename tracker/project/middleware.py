@@ -12,19 +12,15 @@ def add_project_user_middleware(get_response):
 
         if not isinstance(request.user, AnonymousUser):
             request.project_user = (
-                ProjectUser.objects.prefetch_related(
-                    "manages__children__children__children__children"
-                )
-                .prefetch_related("belongs_to__children__children__children__children")
+                ProjectUser.objects
+                .select_related("manages","belongs_to")
+                #.prefetch_related(
+                #    "manages__children__children__children__children"
+                #)
+                #.prefetch_related("belongs_to__children__children__children__children")
                 .get(pk=request.user.pk)
             )
-            request.user = (
-                User.objects.prefetch_related(
-                    "manages__children__children__children__children"
-                )
-                .prefetch_related("belongs_to__children__children__children__children")
-                .get(pk=request.user.pk)
-            )
+
         response = get_response(request)
 
         # Code to be executed for each request/response after

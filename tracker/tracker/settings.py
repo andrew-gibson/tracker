@@ -15,7 +15,7 @@ from pathlib import Path
 
 from decouple import config
 
-SHELL_PLUS_PRINT_SQL_TRUNCATE = 2000
+SHELL_PLUS_PRINT_SQL_TRUNCATE = 20000
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 LOGIN_URL = "/core/login/"
@@ -37,7 +37,10 @@ STATICFILES_DIRS = [
 ]
 STATIC_URL = "static/"
 TESTING = "pytest" in "".join(sys.argv)
-
+SILKY_IGNORE_PATHS = [
+    r'^/silk/', 
+    r'^/static' 
+]
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
@@ -60,8 +63,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "core",
     "project",
-    #"rules",
-    #"debug_toolbar",
+    "silk",
 ]
 
 AUTHENTICATION_BACKENDS = (
@@ -71,6 +73,7 @@ AUTHENTICATION_BACKENDS = (
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+   'silk.middleware.SilkyMiddleware',
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",

@@ -1,4 +1,4 @@
-import  {ui_state, make_right_dropdown, inplace_char_edit,make_cancel_button, append_edit_attr} from "d3-ui";
+import  {ui_state, make_right_dropdown, inplace_char_edit,make_cancel_button, append_edit_attr,make_delete_button} from "d3-ui";
 export const stream_mini = (stream)=>{
     const observable_data = mobx.makeAutoObservable(stream);
 
@@ -14,21 +14,13 @@ export const stream_mini = (stream)=>{
         })
         .select_parent()
         .call(function(selection){
-            const hx_args =  {
-                "hx-delete" : d.__url__,
-                "hx-on::after-request"  :  "window.reset_ui('reloadTasks')",
-                "hx-swap" : "none",
-            }
+            const d = selection.datum();
             make_right_dropdown(selection,dropdown=>{
                 dropdown
                     .append("li")
-                        .append("a")    
-                            .classed("dropdown-item text-end",true)
-                            .html("Deete")
-                            .attrs(window.delete_modal.attrs)
-                            .on("click", e=>{
-                                window.delete_modal(hx_args);
-                            })
+                        .call(function(selection2){
+                            make_delete_button(selection2, d,d=>d.id, "reloadTasks")
+                        })
             })
         })
 };

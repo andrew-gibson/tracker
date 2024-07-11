@@ -22,7 +22,10 @@ def good_request(user, method, obj):
 
         case [models.ProjectGroup(), "POST" | "PUT" | "DELETE"]:
             # only group alterations are allowed by the group owner
-            return obj.app == "project" and (user.manages in [obj, *obj.parents])
+            p1 =  obj.app == "project"
+            p2 =  bool(user.manages)
+            p3 =  (obj in user.manages.descendants)
+            return  p1 and p2 and p3
 
         case [
             models.ProjectGroup() | models.EXCompetency() | models.ProjectStatus(),
@@ -47,19 +50,19 @@ def good_request(user, method, obj):
         case [models.ProjectUser(), "POST"]:
             return (
                 user.manages == obj.belongs_to
-                or user.manages in obj.belongs_to.parents
+                or obj.belongs_to in user.manages.descendants
                 or user.pk == obj.pk
             )
 
         case [models.ProjectUser(), "PUT" | "DELETE"]:
             # only for users who manage a group in the reporting chain
-            return user.manages in [obj.belongs_to, *obj.belongs_to.parents]
+            return user.manages and obj.belongs_to in user.manages.descendants
 
         case [models.ProjectUser(), "GET"]:
             # only return user info to the request user
             return (
                 user.pk == obj.pk
-                or user.manages in [obj.belongs_to, *obj.belongs_to.parents]
+                or (user.manages and obj.belongs_to in user.manages.descendants)
                 or user.belongs_to == obj.belongs_to
             )
 
@@ -89,6 +92,10 @@ def good_request(user, method, obj):
             "POST" | "PUT" | "DELETE" | "GET",
         ]:
             # default to the owner project for permissions
+            #if "project" not in obj._state.fields_cache:
+            #    import pdb
+            #    pdb.set_trace()
+
             return good_project_request(user, method, obj.project)
 
         case [

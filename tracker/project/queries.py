@@ -57,13 +57,13 @@ def force_type(model):
     ]
 
 
-def __core_info__(request, *include_fields):
+def __core_info__(request, include_fields=None,select_related=None):
 
     def perms(user, *attrs):
-        if attrs:
-            prepare = qs.include_fields(*attrs)
-        else:
-            prepare = qs.noop
+        prepare = qs.pipe(
+            qs.include_fields(*(include_fields or [])),
+            qs.select_related(*(select_related or []))
+        )
 
         def producer(inst):
             return {
@@ -77,7 +77,7 @@ def __core_info__(request, *include_fields):
         "id",
         {"__type__": (qs.noop, producers.attrgetter("_meta.label"))},
         {"__url__": (qs.noop, producers.attrgetter("url"))},
-        {"__perms__": perms(request.user, *include_fields)},
+        {"__perms__": perms(request.project_user, include_fields, select_related)},
     ]
 
 
@@ -118,19 +118,23 @@ def projectuser_spec(cls, request, pk=None):
 
     if pk:
 
-        user = (
-            ProjectUser.objects.only("id", "manages")
-            .select_related("manages")
-            .get(pk=pk)
-        )
+        if pk == request.project_user.pk:
+            user =  request.project_user
+        else:
+            user = (
+                ProjectUser.objects.only("id", "manages","belongs_to")
+                .select_related("manages","belongs_to")
+                .get(pk=pk)
+            )
 
         def add_project_data_to_user():
-            prepare_qs, projection = Project.readers(request)
+            prepare_qs, projection = specs.process(miniproject_spec(Project, request))
+            
 
             def producer(u):
                 return {
                     "projects": [
-                        projection(x) for x in prepare_qs(user.all_my_projects)
+                       projection(x) for x in prepare_qs(user.all_my_projects.all())
                     ]
                 }
 
@@ -148,8 +152,8 @@ def projectuser_spec(cls, request, pk=None):
             return qs.noop, producer
 
         return spec + (
-            add_project_data_to_user(),
-            add_manages_descendants(),
+                add_project_data_to_user(),
+                add_manages_descendants(),
             {
                 "manages": [
                     *force_type("project.ProjectGroup"),
@@ -157,7 +161,7 @@ def projectuser_spec(cls, request, pk=None):
                     "id",
                     {
                         "team_members": [
-                            pairs.exclude(pk=request.user.pk),
+                            pairs.exclude(pk=request.project_user.pk),
                             *force_type("project.ProjectUser"),
                             {"name": "username"},
                             "id",
@@ -179,7 +183,7 @@ def task_spec(cls, request, pk=None):
         {"project": [*__core_info__(request), lang_field("name")]},
         {
             "stream": [
-                *__core_info__(request),
+                *__core_info__(request,select_related=["project"]),
                 lang_field("name"),
             ]
         },
@@ -193,13 +197,12 @@ def task_spec(cls, request, pk=None):
 
 
 def tag_spec(cls, request, pk=None):
-    ProjectGroup = apps.get_model("project.ProjectGroup")
     return [
         (
             qs.select_related("group"),
             projectors.noop,
         ),
-        *__core_info__(request, "group"),
+        *__core_info__(request),
         "name",
         "public",
     ]
@@ -221,14 +224,12 @@ def contact_spec(cls, request, pk=None):
 
 def projectgroup_spec(cls, request, pk=None):
     spec = (
-        (
-            qs.pipe(
-                qs.include_fields("parent", "projects"),
-                qs.select_related("parent__parent__parent__parent"),
-                qs.prefetch_related("children__children__children__children"),
+            (
+                qs.pipe(
+                    qs.include_fields("app"),
+                ),
+                projectors.noop,
             ),
-            projectors.noop,
-        ),
         *__core_info__(request),
         lang_field("name"),
     )
@@ -281,20 +282,19 @@ def project_spec(cls, request, pk=None):
     ProjectLog = apps.get_model("project.ProjectLog")
     Task = apps.get_model("project.Task")
     ProjectUser = apps.get_model("project.ProjectUser")
-    sub_qs = ProjectUser.objects.filter(pk=request.user.pk)
+    sub_qs = ProjectUser.objects.filter(pk=request.project_user.pk)
     return [
         (
             qs.pipe(
                 qs.prefetch_many_to_many_relationship(
                     "viewers", related_queryset=sub_qs
                 ),
-                qs.include_fields("group"),
+                qs.include_fields("group","private","private_owner"),
                 qs.select_related("group"),
             ),
             projectors.noop,
         ),
         *__core_info__(request),
-        "private",
         lang_field("text"),
         {"text_m": render_markdown(f"text_{lang()}")},
         lang_field("name"),
@@ -310,14 +310,14 @@ def project_spec(cls, request, pk=None):
         },
         {
             "streams": [
-                {"name_count": name_task_count()},
                 *__core_info__(request),
+                {"name_count": name_task_count()},
                 lang_field("name"),
                 {"tasks": task_spec(Task, request)},
             ],
         },
         {
-            "group": [*__core_info__(request), lang_field("name")],
+            "group": [*__core_info__(request), lang_field("name"),],
         },
         {
             "status": [*__core_info__(request), lang_field("name")],
@@ -344,10 +344,19 @@ def project_spec(cls, request, pk=None):
             ],
         },
         {
-            "tags": [*__core_info__(request), "name"],
+            "tags": [(qs.include_fields("group"),projectors.noop),*__core_info__(request),"name"],
         },
     ]
 
+def miniproject_spec(cls, request, pk=None):
+    return [
+        pairs.exclude( status__name_en__in=["Completed","Canceled"]),
+        {"private_owner": ["id"]},
+        {"group" : ["id"]},
+        "private",
+        *__core_info__(request),
+        lang_field("name"),
+    ]
 
 def projectlog_spec(cls, request, pk=None):
     ProjectLogEntry = apps.get_model("project.ProjectLogEntry")

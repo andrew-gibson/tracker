@@ -173,7 +173,12 @@ document.addEventListener("htmx:afterRequest",event => {
    if ("data-refresh-model" in event.target.attributes){
       const models = event.target.attributes["data-refresh-model"].value.split(",")
        _.each(models,m=>{
-         ui_state.refresh_model_store(_.trim(m));
+           const e = _.trim(m);
+           if (e.startsWith("reload")){
+              ui_state.signal(e);
+           } else {
+             ui_state.refresh_model_store(e);
+           }
        })
    }
 })
@@ -420,7 +425,8 @@ d3.selection.prototype.last = function() {
 }
 
 
-export const make_delete_button = function(selection, d, key, models_to_refresh){
+export const make_delete_button = function(selection, d, key, models_to_refresh,options={}){
+    const {html="X"} = options;
     if (!selection.selectAll("button").empty()) {
         // already been created, so bail
         return;
@@ -431,7 +437,7 @@ export const make_delete_button = function(selection, d, key, models_to_refresh)
            .join("button")
               .attr("type","button")
               .classed("btn btn-outline-danger p-1 m-1",true)
-              .html("X")
+              .html(html)
             .attrs({
                 "data-bs-toggle":"modal",
                 "data-bs-target":`#delete_modal`
