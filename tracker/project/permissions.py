@@ -2,6 +2,7 @@ from . import models
 
 
 def good_m2m_request(user, method, obj1, obj2, attr):
+
     match [obj1, obj2, attr, method]:
         case [models.Project(), models.ProjectUser(), "viewers", "POST" | "DELETE"]:
             # allow a user to add itself as a viewer of a project normally outside its group
@@ -78,14 +79,25 @@ def good_request(user, method, obj):
             # only tag reads are allowed by the group members except for public tags
             return (obj.group in user.belongs_to.descendants) or obj.public
 
-        case [models.ProjectLog(), "POST"]:
+        case [models.ProjectLog(), "POST" | "PUT" | "DELETE" ]:
             # project logs are created automatically
             return False
 
         case [models.Stream() | models.Task(), "POST"] if not obj.id:
             # can a user in general create a blank version of these objects?
             # return None to indicate that it's depends
-            return None
+            try:
+                return good_project_request(user, method, obj.project)
+            except obj.__class__.project.RelatedObjectDoesNotExist:
+                return None
+
+        case [ models.Stream() , "PUT" | "DELETE" ] if obj.project_default:
+            # default to the owner project for permissions
+            #if "project" not in obj._state.fields_cache:
+            #    import pdb
+            #    pdb.set_trace()
+
+            return False
 
         case [
             models.Stream() | models.Task() | models.ProjectLog(),

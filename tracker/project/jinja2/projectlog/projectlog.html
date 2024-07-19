@@ -4,7 +4,7 @@
     </ul>
 
     <script type="module">
-    import { append_edit_attr, ui_state } from "d3-ui";
+    import { append_edit_attr, ui_state ,make_delete_button} from "d3-ui";
 
     const log = {{dumps(inst)|safe}};
     const observable_data = mobx.makeAutoObservable(log);
@@ -17,22 +17,15 @@
         .join("li")
         .classed("list-group-item",true)
         .each(function(d,i){
-           const delete_hx_args =  {
-                "hx-delete" : d.__url__,
-                "hx-on::after-request" : "window.reset_ui('reloadLog')",
-                "hx-swap" : "none",
-           }
            append_edit_attr(d3.select(this).append("div").styles({"width":"90%","display" : "inline-block"}), 
                             d,
                             "text",new Date(d.addstamp).toLocaleDateString(),
                             {on_change : "reloadLog",display_attr : "rendered_text" });
-           d3.select(this).append("div").style("width","10%").attr("class","d-inline-block text-end")
-                .append("button")    
-                    .classed("btn btn-close",true)
-                    .attrs(window.delete_modal.attrs)
-                    .on("click", e=>{
-                        window.delete_modal(delete_hx_args);
-                    })
+           make_delete_button( 
+               d3.select(this).append("div").style("width","10%").attr("class","d-inline-block text-end"),
+               d,
+               d=>d.id, 
+               "reloadLog")
         })
 
     d3.select(`#projectlog${log.id} .list-group`)

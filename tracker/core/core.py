@@ -60,14 +60,16 @@ class CoreModel(LifecycleModelMixin, Model):
             "rgba": getattr(cls, "__rgba__", "rgba(21,21,21,0.3))"),
             "hex": getattr(cls, "__hex__", "#1a1a1a"),
             "multilingual_fields": cls.multilingual_fields,
-            "POST" : cls.perms.good_request(request.user, "POST", cls.test_post(request)),
-            "filters" : {},
-            "data"  : [],
+            "POST": cls.app_config.perms.good_request(
+                request.user, "POST", cls.test_post(request)
+            ),
+            "filters": {},
+            "data": [],
             "refresh_time": datetime.datetime.now().timestamp(),
         }
 
     @classmethod
-    def test_post(cls,request):
+    def test_post(cls, request):
         return cls()
 
     @classmethod
@@ -106,8 +108,8 @@ class CoreModel(LifecycleModelMixin, Model):
         return specs.process(spec)
 
     @classproperty
-    def perms(cls):
-        return cls._meta.app_config.permissions
+    def app_config(cls):
+        return cls._meta.app_config
 
     @classmethod
     def get_projection_by_pk(cls, request, pk, method=""):
@@ -121,7 +123,7 @@ class CoreModel(LifecycleModelMixin, Model):
         method = method or request.method
         try:
             obj = qs.first()
-            assert cls.perms.good_request(request.user, method, obj)
+            assert cls.app_config.perms.good_request(request.user, method, obj)
             if not obj:
                 raise cls.DoesNotExist()
             return obj, projection(obj)
@@ -138,10 +140,14 @@ class CoreModel(LifecycleModelMixin, Model):
 
     @classmethod
     def form(cls, request):
+        fields = [
+            resolve_field_to_current_lang(x) if x in cls.multilingual_fields else x
+            for x in getattr(cls, "form_fields", cls._Form._meta.fields)
+        ]
         Form = modelform_factory(
             cls,
             form=cls._Form,
-            fields=getattr(cls, "form_fields", cls._Form._meta.fields),
+            fields=fields,
             field_classes=getattr(cls, "field_classes", {}),
             widgets=getattr(cls, "form_widgets", {}),
         )
@@ -153,7 +159,7 @@ class CoreModel(LifecycleModelMixin, Model):
         form = cls.form(request)(request.POST)
         context = {"form": form}
         preoare_qs, projection = cls.readers(request)
-        if form.is_valid() and cls.perms.good_request(
+        if form.is_valid() and cls.app_config.perms.good_request(
             request.user, "POST", cls(**form.cleaned_data)
         ):
             inst = form.instance
@@ -215,8 +221,8 @@ class CoreModel(LifecycleModelMixin, Model):
                     "form": form,
                     "standalone": not request.htmx,
                     "settings": cls.settings(request),
-                    "model_label" : cls._meta.label,
-                    "target" : request.headers.get("hx-target",None),
+                    "model_label": cls._meta.label,
+                    "target": request.headers.get("Hx-target", None),
                 },
             )
         else:
@@ -225,7 +231,7 @@ class CoreModel(LifecycleModelMixin, Model):
                 for p in prepare_qs(cls.objects.user_filter(request)).order_by(
                     *cls._meta.ordering
                 )
-                if cls.perms.good_request(request.user, request.method, p)
+                if cls.app_config.perms.good_request(request.user, request.method, p)
             ]
             if request.json:
                 return JsonResponse(insts, safe=False)
@@ -236,15 +242,15 @@ class CoreModel(LifecycleModelMixin, Model):
                     "insts": insts,
                     "standalone": not request.htmx,
                     "settings": cls.settings(request),
-                    "model_label" : cls._meta.label,
-                    "target" : request.headers.get("hx-target",None),
+                    "model_label": cls._meta.label,
+                    "target": request.headers.get("hx-target", None),
                 },
             )
 
     @classmethod
     def DELETE(cls, request, pk):
         obj = get_object_or_404(cls, pk=pk)
-        if cls.perms.good_request(request.user, request.method, obj):
+        if cls.app_config.perms.good_request(request.user, "DELETE", obj):
             obj.delete()
         return HttpResponse("Deleted")
 
@@ -283,7 +289,7 @@ class CoreModel(LifecycleModelMixin, Model):
         return attr
 
     def add_user_and_save(self, request):
-        if "group" in self.model_info["fields"]:
+        if "group" in self.model_info(request)["fields"]:
             self.group = request.user.belongs_to
         self.save()
 
@@ -402,9 +408,11 @@ class AutoCompleteNexus:
         if "attach_to" in f:
             instructions = f.get("attach_to")
             atachee_model = get_related_model_or_404(cls, instructions["attr"])[0]
-            atachee = get_object_or_404(
-                atachee_model.objects.user_filter(request), pk=instructions["pk"]
-            )
+            atachee = get_object_or_404(atachee_model, pk=instructions["pk"])
+            try:
+                assert cls.app_config.perms.good_request(request.user, "GET", atachee)
+            except:
+                raise Http404("Invaolid permissions")
             setattr(obj, instructions["attr"], atachee)
 
         obj.add_user_and_save(request)
@@ -522,7 +530,7 @@ class AutoCompleteCoreModel(CoreModel):
             (len(results) == 0 and query.endswith(" ") or not query.endswith(" "))
             and query.strip() != ""
             and not any(query.lower() == x[search_field].lower() for x in results)
-            and cls.perms.good_request(
+            and cls.app_config.perms.good_request(
                 request.user, "POST", cls()
             )  # check if you can actually create a new one
         ):

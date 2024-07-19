@@ -1,6 +1,20 @@
 import markdown
 from django.apps import apps
-from django.db.models import CharField, Value, Q, Count, CharField, F
+from django.db.models import (
+    CharField,
+    CharField,
+    BooleanField,
+    Value,
+    Q,
+    Count,
+    F,
+    Prefetch,
+    OuterRef,
+    Subquery,
+    Max,
+    When,
+    Case,
+)
 from django.db.models.functions import Concat, Replace
 from django_readers import qs, pairs, projectors, producers, specs
 from django.urls import reverse
@@ -57,12 +71,12 @@ def force_type(model):
     ]
 
 
-def __core_info__(request, include_fields=None,select_related=None):
+def __core_info__(request, include_fields=None, select_related=None):
 
     def perms(user, *attrs):
         prepare = qs.pipe(
             qs.include_fields(*(include_fields or [])),
-            qs.select_related(*(select_related or []))
+            qs.select_related(*(select_related or [])),
         )
 
         def producer(inst):
@@ -119,22 +133,21 @@ def projectuser_spec(cls, request, pk=None):
     if pk:
 
         if pk == request.project_user.pk:
-            user =  request.project_user
+            user = request.project_user
         else:
             user = (
-                ProjectUser.objects.only("id", "manages","belongs_to")
-                .select_related("manages","belongs_to")
+                ProjectUser.objects.only("id", "manages", "belongs_to")
+                .select_related("manages", "belongs_to")
                 .get(pk=pk)
             )
 
         def add_project_data_to_user():
             prepare_qs, projection = specs.process(miniproject_spec(Project, request))
-            
 
             def producer(u):
                 return {
                     "projects": [
-                       projection(x) for x in prepare_qs(user.all_my_projects.all())
+                        projection(x) for x in prepare_qs(user.all_my_projects.all())
                     ]
                 }
 
@@ -152,8 +165,8 @@ def projectuser_spec(cls, request, pk=None):
             return qs.noop, producer
 
         return spec + (
-                add_project_data_to_user(),
-                add_manages_descendants(),
+            add_project_data_to_user(),
+            add_manages_descendants(),
             {
                 "manages": [
                     *force_type("project.ProjectGroup"),
@@ -183,7 +196,7 @@ def task_spec(cls, request, pk=None):
         {"project": [*__core_info__(request), lang_field("name")]},
         {
             "stream": [
-                *__core_info__(request,select_related=["project"]),
+                *__core_info__(request, select_related=["project"]),
                 lang_field("name"),
             ]
         },
@@ -224,12 +237,12 @@ def contact_spec(cls, request, pk=None):
 
 def projectgroup_spec(cls, request, pk=None):
     spec = (
-            (
-                qs.pipe(
-                    qs.include_fields("app"),
-                ),
-                projectors.noop,
+        (
+            qs.pipe(
+                qs.include_fields("app"),
             ),
+            projectors.noop,
+        ),
         *__core_info__(request),
         lang_field("name"),
     )
@@ -270,6 +283,12 @@ def stream_spec(cls, request, pk=None):
     tasks += [x for x in task_spec(Task, request) if "project" not in x]
     return [
         *__core_info__(request),
+        (
+            qs.include_fields(
+                "project_default",
+            ),
+            projectors.noop,
+        ),
         lang_field("name"),
         {"name_count": name_task_count()},
         {"project": [*__core_info__(request), lang_field("name")]},
@@ -280,17 +299,38 @@ def stream_spec(cls, request, pk=None):
 def project_spec(cls, request, pk=None):
     Stream = apps.get_model("project.Stream")
     ProjectLog = apps.get_model("project.ProjectLog")
+    ProjectLogEntry = apps.get_model("project.ProjectLogEntry")
     Task = apps.get_model("project.Task")
     ProjectUser = apps.get_model("project.ProjectUser")
     sub_qs = ProjectUser.objects.filter(pk=request.project_user.pk)
+    most_recent_date_subquery = (
+        ProjectLogEntry.objects.filter(
+            log__project=OuterRef("pk"), user=request.project_user
+        )
+        .order_by("-addstamp")
+        .values("addstamp")[:1]
+    )
+    #reported_time_in_last_month
+    #reported_time_in_last_quarter
+    #reported_time_in_last_year
+
     return [
         (
             qs.pipe(
                 qs.prefetch_many_to_many_relationship(
                     "viewers", related_queryset=sub_qs
                 ),
-                qs.include_fields("group","private","private_owner"),
+                qs.include_fields("group", "private", "private_owner"),
                 qs.select_related("group"),
+                qs.annotate(
+                    most_recent_log_date=Subquery(most_recent_date_subquery),
+                    has_log_date=Case(
+                        When(most_recent_log_date__isnull=True, then=Value(False)),
+                        When(most_recent_log_date__isnull=False, then=Value(True)),
+                        output_field=BooleanField(),
+                    ),
+                ),
+                qs.order_by("-has_log_date", "-most_recent_log_date"),
             ),
             projectors.noop,
         ),
@@ -310,6 +350,10 @@ def project_spec(cls, request, pk=None):
         },
         {
             "streams": [
+                (
+                    qs.include_fields("project_default"),
+                    projectors.noop
+                ),
                 *__core_info__(request),
                 {"name_count": name_task_count()},
                 lang_field("name"),
@@ -317,7 +361,10 @@ def project_spec(cls, request, pk=None):
             ],
         },
         {
-            "group": [*__core_info__(request), lang_field("name"),],
+            "group": [
+                *__core_info__(request),
+                lang_field("name"),
+            ],
         },
         {
             "status": [*__core_info__(request), lang_field("name")],
@@ -344,26 +391,39 @@ def project_spec(cls, request, pk=None):
             ],
         },
         {
-            "tags": [(qs.include_fields("group"),projectors.noop),*__core_info__(request),"name"],
+            "tags": [
+                (qs.include_fields("group"), projectors.noop),
+                *__core_info__(request),
+                "name",
+            ],
         },
     ]
 
+
 def miniproject_spec(cls, request, pk=None):
     return [
-        pairs.exclude( status__name_en__in=["Completed","Canceled"]),
+        pairs.exclude(status__name_en__in=["Completed", "Canceled"]),
         {"private_owner": ["id"]},
-        {"group" : ["id"]},
+        {"group": ["id"]},
         "private",
         *__core_info__(request),
         lang_field("name"),
     ]
+
 
 def projectlog_spec(cls, request, pk=None):
     ProjectLogEntry = apps.get_model("project.ProjectLogEntry")
     return [
         *__core_info__(request),
         {"project": [*__core_info__(request)]},
-        {"entries": projectlogentry_spec(ProjectLogEntry, request)},
+        {
+            "entries": [
+                *__core_info__(request),
+                "text",
+                {"rendered_text": render_markdown(f"text")},
+                "addstamp",
+            ]
+        },
     ]
 
 
@@ -381,6 +441,8 @@ def time_report(cls, request, pk=None):
     return [
         *__core_info__(request),
         {"user": [*__core_info__(request), "username"]},
+        {"project" : ["id"]},
+        "text",
         "time",
         "week",
     ]

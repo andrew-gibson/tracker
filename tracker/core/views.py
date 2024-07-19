@@ -172,7 +172,8 @@ def text_ac(request, m, pk, attr):
     try:
         q = request.GET.get("q")
         model = get_model_or_404(m, test=lambda m: issubclass(m, (AutoCompleteCoreModel,)))
-        obj = get_object_or_404(model.objects.user_filter(request), pk=pk)
+        obj = get_object_or_404(model, pk=pk)
+        assert model.perms.good_request(request.user, "GET",obj)
         assert attr in local_relations(model) + non_local_relations(model)
         f = model._meta.get_field(attr)
         if hasattr(model, "proxy_map") and attr in model.proxy_map:
@@ -215,7 +216,7 @@ def text_ac(request, m, pk, attr):
             }
         )
     except:
-        return HttpResponseBadRequest("incorrectly formatted GET params")
+        return HttpResponseBadRequest("Incorrect request")
 
 @api.post_get("create_from_parsed/<str:m>/<str:attr>/")
 def create_from_parsed(request, m, attr, suppress_links=""):

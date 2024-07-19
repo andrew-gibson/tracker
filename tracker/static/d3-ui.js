@@ -378,7 +378,7 @@ const toggle_fk_attr = async (result) => {
         const  d  = ui_state.d;
         const model_info =  ui_state.active_model_info;
         if (resp.status == 200) {
-            const obj_refresh_resp = await fetch_recipies.GET(result.__url__);
+            const obj_refresh_resp = await fetch_recipies.GET(ui_state.d.__url__);
             if (obj_refresh_resp.status == 200){
                 const data = await  obj_refresh_resp.json()
                 d[attr] = data[attr];
@@ -585,10 +585,6 @@ export const inplace_char_edit = function(selection,
     if (selection.select("#"+ids.normal).node()) {
         return;
     }
-    if (observable_data.__perms__.PUT == false) {
-        // no permision to POST so just put the title 
-       selection.html(title)
-    }
 
     const insert_mode = selection
         .append("div")
@@ -633,6 +629,10 @@ export const inplace_char_edit = function(selection,
             ui_state.attr = attr;
         })
         .call(selection=>{
+            if (observable_data.__perms__.PUT == false) {
+                // no permision so don't enter insert mode
+               selection.attr("disabled","true")
+            }
             autoRun(selection.node(),
                     ()=>{
                         selection.html(observable_data[display_attr] || "+")
@@ -810,11 +810,12 @@ export const append_edit_local_attr = function(selection,observable_data, attr="
                     })
 
                 insert_mode
+                    .classed("border p-1",true)
                     .append("div")
                     .styles({
                         "background-color" : "rgba(0,0,0,.03)",
                     })
-                    .classed("d-flex justify-content-between align-items-center border p-1 w-100",true)
+                    .attr("class","d-flex justify-content-between align-items-center border p-1 w-100")
                     .append("div")
                         .classed(" fw-bold pe-3 ps-3",true)
                         .attr("id", ids.insert_label)
@@ -834,7 +835,7 @@ export const append_edit_local_attr = function(selection,observable_data, attr="
                     .attr("rows", 5)
                     .attr("name", attr)
                     .call(selection =>{
-                        const content =  observable_data[attr] || "1. \n2. \n3. ";
+                        const content =  observable_data[attr] || "*  \n*  \n*  ";
                         const element =  selection.node();
                         autoRun(selection.node(),()=>{
                           selection.node().value = observable_data[attr];

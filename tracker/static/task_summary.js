@@ -1,4 +1,4 @@
-import  { append_edit_attr,ui_state, make_right_dropdown,autoRun, is_null,create_button, inplace_char_edit} from "d3-ui";
+import  { append_edit_attr,ui_state, make_right_dropdown,autoRun, is_null,create_button, inplace_char_edit,make_delete_button} from "d3-ui";
 
 export const task_state = mobx.makeAutoObservable({
     tasks : [],
@@ -94,21 +94,8 @@ export const task_summaries = tasks=>{
 
            inplace_char_edit(header_left.append("div").style("width","15%").style("display","inline-block"), observable_data, "order", "Order",{btn_class : "btn-outline-primary", on_change : "reloadTasks", input_class : "w-25"} );
            inplace_char_edit(header_left.append("div").style("width","85%").style("display","inline-block"), observable_data, "name", "Name");
-           const delete_hx_args =  {
-                "hx-delete" : task.__url__,
-                "hx-on::after-request"  :  "window.reset_ui('reloadTasks')",
-                "hx-swap" : "none",
-           }
            make_right_dropdown(header_sel,dropdown=>{
-                dropdown
-                    .append("li")
-                        .append("a")    
-                            .classed("dropdown-item text-end",true)
-                            .html("Delete")
-                            .attrs(window.delete_modal.attrs)
-                            .on("click", e=>{
-                                window.delete_modal(delete_hx_args);
-                            })
+                make_delete_button( dropdown.append("li"),task,d=>d.id, "reloadTasks",{html : "Delete"})
            });
 
             autoRun(selection.node(),()=>{

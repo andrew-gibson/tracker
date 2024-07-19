@@ -2,16 +2,6 @@
  {%for template in navbar %}
      {%include template%}
  {%endfor%}
-    <li class="nav-item">
-      <a class="nav-link" 
-            hx-replace-url="true"
-            href="#"
-            hx-swap="outerHTML"
-            hx-target="#main-content"
-            hx-get="{{request.headers["Hx-Current-Url"]}}"> Back
-          </a>
-    </li>
-
   <li class="nav-item dropdown">
      <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
          {{request.user.username}} 👤

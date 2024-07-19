@@ -27,7 +27,6 @@ from django.db.models import (
     F,
     Count,
     TextField,
-    Prefetch,
 )
 from django.db.models.functions import Concat, Replace
 from django.http import QueryDict
@@ -116,7 +115,9 @@ class MyProjectGroup(Group):
 
     @classmethod
     def user_filter(cls, request):
-        return cls.objects.filter(id__in=[x.id for x in request.project_user.belongs_to.descendants])
+        return cls.objects.filter(
+            id__in=[x.id for x in request.project_user.belongs_to.descendants]
+        )
 
 
 class GroupPrefetcherManager(UserManager):
@@ -473,6 +474,7 @@ class Stream(AutoCompleteCoreModel):
         ordering = ("id",)
         unique_together = ("name_en", "project")
 
+    "before post, change the field, make multilingual fields be optional, but one of them has to be there"
     form_fields = [
         "name_en",
         "project",
@@ -491,9 +493,9 @@ class Stream(AutoCompleteCoreModel):
     @classmethod
     def user_filter(cls, request):
         filters = cls.get_filters(request)
-        return cls.objects.filter(project__group__in=request.user.groups.all()).filter(
-            filters
-        )
+        if "project" in filters.referenced_base_fields:
+            return cls.objects.filter(filters)
+        return cls.objects.none()
 
     @classmethod
     def ac_query(cls, request, search_field, query, requestor):
@@ -652,6 +654,7 @@ class TimeReport(CoreModel):
         class Meta:
             fields = [
                 "project",
+                "text",
                 "time",
                 "week",
             ]

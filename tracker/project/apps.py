@@ -7,7 +7,7 @@ class ProjectConfig(AppConfig):
     
     def ready(self):
         from . import permissions
-        self.permissions = permissions
+        self.perms = permissions
         from . import colours
         for model,colour in colours.get_model_colour_map().items():
             setattr(model,"__hex__",colour[0])

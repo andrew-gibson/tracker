@@ -13,12 +13,14 @@
 
 {% block content%}
 <div id="main-content" hx-swap-oob="true">
-    <div class="row">
+    <div class="row" id="timereporting-weeks">
         <div class="col-2"  id="weeks">
             <ul class="list-group" id="weeks-list">
             </ul>
         </div>
-        <div class="col-10 border-start"  id="timereporting">
+        <div class="col-10 border-start"  >
+            <div class="row align-items-start"  id="timereporting">
+            </div>
         </div>
     </div>
 
@@ -26,10 +28,13 @@
 
     <script type="module">
     import fetch_recipies from "fetch-recipies";
-    import {ui_state, reaction,inplace_char_edit} from "d3-ui";   
+    import {ui_state, reaction,inplace_char_edit,append_edit_attr} from "d3-ui";   
+    const root = d3.select("#timereporting-weeks")
+    const on_change = ()=>timereport_state.update_weeks()
     const timereport_state = mobx.makeAutoObservable({
-         active :  "",
+         active :  "{{weeks[0].week_start}}",
          weeks :  {{dumps(weeks)|safe}},
+         update : 0,
          async fetch_timereports (){
             const filters = this.active ? {week:this.active} : {};
             const url = ui_state.models["project.TimeReport"].main +`?f=${btoa(JSON.stringify({filters}))}`
@@ -37,20 +42,13 @@
          },
          async update_weeks(){
             timereport_state.weeks = await fetch_recipies.GETjson(window.location.href + "?update=True");
-            document.removeEventListener("edit",this.update_weeks);
-            render();
+            this.update++
          },
     });
-
-    const projects =  await fetch_recipies.GETjson(ui_state.models["project.MinProject"].main)
-
     const render = async ()=>{
         // clear any previously setup d3-ui elements from other selected weeks   
-        ui_state.reset_ui(); 
-        setup_reaction();
-
+        const projects = ui_state.models["user"].data.projects;
         const timereports =  await timereport_state.fetch_timereports();
-
         const get_or_create = (project) => {
             return  _.find(timereports, t=>t.project.id === project.id)  ||  mobx.makeAutoObservable({
                   project,
@@ -58,6 +56,7 @@
                   time  : 0,
                   text:"",
                   __url__ :   ui_state.models["project.TimeReport"].main,
+                  __perms__ : {POST : true, PUT : true},
                   __type__ : "project.TimeReport"})  
         }
 
@@ -66,9 +65,7 @@
           .data(timereport_state.weeks,d=>d.week_start+d.worked)
           .join("li")
           .attr("class","list-group-item")
-          .classed("bg-primary",d=>{
-            return d.week_start == timereport_state.active
-          })
+          .classed("bg-primary",d=>  d.week_start == timereport_state.active)
           .classed("bg-light",d=>d.week_start != timereport_state.active)
           .each(function(d){
             const sel = d3.select(this)
@@ -83,42 +80,43 @@
                .attr("class", "btn text-nowrap")
                .classed("btn-success", d=>d.worked >= d.total)
                .classed("btn-warning", d=>d.worked < d.total)
-               .html(d=>{
-                  1+1
-                  return `${d.worked} / ${d.total}`
-               } )
+               .html(d=>  `${d.worked} / ${d.total}`)
                .on("click",function(e){
                      const d = d3.select(e.target).datum();
                     timereport_state.active = d.week_start;
+                    timereport_state.update++;
                })
           })
 
-        d3.select("#timereporting")
+        const cards = d3.select("#timereporting")
           .html("") 
-          .selectAll("div.timereporting-row")
-          .data(projects)
+          .selectAll("div.card")
+          .data(projects, d=>d.id)
           .join("div")
-          .attr("class","timereporting-row d-flex justify-content-between align-items-center")
-          .each(function(d){
-                const selection = d3.select(this);
-                const timereport =  get_or_create(d);
-                selection.append("div").attr("class","fw-bold").html(d.name)
-                inplace_char_edit(selection, timereport,"time", "Hours worked",{type:"number"});
-          });
+          .attr("class","col-5 card m-2 ");
+
+        cards.selectAll("div.card-header")
+            .data(d=>[d],d=>d.id)
+            .join("div")
+            .attr("class","card-header")
+            .html(d=>d.name)
+
+        cards.selectAll("div.card-body")
+            .data(d=>[d],d=>d.id)
+            .join("div")
+            .attr("class","card-body")
+            .each(function(d){
+                  const selection = d3.select(this);
+                  const timereport =  get_or_create(d);
+                  append_edit_attr(selection, timereport,"time", "Hours",{on_change });
+                  append_edit_attr(selection, timereport,"text", "Notes",{on_change });
+            });
 
     };
-
-    const setup_reaction = () => {
-        reaction(d3.select("#main-content"), 
-                ()=> timereport_state.active,
-                render);
-        document.addEventListener("edit",timereport_state.update_weeks)
-    };
-
-    setup_reaction();
-    timereport_state.active = _.first(timereport_state.weeks).week_start
-
-    
+    reaction(d3.select("#main-content"), 
+            ()=> [timereport_state.update, ui_state.models["project.TimeReport"].refresh_time],
+            render);
+    render();
 
     </script>
 </div>
