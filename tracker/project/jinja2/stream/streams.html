@@ -16,8 +16,84 @@
 </a>
 
 <script type="module">
-import {task_summaries} from "{{ static('task_summary.js') }}";
 import {stream_mini} from "{{ static('stream_mini.js') }}";
+import  { 
+    append_edit_attr,
+    ui_state,
+    make_right_dropdown,
+    autoRun,
+    is_null,
+    create_button,
+    inplace_char_edit,
+     card_state,
+    make_delete_button} from "d3-ui";
+
+export const task_summaries = tasks=>{
+  _.each(tasks, task=> {
+    const observable_data = mobx.makeAutoObservable({...task});
+
+    if (d3.select(`#task${observable_data.id}`).node() == null){
+        return;
+    }
+
+    d3.select(`#task${observable_data.id}`)
+        .data([task])
+        .call(function(selection){
+            const header_sel =  selection.select(".card-header");
+            header_sel.html(""); // clear out placeh9olders
+            const header_left = header_sel.append("div").classed("flex-fill",true);
+            const body_sel = selection.select(".card-body");
+            body_sel.html(""); // clear out placeh9olders
+            const footer_sel = selection.select(".card-footer");
+
+           inplace_char_edit(header_left.append("div").style("width","15%").style("display","inline-block"), observable_data, "order", "Order",{btn_class : "btn-outline-primary", on_change : "reloadTasks", input_class : "w-25"} );
+           inplace_char_edit(header_left.append("div").style("width","85%").style("display","inline-block"), observable_data, "name", "Name");
+           make_right_dropdown(header_sel,dropdown=>{
+                make_delete_button( dropdown.append("li"),task,d=>d.id, "reloadTasks",{html : "Delete"})
+           });
+
+            autoRun(selection.node(),()=>{
+                card_state.redraw
+                body_sel.html("")
+                _.each([["text","Notes",""],
+                        ["start_date", "Start Date",""],
+                        ["target_date","Target Date",""],
+                        ["lead", "Contact",{name_attr : "username"}],
+                        ["teams", "Teams",""],
+                        ["competency", "Competency",""],
+                        ["stream", "Stream",{on_change : "reloadTasks"}]], 
+                    args=>{
+                        if(card_state.minified_cards.includes(observable_data.id) && !is_null(observable_data[args[0]])){
+                            append_edit_attr(body_sel, observable_data, ...args);
+                        } else if ( !card_state.minified_cards.includes(observable_data.id)){
+                            append_edit_attr(body_sel, observable_data, ...args);
+                        }
+                });
+
+                footer_sel   
+                    .selectAll("div.left")                                                 
+                    .data([1])
+                    .join("div")
+                    .classed("left fs-6 d-flex justify-content-center align-items-center expand-task text-body-tertiary text-body", true)
+                    .html("")
+                    .append("button")
+                    .classed("btn btn-small btn-light p-1 mb-1", true)
+                    .html(d=> card_state.minified_cards.includes(observable_data.id) ? "+" : "-")
+                    .on("click", e => {
+                        card_state.toggle_minified_state("task",task)
+                    });
+            });
+
+            footer_sel   
+                 .classed("d-flex justify-content-between align-items-center", true)
+                 .append("div")
+                 .call(function(foodter_sel){
+                    append_edit_attr(foodter_sel, observable_data, "done", "Done",{on_change : "reloadTasks"});
+                 })
+        })
+  });
+};
+
 _.chain({{dumps(insts)|safe}})
  .each(stream_mini)
  .map(s=>s.tasks)

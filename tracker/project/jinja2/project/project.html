@@ -59,8 +59,32 @@
     {%endwith%}
 
     <script type="module">
-        import { make_right_dropdown } from "d3-ui";
-        import {project_summary} from "{{ static('task_summary.js') }}";
+        // set projects to be shrinkable
+        import { create_button,append_edit_attr , ui_state} from "d3-ui";
+        export const project_summary =  project => {
+            const observable_data = mobx.makeAutoObservable( project);
+            const root = d3.select(`#project${project.id}`)
+                .call(function(selection){
+                    const left_sel = selection.select(".card-body .left");
+                    append_edit_attr(left_sel, observable_data, "name", "Name");
+                    append_edit_attr(left_sel, observable_data, "status","Status");
+                    append_edit_attr(left_sel, observable_data, "text","Summary",{display_attr:"text_m"});
+                    append_edit_attr(left_sel, observable_data, "short_term_outcomes","Short Term Outcomes",{display_attr:"short_term_outcomes_m"});
+                    append_edit_attr(left_sel, observable_data, "long_term_outcomes","Long Term Outcomes",{display_attr:"long_term_outcomes_m"});
+                    append_edit_attr(left_sel, observable_data,"lead", "Lead", {name_attr : "username"});
+                    append_edit_attr(left_sel, observable_data,"project_manager", "Project Manager", {name_attr : "username"});
+                    append_edit_attr(left_sel, observable_data,"project_team", "Project Team", );
+                    append_edit_attr(left_sel, observable_data,"tags", "Tags");
+                    append_edit_attr(left_sel, observable_data,"partners", "Partners");
+                    create_button( selection.select("#new-stream"), 
+                                  ()=>mobx.makeAutoObservable({name:"",__type__:"project.Stream",project:observable_data}),
+                                  "name",
+                                  "+ Workstream",
+                                {on_change : "reloadTasks"})
+                });
+
+            ui_state.active_elements.push(root)
+        };
         const project = {{dumps(inst)|safe}};
         project_summary({...project});
     </script>

@@ -32,7 +32,6 @@
 
 <script type="module">
 import  {ui_state} from "d3-ui";
-import fetch_recipies from "fetch-recipies";
 const f = ui_state.models["project.Project"].filters
 
 d3.select("#full-text-search")
@@ -45,7 +44,7 @@ d3.select("#full-text-search")
   })
 
 const render_leads_menu = async (attr,model)=>{
-    const data = await fetch_recipies.GETjson(ui_state.models[model].main);
+    const data = await ui_state.get_store(model)
     const _render = ()=>{
        d3.select(`#${attr}-header`)
          .classed("fw-bold text-white",f[attr])
@@ -71,6 +70,7 @@ const render_leads_menu = async (attr,model)=>{
     }
     _render();
 }
+
 render_leads_menu("group","project.MyProjectGroup");
 render_leads_menu("leads","project.ProjectUser");
 render_leads_menu("tags","project.Tag");

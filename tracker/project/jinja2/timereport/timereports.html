@@ -13,12 +13,12 @@
 
 {% block content%}
 <div id="main-content" hx-swap-oob="true">
-    <div class="row" id="timereporting-weeks">
-        <div class="col-2"  id="weeks">
+    <div class="row" id="timereporting-weeks" >
+        <div class="col-3"  id="weeks">
             <ul class="list-group" id="weeks-list">
             </ul>
         </div>
-        <div class="col-10 border-start"  >
+        <div class="col-9 border-start">
             <div class="row align-items-start"  id="timereporting">
             </div>
         </div>
@@ -27,8 +27,7 @@
 
 
     <script type="module">
-    import fetch_recipies from "fetch-recipies";
-    import {ui_state, reaction,inplace_char_edit,append_edit_attr} from "d3-ui";   
+    import {fetch_recipies,ui_state, reaction,inplace_char_edit,append_edit_attr} from "d3-ui";   
     const root = d3.select("#timereporting-weeks")
     const on_change = ()=>timereport_state.update_weeks()
     const timereport_state = mobx.makeAutoObservable({
@@ -72,14 +71,15 @@
             sel.selectAll("div")
                .data([d],d=>d.week_start+d.worked)
                .join("div")
-               .attr("class","ms-2 me-auto fw-bold")
+               .attr("class","ms-2 me-auto fw-bold float-start d-inlineblock")
                .html(d.name)
             sel.selectAll("button")
                .data([d],d=>d.week_start+d.worked)
                .join("button")
-               .attr("class", "btn text-nowrap")
-               .classed("btn-success", d=>d.worked >= d.total)
+               .attr("class", "btn text-nowrap float-end")
+               .classed("btn-success", d=>d.worked == d.total)
                .classed("btn-warning", d=>d.worked < d.total)
+               .classed("btn-attention", d=>d.worked >d.total)
                .html(d=>  `${d.worked} / ${d.total}`)
                .on("click",function(e){
                      const d = d3.select(e.target).datum();
@@ -105,6 +105,7 @@
             .data(d=>[d],d=>d.id)
             .join("div")
             .attr("class","card-body")
+            .style( "font-size","1.5em")
             .each(function(d){
                   const selection = d3.select(this);
                   const timereport =  get_or_create(d);
