@@ -355,6 +355,7 @@ class Project(AutoCompleteNexus, AutoCompleteCoreModel):
         return {
             "selected": request.user in self.viewers.all()
             or self.group in request.user.groups.all(),
+            "id" : self.id,
             "__url__": reverse(
                 "core:toggle_link",
                 kwargs={
@@ -510,7 +511,7 @@ class Stream(AutoCompleteCoreModel):
         if isinstance(requestor, Task):
             q = q & Q(project=requestor.project)
 
-        return cls.user_filter(request).filter(q).distinct()
+        return cls.objects.filter(q).distinct()
 
     def __str__(self):
         return f"{self.pk}-{self.name_en}"

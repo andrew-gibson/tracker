@@ -511,20 +511,21 @@ class AutoCompleteCoreModel(CoreModel):
         optional_projection=False,
     ):
 
-        search_field = cls.localize_field(search_field)
+        _search_field = cls.localize_field(search_field)
         preoare_qs, projection = cls.readers(request)
-        qs = preoare_qs(cls.ac_query(request, search_field, query, requestor))
+        qs = preoare_qs(cls.ac_query(request, _search_field, query, requestor))
 
         if filter_qs:
-            qs = qs.filter(filter_qs)
+            qs =  qs.filter(filter_qs)
 
+        results = [x for x in qs if cls.app_config.perms.good_request(request.user, "GET",x)]
         if query == "" and cutoff:
-            qs = qs[:10]
+            results = results[:10]
 
         if optional_projection:
-            results = [optional_projection(projection(x)) for x in qs]
+            results = [optional_projection(projection(x)) for x in results]
         else:
-            results = [projection(x) for x in qs]
+            results = [projection(x) for x in results]
 
         if (
             (len(results) == 0 and query.endswith(" ") or not query.endswith(" "))

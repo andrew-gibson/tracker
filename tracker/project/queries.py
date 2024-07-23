@@ -335,6 +335,7 @@ def project_spec(cls, request, pk=None):
             projectors.noop,
         ),
         *__core_info__(request),
+        "private",
         lang_field("text"),
         {"text_m": render_markdown(f"text_{lang()}")},
         lang_field("name"),

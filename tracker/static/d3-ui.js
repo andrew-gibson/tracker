@@ -56,7 +56,6 @@ class UIState {
 
     constructor(){
         mobx.makeAutoObservable(this,{deep:true })
-        this.active_elements = [];
         this.refresh_limit = 2160000;  // time limit after which, refresh data store by default
     }
 
@@ -187,7 +186,6 @@ class UIState {
     }
     reset_ui(e) {
         card_state.reset();
-        this.active_elements = [];
         _dispose_functions.dispose() ;
         this.signal(e);
     }
@@ -203,68 +201,11 @@ window.__uistate = ui_state;
 
 /**
 
- defines an observable state management object for handling a collection of cards using MobX, a library for state management. 
- This object, card_state, includes properties and methods to manage the state of the cards, particularly focusing on whether
- each card is in a "minified" state or not. Here's a detailed breakdown of what each part of the code does:
-
-Initialization
-=====================
-The makeAutoObservable method from MobX makes the card_state object reactive, allowing it to automatically track and react to changes in its properties.
-
-Properties
-===========
-cards: An array to hold card objects.
-_minified: A private array to keep track of minified card objects.
-_redraw: A property to trigger redraws, initialized with a random number.
-
-Methods
-========
-toggle_minified_state (id_prefix, card)
-This method toggles the minified state of a given card:
-
-*  If the card is already minified, it uses D3.js to select the card's body element 
-and reset its height, and then removes the card from the minified state.
-*  If the card is not minified, it adds the card to the minified state.
-
-Getters and Setters
-======================
-Getter: minified_cards
-Returns an array of IDs of the currently minified cards.
-
-Setter: minified_cards
-This setter handles adding and removing cards from the _minified array:
-
-If val contains an add property, it adds the specified card(s) to the _minified array.
-If val contains a remove property, it removes the specified card from the _minified array.
-Sets this.redraw to true if cards are added, which will trigger a redraw due to the random number assignment in the redraw setter.
-Getter: redraw
-Returns the current value of _redraw.
-
-Setter: redraw
-Sets _redraw to a new random number, triggering reactions that depend on this value.
-
-register (cards)
-This method registers new cards:
-
-Adds the new cards to the existing cards array.
-Marks the new cards as minified.
-Updates ui_state.active_elements to include the new cards.
-External Dependencies
-===================
-*  MobX: For creating the observable object and handling reactivity.
-*  D3.js: For selecting and manipulating DOM elements based on card IDs.
-*  Lodash: For filtering the _minified array when removing cards (_.filter).
-*  ui_state: This is referenced but not defined in the provided code, indicating it is an external state or configuration object.
-Overall Functionality
-====================
-The card_state object manages a list of cards, providing functionality to toggle their minified state and ensuring that 
-the UI reflects these changes by triggering redraws. The use of MobX allows other parts of the application to reactively 
-update when the state of card_state changes.
 
 ^*/
 export const card_state = mobx.makeAutoObservable({
     _minified : [],
-    _redraw : Math.random(),
+    _redraw : [],
     toggle_minified_state (id_prefix, card){
         if (this.minified_cards.includes(card.id) ) {
             d3.select(`#${id_prefix}${card.id} .card-body`).style("height",null)
@@ -280,24 +221,25 @@ export const card_state = mobx.makeAutoObservable({
         if (val.add) {
             if (Array.isArray(val.add)) {
                this._minified  = [...this._minified, ...val.add];
+               this.redraw = _.map(val.add,x=>x.id);
             } else {
                this._minified.push(val.add);
+               this.redraw = [val.add.id]
             }
-            this.redraw = true;
         }
         if (val.remove) {
             this._minified = _.filter(this._minified, t=> t.id != val.remove.id);
+            this.redraw = [val.remove.id]
         }
     },
     get redraw (){
        return this._redraw;
     },
-    set redraw (x){
-       this._redraw = Math.random();
+    set redraw (val){
+       return this._redraw = val;
     },
     register (cards){
-        this.minified_cards = {add : [...cards]};
-        ui_state.active_elements = [...ui_state.active_elements, ...cards]
+        this.minified_cards = {add : cards};
     },
     reset (){
         this._minified = [];
@@ -444,7 +386,7 @@ const observable_to_obj = model=>{
     const fields = ui_state.models[model.__type__].fields
     for (var x in fields){
         if (["ManyToOneRel", "ManyToManyField"].includes(fields[x]) ){
-            const val =  (model[x] || []).map(x=>x.id);
+            const val =  (force_list(model[x])|| []).map(x=>x.id);
             if (val.length) {
                 obj[x] = val;
             }
@@ -585,7 +527,7 @@ d3.selection.prototype.last = function() {
 
 
 export const make_delete_button = function(selection, d, key, models_to_refresh,options={}){
-    const {html="X"} = options;
+    const {html="X",_class="btn btn-outline-danger"} = options;
     if (!selection.selectAll("button").empty()) {
         // already been created, so bail
         return;
@@ -595,7 +537,7 @@ export const make_delete_button = function(selection, d, key, models_to_refresh,
            .data([d],key)
            .join("button")
               .attr("type","button")
-              .classed("btn btn-outline-danger p-1 m-1",true)
+              .attr("class",`${_class} p-1 me-1 ms-1 ` )
               .html(html)
             .attrs({
                 "data-bs-toggle":"modal",
@@ -888,6 +830,7 @@ export const append_edit_local_attr = function(selection,observable_data, attr="
                     .classed("w-50 ",true)
                     .append("input")
                     .attr("type","date")
+                    .style("font-size", "1em")
                     .classed("form-control ps-2 pe-0",true)
                     .call(selecion=>{
                         autoRun(selection.node(),()=>selecion.node().value = observable_data[attr] )

@@ -126,6 +126,8 @@ def good_request(user, method, obj):
         case [models.ProjectLogEntry() | models.TimeReport(), "POST"]:
             # Logentry and TimeReport belong exclusively to the owning users
             return True
+        case [models.Settings() , "POST" | "GET" | "PUT"]:
+            return True
         case _:
             # default is no permission
             return False

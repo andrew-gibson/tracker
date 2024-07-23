@@ -6,30 +6,16 @@
     {%endfor%}
 
     <script type="module">
-    import  { autoRun, append_edit_attr,ui_state, make_right_dropdown, create_button } from "d3-ui";
+    import  { reaction, append_edit_attr,ui_state, make_right_dropdown, create_button , is_null, make_delete_button, card_state} from "d3-ui";
     const project_summary = project => {
         const root = d3.select(`#project${project.id}`)
             .call(function(selection){
                const body_sel = selection.select(".card-body");
                const footer_sel = selection.select(".card-footer");
                const header_sel =  selection.select(".card-header");
-               const delete_hx_args =  {
-                    "hx-delete" : project.__url__,
-                    "hx-on::after-request"  :  "window.reset_ui('reloadProjects')",
-                    "hx-swap" : "none",
-               }
                make_right_dropdown(header_sel,dropdown=>{
-                    dropdown
-                        .append("li")
-                            .append("a")    
-                                .classed("dropdown-item text-end",true)
-                                .html("Delete")
-                                .attrs(window.delete_modal.attrs)
-                                .on("click", e=>{
-                                    window.delete_modal(delete_hx_args);
-                                })
+                    make_delete_button( dropdown.append("li"),project,d=>d.id, "reloadProjects",{html : "Delete"})
                });
-
                header_sel
                     .append("div")
                     .classed(`mb-1 name-row editor-normal`, true)
@@ -42,15 +28,47 @@
                     })
                     .setup_htmx()
                     .html(project.name)
-                append_edit_attr(body_sel, project, "status","Status");
-                append_edit_attr(body_sel, project,"text", "Summary");
-                append_edit_attr(body_sel, project, "group","Team",{on_change : "reloadProjects"});
-                append_edit_attr(body_sel, project,"streams", "Streams",{read_only:true, name_attr:"name_count"});
-                append_edit_attr(body_sel, project,"lead", "Lead", {name_attr : "username"});
-                append_edit_attr(body_sel, project,"project_manager", "Project Manager", {name_attr : "username"});
-                append_edit_attr(body_sel, project,"project_team", "Project Team", {name_attr : "username"});
-                append_edit_attr(body_sel, project,"tags", "Tags");
-                append_edit_attr(body_sel, project,"partners", "Partners");
+                const fields =  [["status","Status"],
+                                  ["text", "Summary"],
+                                  ["group","Team",{on_change : "reloadProjects"}],
+                                  ["streams", "Streams",{read_only:true, name_attr:"name_count"}],
+                                  ["lead", "Lead", {name_attr : "username"}],
+                                  ["project_manager", "Project Manager", {name_attr : "username"}],
+                                  ["project_team", "Project Team", {name_attr : "username"}],
+                                  ["tags", "Tags"],
+                                  ["partners", "Partners" ],
+                                  ];
+
+               reaction(
+                  selection.node(),
+                  ()=> card_state.redraw.slice(),
+                  ()=>{
+                      if (card_state.redraw.includes(project.id)) {
+                           body_sel.html("")
+                          _.each(fields, 
+                              args=>{
+                                  if(card_state.minified_cards.includes(project.id) && !is_null(project[args[0]])){
+                                      append_edit_attr(body_sel, project, ...args);
+                                  } else if ( !card_state.minified_cards.includes(project.id)){
+                                      append_edit_attr(body_sel, project, ...args);
+                                  }
+                         });
+
+                         footer_sel   
+                              .selectAll("div.left")                                                 
+                              .data([1])
+                              .join("div")
+                              .classed("left fs-6 d-flex justify-content-center align-items-center expand-task text-body-tertiary text-body", true)
+                              .html("")
+                              .append("button")
+                              .classed("btn btn-small btn-light p-1 mb-1", true)
+                              .html(d=> card_state.minified_cards.includes(project.id) ? "+" : "-")
+                              .on("click", e => {
+                                  card_state.toggle_minified_state("project",project)
+                              });
+                      }
+                })
+                
                 footer_sel   
                      .classed("d-flex justify-content-between align-items-center", true)
                      .append("div")
@@ -58,10 +76,11 @@
                         append_edit_attr(foodter_sel, project, "private", "Private");
                      })
             })
-        ui_state.active_elements.push(root)
     };
 
     await ui_state.refresh_model_store("project.Project",{{dumps(insts)|safe}} )
-    _.each(ui_state.models["project.Project"].data, p=> project_summary( p, "true"));
+    _.each(ui_state.models["project.Project"].data, project_summary);
+    card_state.register(ui_state.models["project.Project"].data);
+
     </script>
 </div>

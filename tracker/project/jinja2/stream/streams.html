@@ -16,7 +16,6 @@
 </a>
 
 <script type="module">
-import {stream_mini} from "{{ static('stream_mini.js') }}";
 import  { 
     append_edit_attr,
     ui_state,
@@ -28,7 +27,21 @@ import  {
      card_state,
     make_delete_button} from "d3-ui";
 
-export const task_summaries = tasks=>{
+const stream_mini = (stream)=>{
+    const observable_data = mobx.makeAutoObservable(stream);
+
+    if (d3.select(`#stream${stream.id}`).node() == null){
+        return;
+    }
+    d3.select(`#stream${stream.id}`)
+        .call(function(selection){
+            inplace_char_edit(selection.append("span"), observable_data, "name", "Name",{display_attr : "name_count"});
+            make_delete_button(selection.append("div"), observable_data, d=>d.id, "reloadTasks")
+        })
+    d3.selectAll(`#stream${stream.id}`).node()
+};
+
+const task_summaries = tasks=>{
   _.each(tasks, task=> {
     const observable_data = mobx.makeAutoObservable({...task});
 
@@ -43,14 +56,14 @@ export const task_summaries = tasks=>{
             header_sel.html(""); // clear out placeh9olders
             const header_left = header_sel.append("div").classed("flex-fill",true);
             const body_sel = selection.select(".card-body");
-            body_sel.html(""); // clear out placeh9olders
             const footer_sel = selection.select(".card-footer");
+            body_sel.html(""); // clear out placeh9olders
 
+           make_right_dropdown(header_sel,dropdown=>{
+                make_delete_button( dropdown.append("li").append('span').classed("dropdown-item d-grid",true),task,d=>d.id, "reloadTasks",{html : "Delete", _class : "btn btn-danger"})
+           });
            inplace_char_edit(header_left.append("div").style("width","15%").style("display","inline-block"), observable_data, "order", "Order",{btn_class : "btn-outline-primary", on_change : "reloadTasks", input_class : "w-25"} );
            inplace_char_edit(header_left.append("div").style("width","85%").style("display","inline-block"), observable_data, "name", "Name");
-           make_right_dropdown(header_sel,dropdown=>{
-                make_delete_button( dropdown.append("li"),task,d=>d.id, "reloadTasks",{html : "Delete"})
-           });
 
             autoRun(selection.node(),()=>{
                 card_state.redraw
@@ -59,7 +72,7 @@ export const task_summaries = tasks=>{
                         ["start_date", "Start Date",""],
                         ["target_date","Target Date",""],
                         ["lead", "Contact",{name_attr : "username"}],
-                        ["teams", "Teams",""],
+                        ["teams", "Teams",{name_attr : "username"}],
                         ["competency", "Competency",""],
                         ["stream", "Stream",{on_change : "reloadTasks"}]], 
                     args=>{
@@ -94,12 +107,12 @@ export const task_summaries = tasks=>{
   });
 };
 
-_.chain({{dumps(insts)|safe}})
+const tasks =  {{dumps(insts)|safe}};
+_.chain(tasks)
  .each(stream_mini)
  .map(s=>s.tasks)
  .each(task_summaries)
  .value()
+card_state.register(tasks);
 
 </script>
-
-
