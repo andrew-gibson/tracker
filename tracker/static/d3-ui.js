@@ -282,6 +282,11 @@ document.addEventListener("htmx:afterRequest",event => {
            }
        })
    }
+    d3.selectAll(".TMCommandBar").each(function(d){
+        if (this.parentElement == document.body){
+            this.remove()
+        }
+    })
 })
            
 

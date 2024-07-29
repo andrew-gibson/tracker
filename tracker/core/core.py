@@ -258,9 +258,27 @@ class CoreModel(LifecycleModelMixin, Model):
     def filter(cls, qs, request):
         return qs
 
+
+    @classmethod
+    def check_for_attach_instruction(cls, request):
+        instructions = decode_get_params(request.GET).get("f", {})
+        if "attach_to" in instructions:
+            instructions = instructions.get("attach_to")
+            atachee_model = get_related_model_or_404(cls, instructions["attr"])[0]
+            attachee = get_object_or_404(atachee_model, pk=instructions["pk"])
+            try:
+                assert cls.app_config.perms.good_request(request.user, "GET", attachee)
+            except:
+                raise Http404("Invaolid permissions")
+            return {
+                "attr" :   instructions["attr"],
+                "attachee" : attachee
+            }
+
     @classmethod
     def get_filters(cls, request):
-        q_param = decode_get_params(request.GET).get("f", {}).get("filters", {})
+        f =  decode_get_params(request.GET).get("f", {})
+        q_param = f.get("filters", {})
         if "full-text-search" in q_param:
             val = q_param["full-text-search"]
             del q_param["full-text-search"]
@@ -348,13 +366,13 @@ class AutoCompleteNexus:
         else:
             remainder = text_input = request.GET.get("q", "")
 
-        fields = cls.get_autocompletes(exclude)
+        fields = {f.name : f for f in  cls.get_autocompletes(exclude)}
         results = {
             f.name: {
                 "trigger": f.__text_trigger__,
                 "search_field": f.__search_field__,
                 "model": f.related_model,
-                "model_info": f.related_model.model_info,
+                "model_info": f.related_model.model_info(request),
                 "verbose": getattr(
                     f.related_model._meta,
                     "verbose_name_plural" if f.many_to_many else "verbose_name",
@@ -365,7 +383,7 @@ class AutoCompleteNexus:
                     text_input, f.__text_trigger__, many=f.many_to_many
                 ),
             }
-            for f in fields
+            for f in fields.values()
         }
 
         for name in results:
@@ -375,7 +393,11 @@ class AutoCompleteNexus:
                 [
                     term,
                     results[name]["model"].ac(
-                        request, term, cls(), search_field, filter_qs=filter_qs
+                        request,
+                        cls(),
+                        fields[name],
+                        term,
+                        filter_qs=filter_qs
                     ),
                 ]
                 for term in results[name]["search_terms"]
@@ -385,7 +407,7 @@ class AutoCompleteNexus:
                 remainder = remainder.replace(trigger + parsed, "")
 
         cls.cls_text_scan(
-            remainder, results, [x.__text_trigger__ for x in fields]
+            remainder, results, [x.__text_trigger__ for x in fields.values()]
         )  # default is nothing happens, but classes can add extra scanning, for example: dates
 
         # secondd pass through
@@ -405,15 +427,8 @@ class AutoCompleteNexus:
         f = decode_get_params(request.GET).get("f", {})
         obj = cls(**{attr: attr_val})
 
-        if "attach_to" in f:
-            instructions = f.get("attach_to")
-            atachee_model = get_related_model_or_404(cls, instructions["attr"])[0]
-            atachee = get_object_or_404(atachee_model, pk=instructions["pk"])
-            try:
-                assert cls.app_config.perms.good_request(request.user, "GET", atachee)
-            except:
-                raise Http404("Invaolid permissions")
-            setattr(obj, instructions["attr"], atachee)
+        if attache:=cls.check_for_attach_instruction(request):
+            setattr(obj, attache["attr"], attache["attachee"])
 
         obj.add_user_and_save(request)
 
@@ -461,8 +476,7 @@ class AutoCompleteNexus:
 
                     existing_objs = (
                         x["model"]
-                        .objects.user_filter(request)
-                        .filter(id__in=existing_ids)
+                        .objects.filter(id__in=existing_ids)
                     )
 
                     if x["many_to_many"]:
@@ -489,36 +503,43 @@ class AutoCompleteCoreModel(CoreModel):
         return f
 
     @classmethod
-    def ac_query(cls, request, search_field, query, requestor):
+    def ac_query(cls, request, requestor, field_obj, search_field, query):
+        f = decode_get_params(request.GET).get("f", {})
+        ac_filters = f.get("ac_filters", {})
         if query == "":
             q = Q()
         elif query.endswith(" "):
             q = Q(**{f"{search_field}__iexact": query.strip()})
         else:
             q = Q(**{f"{search_field}__icontains": query})
-        return cls.objects.user_filter(request).filter(q).distinct()
+        # look for any ac_filter which match this field
+        if q_param:=ac_filters.get(field_obj.name,False):
+            q = q  & Q(**q_param)
+        return q
 
     @classmethod
     def ac(
         cls,
         request,
-        query,
         requestor,
-        search_field,
+        field_obj,
+        query,
         variant=None,
         filter_qs=None,
         cutoff=None,
         optional_projection=False,
     ):
-
-        _search_field = cls.localize_field(search_field)
+        _search_field = cls.localize_field(field_obj.__search_field__)
         preoare_qs, projection = cls.readers(request)
-        qs = preoare_qs(cls.ac_query(request, _search_field, query, requestor))
+        q_obj = cls.ac_query(request, requestor, field_obj, _search_field, query)
+        qs = preoare_qs(cls.objects.filter(q_obj).distinct() )
 
         if filter_qs:
-            qs =  qs.filter(filter_qs)
+            qs = qs.filter(filter_qs)
 
-        results = [x for x in qs if cls.app_config.perms.good_request(request.user, "GET",x)]
+        results = [
+            x for x in qs if cls.app_config.perms.good_request(request.user, "GET", x)
+        ]
         if query == "" and cutoff:
             results = results[:10]
 
@@ -530,7 +551,7 @@ class AutoCompleteCoreModel(CoreModel):
         if (
             (len(results) == 0 and query.endswith(" ") or not query.endswith(" "))
             and query.strip() != ""
-            and not any(query.lower() == x[search_field].lower() for x in results)
+            and not any(query.lower() == x[field_obj.__search_field__].lower() for x in results)
             and cls.app_config.perms.good_request(
                 request.user, "POST", cls()
             )  # check if you can actually create a new one
@@ -541,7 +562,7 @@ class AutoCompleteCoreModel(CoreModel):
                 "name": query,
                 "id": -1,
                 "new": True,
-                search_field: query,
+                field_obj.__search_field__: query,
                 "__type__": cls._meta.label,
             }
 

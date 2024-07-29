@@ -100,3 +100,8 @@ def timereporting(request):
             "weeks": weeks,
         },
     )
+
+@api.get("dashboard/")
+def dashboard(request):
+    pass
+

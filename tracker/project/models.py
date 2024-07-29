@@ -27,6 +27,8 @@ from django.db.models import (
     F,
     Count,
     TextField,
+
+
 )
 from django.db.models.functions import Concat, Replace
 from django.http import QueryDict
@@ -115,9 +117,7 @@ class MyProjectGroup(Group):
 
     @classmethod
     def user_filter(cls, request):
-        return cls.objects.filter(
-            id__in=[x.id for x in request.project_user.belongs_to.descendants]
-        )
+        return cls.objects.filter(id__in=[x.id for x in request.project_user.belongs_to.descendants])
 
 
 class GroupPrefetcherManager(UserManager):
@@ -138,11 +138,6 @@ class ProjectUser(User, AutoCompleteCoreModel):
     class Meta:
         proxy = True
         ordering = ("username",)
-
-    def add_user_and_save(self, request):
-        # permissions.py enforces that request.user.manages is not null
-        self.belongs_to = request.user.manages
-        self.save()
 
     @property
     def all_my_projects(self):
@@ -499,19 +494,16 @@ class Stream(AutoCompleteCoreModel):
         return cls.objects.none()
 
     @classmethod
-    def ac_query(cls, request, search_field, query, requestor):
-        if query == "":
-            q = Q()
-        elif query.endswith(" "):
-            name = resolve_field_to_current_lang("name")
-            q = Q(**{f"{name}__iexact": query.strip()})
-        else:
-            q = Q(name__icontains=query) | Q(project__name__icontains=query)
+    def ac_query(cls, request, requestor, field_obj, search_field, query):
+        q = super().ac_query(request, requestor, field_obj, search_field, query)
+        if  isinstance(requestor, Task):
+            try:
+                q = q & Q(project=requestor.project)
+            except Task.project.RelatedObjectDoesNotExist:
+                pass
+        return q
 
-        if isinstance(requestor, Task):
-            q = q & Q(project=requestor.project)
 
-        return cls.objects.filter(q).distinct()
 
     def __str__(self):
         return f"{self.pk}-{self.name_en}"
@@ -613,6 +605,11 @@ class Task(AutoCompleteCoreModel, AutoCompleteNexus):
         if last_in_order and last_in_order.order:
             self.order = last_in_order.order + 1
         else:
+            self.stream = self.project.default_stream
+        last_in_order = self.stream.tasks.order_by("order").last()
+        if last_in_order and last_in_order.order:
+            self.order = last_in_order.order + 1
+        else:
             self.order = 1
 
     def __str__(self):
@@ -655,7 +652,6 @@ class TimeReport(CoreModel):
         class Meta:
             fields = [
                 "project",
-                "text",
                 "time",
                 "week",
             ]

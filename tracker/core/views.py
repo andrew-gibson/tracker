@@ -212,9 +212,9 @@ def text_ac(request, m, pk, attr):
                 "many_to_many": f.many_to_many,
                 "results": related_model.ac(
                     request, 
-                    q, 
                     obj, 
-                    f.__search_field__, 
+                    f,
+                    q,
                     optional_projection=projection, 
                 ),
             }

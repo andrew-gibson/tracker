@@ -11,6 +11,7 @@ from django.db.models import (
     Prefetch,
     OuterRef,
     Subquery,
+    Sum,
     Max,
     When,
     Case,
@@ -20,6 +21,7 @@ from django_readers import qs, pairs, projectors, producers, specs
 from django.urls import reverse
 from core.lang import lang, resolve_field_to_current_lang
 from . import permissions
+from . import time_utils
 
 """
   1. top level is specs
@@ -147,7 +149,7 @@ def projectuser_spec(cls, request, pk=None):
             def producer(u):
                 return {
                     "projects": [
-                        projection(x) for x in prepare_qs(user.all_my_projects.all())
+                        projection(x) for x in prepare_qs(user.all_my_projects).all()
                     ]
                 }
 
@@ -298,11 +300,13 @@ def stream_spec(cls, request, pk=None):
 
 def project_spec(cls, request, pk=None):
     Stream = apps.get_model("project.Stream")
-    ProjectLog = apps.get_model("project.ProjectLog")
+    TimeReport = apps.get_model("project.TimeReport")
     ProjectLogEntry = apps.get_model("project.ProjectLogEntry")
     Task = apps.get_model("project.Task")
     ProjectUser = apps.get_model("project.ProjectUser")
+
     sub_qs = ProjectUser.objects.filter(pk=request.project_user.pk)
+
     most_recent_date_subquery = (
         ProjectLogEntry.objects.filter(
             log__project=OuterRef("pk"), user=request.project_user
@@ -310,9 +314,6 @@ def project_spec(cls, request, pk=None):
         .order_by("-addstamp")
         .values("addstamp")[:1]
     )
-    #reported_time_in_last_month
-    #reported_time_in_last_quarter
-    #reported_time_in_last_year
 
     return [
         (
@@ -335,10 +336,36 @@ def project_spec(cls, request, pk=None):
             projectors.noop,
         ),
         *__core_info__(request),
+        {"most_recent_log_date" : (qs.noop,producers.attr("most_recent_log_date"))},
+        {"team_size" : pairs.count("project_team")},
+        {"reported_time_in_last_month" : pairs.sum(
+                        "timereports__time",
+                        filter=Q(
+                            timereports__week__gte=time_utils.get_last_n_weeks(4)[-1][
+                                "week_start"
+                            ]
+                        ),
+        )},
+        {"reported_time_in_last_quarter" : pairs.sum(
+                        "timereports__time",
+                        filter=Q(
+                            timereports__week__gte=time_utils.get_last_n_weeks(12)[-1][
+                                "week_start"
+                            ]
+                        ),
+        )},
+        {"reported_time_in_last_year" : pairs.sum(
+                        "timereports__time",
+                        filter=Q(
+                            timereports__week__gte=time_utils.get_last_n_weeks(52)[-1][
+                                "week_start"
+                            ]
+                        ),
+        )},
         "private",
         lang_field("text"),
-        {"text_m": render_markdown(f"text_{lang()}")},
         lang_field("name"),
+        {"text_m": render_markdown(f"text_{lang()}")},
         "short_term_outcomes",
         {"short_term_outcomes_m": render_markdown("short_term_outcomes")},
         "long_term_outcomes",
@@ -351,10 +378,7 @@ def project_spec(cls, request, pk=None):
         },
         {
             "streams": [
-                (
-                    qs.include_fields("project_default"),
-                    projectors.noop
-                ),
+                (qs.include_fields("project_default"), projectors.noop),
                 *__core_info__(request),
                 {"name_count": name_task_count()},
                 lang_field("name"),
@@ -442,7 +466,7 @@ def time_report(cls, request, pk=None):
     return [
         *__core_info__(request),
         {"user": [*__core_info__(request), "username"]},
-        {"project" : ["id"]},
+        {"project": ["id"]},
         "text",
         "time",
         "week",

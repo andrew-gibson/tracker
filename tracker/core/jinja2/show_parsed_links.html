@@ -1,4 +1,4 @@
-<div id="{{m}}-{{attr}}-results">
+<div id="{{m}}-{{attr}}-results" style="overflow-x: clip">
 
     <script type="module">
     import  {append_edit_fk, append_edit_attr } from "d3-ui";
@@ -25,12 +25,15 @@
                     selection
                         .append("div")
                         .classed("d-flex pt-2 bg-secondary bg-opacity-10 justify-content-between remainder",true)
-                        .style("font-size","0.8em")
                         .append("span")
                             .classed("m-1 pe-2 align-self-center  text-secondary",true)
-                            .html("{{attr}} :")
+                            .html("{{attr.replace("_"," ").title()}} :")
                         .select_parent()
                         .append("ul")
+                            .styles({
+                                "overflow-x": "scroll", 
+                                "scrollbar-width":"thin",
+                            })
                             .classed("list-group list-group-horizontal",true)
                             .append("li")
                                 .classed("list-group-item d-flex align-items-center justify-content-between p-1 me-1 bg-opacity-10 border-1 w-100 fw-bold",true)
@@ -40,41 +43,36 @@
              .selectAll("div.parsed")
              .data(data)
              .join("div")
-            .classed("d-flex pt-2 bg-secondary bg-opacity-10 justify-content-between parsed",true)
-            .style("font-size","0.8em")
+            .classed("d-flex  align-items-center justify-content-between pt-2 bg-secondary bg-opacity-10 parsed",true)
 
         if (data.length) {
             results_uls.append("span")
-                    .classed("m-1 pe-2 align-self-center  text-secondary",true)
+                    .classed("m-1 pe-2 text-secondary text-nowrap",true)
+                    .style("overflow-x", "scroll") 
+                    .style("scrollbar-width-x", "thin") 
                     .html(d=> d.verbose + ":")
 
-            results_uls.append("ul")
-                    .classed("list-group list-group-horizontal",true)
-                    .styles({
-                       "overflow-x": "scroll", 
-                        "scrollbar-width":"none",
-                       "max-width": "100%",
-                    })
+            const results = results_uls.append("ul")
+                    .style("overflow-x", "scroll") 
+                    .style("scrollbar-width-x", "thin") 
+                    .classed("list-group list-group-horizontal d-flex  align-items-center pb-0",true)
                     .selectAll("li")
                     .data(d=>d.results)
                     .join("li")
-                    .classed("list-group-item d-flex align-items-center justify-content-between p-1 me-1 bg-opacity-10 border-1 w-100 fw-bold",true)
                     .style("background-color", d=>d.color)
                     .style("border-color", d=>d.border)
-                    .append("span").html(d=>d.name)
-                    .select_parent()
-                    .each(function(d){
+                    .classed("list-group-item d-flex align-items-center justify-content-between p-1 me-1 bg-opacity-10 border-1 w-100 fw-bold  text-nowrap",true)
+            results.append("span").html(d=> d.name )
+            results.each(function(d){
                         if (d.new){
                           d3.select(this).append("span").classed("badge bg-success ms-1",true).html("New");
                         }
                     })
         }
 
-        root.selectAll("ul").last().classed("pb-2",true)
+        //root.selectAll("ul").last().classed("pb-2",true)
 
     })();
     </script>
 
 </div>
-
-
