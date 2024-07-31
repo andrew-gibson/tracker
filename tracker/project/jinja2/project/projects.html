@@ -20,7 +20,7 @@
                     .append("div")
                     .classed(`mb-1 name-row editor-normal`, true)
                     .append("button")
-                    .classed("btn btn-link pb-1 ps-0 text-end",true)
+                    .classed("btn btn-link pb-1 ps-0 text-end d-inline",true)
                     .attrs({
                         "hx-replace-url":"true",
                         "hx-target" : "#main-content",
@@ -28,6 +28,15 @@
                     })
                     .setup_htmx()
                     .html(project.name)
+                    .call(function(sel2){
+                       if (project.is_new){
+                           sel2
+                              .append("span")
+                              .attr("class","badge rounded-pill text-bg-success ms-2 d-inline")
+                              .html("New")
+                       }
+                    })
+
                 const fields =  [["status","Status"],
                                   ["text", "Summary"],
                                   ["group","Team",{on_change : "reloadProjects"}],

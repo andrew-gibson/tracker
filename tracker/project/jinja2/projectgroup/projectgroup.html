@@ -45,6 +45,15 @@
                     })
                     .attr("hx-get",d=>d.__url__)
                     .html(d=>d.name)
+                    .each(function(d){
+                       const sel = d3.select(this)
+                       if (d.is_new){
+                           sel
+                              .append("span")
+                              .attr("class","badge rounded-pill text-bg-success ms-2 d-inline")
+                              .html("New")
+                       }
+                    })
                     .setup_htmx()
                   if ( !ui_state.models["user"].data.projects.map(d=>d.id).includes(group.id) ){
                       fk_toggle(sel,d.viewers,"viewers",{on_change})

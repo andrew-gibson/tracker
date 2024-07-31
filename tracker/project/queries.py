@@ -1,4 +1,5 @@
 import markdown
+import datetime
 from django.apps import apps
 from django.db.models import (
     CharField,
@@ -17,6 +18,7 @@ from django.db.models import (
     Case,
 )
 from django.db.models.functions import Concat, Replace
+from django.utils import timezone
 from django_readers import qs, pairs, projectors, producers, specs
 from django.urls import reverse
 from core.lang import lang, resolve_field_to_current_lang
@@ -253,6 +255,10 @@ def projectgroup_spec(cls, request, pk=None):
             {
                 "projects": [
                     pairs.filter(private=False),
+                    {"is_new" : (qs.include_fields("addstamp"), 
+                                 lambda inst : timezone.now() - inst.addstamp < datetime.timedelta(weeks=4)
+                        )
+                    },
                     *__core_info__(request),
                     lang_field("name"),
                     {
@@ -301,7 +307,6 @@ def stream_spec(cls, request, pk=None):
 def project_spec(cls, request, pk=None):
     Stream = apps.get_model("project.Stream")
     TimeReport = apps.get_model("project.TimeReport")
-    ProjectLogEntry = apps.get_model("project.ProjectLogEntry")
     Task = apps.get_model("project.Task")
     ProjectUser = apps.get_model("project.ProjectUser")
 
@@ -365,6 +370,10 @@ def project_spec(cls, request, pk=None):
         "private",
         lang_field("text"),
         lang_field("name"),
+        {"is_new" : (qs.include_fields("addstamp"), 
+                     lambda inst : timezone.now() - inst.addstamp < datetime.timedelta(weeks=4)
+            )
+        },
         {"text_m": render_markdown(f"text_{lang()}")},
         "short_term_outcomes",
         {"short_term_outcomes_m": render_markdown("short_term_outcomes")},
@@ -428,6 +437,11 @@ def project_spec(cls, request, pk=None):
 def miniproject_spec(cls, request, pk=None):
     return [
         pairs.exclude(status__name_en__in=["Completed", "Canceled"]),
+        {"is_new" : (qs.include_fields("addstamp"), 
+                     lambda inst : timezone.now() - inst.addstamp < datetime.timedelta(weeks=4)
+            )
+        },
+        {"most_recent_log_date": (qs.noop, producers.attr("most_recent_log_date"))},
         {"private_owner": ["id"]},
         {"group": ["id"]},
         "private",

@@ -41,11 +41,16 @@
           .attr("hx-get",d=>d.__url__)
           .setup_htmx()
           .html(d=>d.name)
-
-        document.addEventListener("htmx:swapError",event => {
-            console.log(event)
-        })
-
+          .each(function(d){
+             const sel = d3.select(this)
+             if (d.is_new){
+                 sel
+                    .append("span")
+                    .attr("class","badge rounded-pill text-bg-success ms-2 d-inline")
+                    .html("New")
+             }
+          })
+          .setup_htmx()
 
     </script>
 </div>
