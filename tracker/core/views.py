@@ -108,7 +108,7 @@ def toggle_link(request, m1, pk1, m2, pk2, attr=""):
     obj1 = get_object_or_404(model1, pk=pk1)
     obj2 = get_object_or_404(model2, pk=pk2)
     try:
-        assert model1.perms.good_m2m_request(request.user, request.method, obj1,obj2,attr)
+        assert model1.app_config.perms.good_m2m_request(request.user, request.method, obj1,obj2,attr)
         if request.method == "POST":
             link_or_404(obj1, obj2, attr)
             projection = model1.get_projection_by_pk(request,pk1,"GET")[1]
