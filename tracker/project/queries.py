@@ -286,6 +286,7 @@ def projectgroup_spec(cls, request, pk=None):
             {
                 "projects": [
                     pairs.filter(private=False),
+                    pairs.exclude(status__name_en__in=["Completed", "Canceled"]),
                     {"is_new" : (qs.include_fields("addstamp"), 
                                  lambda inst : timezone.now() - inst.addstamp < datetime.timedelta(weeks=4)
                         )
@@ -358,6 +359,7 @@ def project_spec(cls, request, pk=None):
                     "viewers", related_queryset=sub_qs
                 ),
                 qs.include_fields("group", "private", "private_owner"),
+                pairs.exclude(status__name_en__in=["Completed", "Canceled"]),
                 qs.select_related("group"),
                 qs.annotate(
                     most_recent_log_date=Subquery(most_recent_date_subquery),
