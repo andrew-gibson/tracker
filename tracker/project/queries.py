@@ -344,63 +344,53 @@ def project_spec(cls, request, pk=None):
 
     sub_qs = ProjectUser.objects.filter(pk=request.project_user.pk)
 
-    most_recent_date_subquery = (
-        ProjectLogEntry.objects.filter(
-            log__project=OuterRef("pk"), user=request.project_user
-        )
-        .order_by("-addstamp")
-        .values("addstamp")[:1]
-    )
-
     return [
         (
             qs.pipe(
                 qs.prefetch_many_to_many_relationship(
                     "viewers", related_queryset=sub_qs
                 ),
-                qs.include_fields("group", "private", "private_owner"),
                 pairs.exclude(status__name_en__in=["Completed", "Canceled"]),
+                qs.include_fields("addstamp","group", "private", "private_owner"),
                 qs.select_related("group"),
-                qs.annotate(
-                    most_recent_log_date=Subquery(most_recent_date_subquery),
-                    has_log_date=Case(
-                        When(most_recent_log_date__isnull=True, then=Value(False)),
-                        When(most_recent_log_date__isnull=False, then=Value(True)),
-                        output_field=BooleanField(),
-                    ),
-                ),
-                qs.order_by("-has_log_date", "-most_recent_log_date"),
+                add_log_date_and_order(request),
             ),
             projectors.noop,
         ),
         *__core_info__(request),
-        {"most_recent_log_date" : (qs.noop,producers.attr("most_recent_log_date"))},
-        {"team_size" : pairs.count("project_team")},
-        {"reported_time_in_last_month" : pairs.sum(
-                        "timereports__time",
-                        filter=Q(
-                            timereports__week__gte=time_utils.get_last_n_weeks(4)[-1][
-                                "week_start"
-                            ]
-                        ),
-        )},
-        {"reported_time_in_last_quarter" : pairs.sum(
-                        "timereports__time",
-                        filter=Q(
-                            timereports__week__gte=time_utils.get_last_n_weeks(12)[-1][
-                                "week_start"
-                            ]
-                        ),
-        )},
-        {"reported_time_in_last_year" : pairs.sum(
-                        "timereports__time",
-                        filter=Q(
-                            timereports__week__gte=time_utils.get_last_n_weeks(52)[-1][
-                                "week_start"
-                            ]
-                        ),
-        )},
+        {"most_recent_log_date": (qs.noop, producers.attr("most_recent_log_date"))},
         {"last_look_age": (qs.noop, producers.attr("last_look_age"))},
+        {"team_size": pairs.count("project_team")},
+        {
+            "reported_time_in_last_month": pairs.sum(
+                "timereports__time",
+                filter=Q(
+                    timereports__week__gte=time_utils.get_last_n_weeks(4)[-1][
+                        "week_start"
+                    ]
+                ),
+            )
+        },
+        {
+            "reported_time_in_last_quarter": pairs.sum(
+                "timereports__time",
+                filter=Q(
+                    timereports__week__gte=time_utils.get_last_n_weeks(12)[-1][
+                        "week_start"
+                    ]
+                ),
+            )
+        },
+        {
+            "reported_time_in_last_year": pairs.sum(
+                "timereports__time",
+                filter=Q(
+                    timereports__week__gte=time_utils.get_last_n_weeks(52)[-1][
+                        "week_start"
+                    ]
+                ),
+            )
+        },
         "private",
         lang_field("text"),
         lang_field("name"),
