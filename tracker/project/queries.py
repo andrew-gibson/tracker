@@ -350,7 +350,7 @@ def project_spec(cls, request, pk=None):
                 qs.prefetch_many_to_many_relationship(
                     "viewers", related_queryset=sub_qs
                 ),
-                pairs.exclude(status__name_en__in=["Completed", "Canceled"]),
+                qs.exclude(status__name_en__in=["Completed", "Canceled"]),
                 qs.include_fields("addstamp","group", "private", "private_owner"),
                 qs.select_related("group"),
                 add_log_date_and_order(request),
