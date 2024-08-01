@@ -77,23 +77,11 @@ const redraw = (id,data)=> {
      .selectAll("span")
      .data(d=>[d],d=>d.id)
      .join("span")
-     .attr("class" , d=> {
-         if (d.__url__ == sidebar_state.current_url){
-            return "bg-primary text-white p-2 rounded"
-         }  else {
-            return "pt-2"
-         }
-     })
+     .attr("class" , "pt-2")
      .selectAll("a")
      .data(d=>[d],d=>d.id)
      .join("a")
-     .attr("class" , d=> {
-         if (d.__url__ == sidebar_state.current_url){
-            return "text-white"
-         }  else {
-            return "link-secondary"
-         }
-     })
+     .attr("class" , "link-secondary")
      .classed("text-decoration-none",true)
      .attr("hx-get",d=>d.__url__)
      .style("font-size", "0.8rem")
@@ -107,8 +95,16 @@ const redraw = (id,data)=> {
      .html(d=>{
          return d.name
      })
+
+     // remove any markers of the active element
+     d3.selectAll(`#sidebar *[hx-get]`)
+        .classed( "bg-primary text-white p-2 rounded text-white",false);
+    // find the sidebar element which links to the active url and set the colours
+     d3.select(`#sidebar *[hx-get="${sidebar_state.current_url}"]`)
+        .attr("class", "bg-primary text-white p-2 rounded text-white")
+
 }
-// don't use d3-ui reaction, since this isn't 
+// don't use d3-ui reaction, since this is a permenant sidebar until a page-refresh
 mobx.reaction(
     ()=>[ui_state.models["project.ProjectGroup"].refresh_time, 
          ui_state.models["user"].refresh_time,
@@ -124,13 +120,14 @@ mobx.reaction(
        }
     });
 
-
+// redraw before a url changing request
 document.addEventListener("htmx:beforeRequest",event => {
    if ("hx-replace-url" in event.target.attributes){
          sidebar_state.current_url =  event.target.attributes["hx-get"].value
          sidebar_state.redraw++;
    }
 })
+
 if (ui_state.models["project.Project"].data.length == 0){
      ui_state.refresh_model_store("project.ProjectGroup")
 } else {
