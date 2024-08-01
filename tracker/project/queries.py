@@ -5,6 +5,7 @@ from django.db.models import (
     CharField,
     CharField,
     BooleanField,
+    IntegerField,
     Value,
     Q,
     Count,
@@ -57,6 +58,36 @@ def name_task_count():
             )
         ),
         producers.attr("name_count"),
+    )
+
+
+def add_log_date_and_order(request):
+    two_weeks_ago = timezone.now() - timezone.timedelta(weeks=2)
+    four_weeks_ago = timezone.now() - timezone.timedelta(weeks=3)
+    ProjectLogEntry = apps.get_model("project.ProjectLogEntry")
+    return qs.pipe(
+        qs.annotate(
+            most_recent_log_date=Subquery(
+                ProjectLogEntry.objects.filter(
+                    log__project=OuterRef("pk"), user=request.project_user
+                )
+                .order_by("-addstamp")
+                .values("addstamp")[:1]
+            ),
+            has_log_date = Case(
+                When(most_recent_log_date__isnull=True, then=Value(False)),
+                When(most_recent_log_date__isnull=False, then=Value(True)),
+                output_field=BooleanField(),
+            ),
+            last_look_age = Case(
+               When(most_recent_log_date__gte = two_weeks_ago, then=Value(0)),
+               When(most_recent_log_date__gte = four_weeks_ago, then=Value(1)),
+               When(most_recent_log_date__lt = four_weeks_ago, then=Value(2)),
+               When(has_log_date = False, then=Value(2)),
+               output_field=IntegerField()
+            ),
+        ),
+        qs.order_by("has_log_date", "most_recent_log_date"),
     )
 
 
@@ -367,6 +398,7 @@ def project_spec(cls, request, pk=None):
                             ]
                         ),
         )},
+        {"last_look_age": (qs.noop, producers.attr("last_look_age"))},
         "private",
         lang_field("text"),
         lang_field("name"),
@@ -435,13 +467,16 @@ def project_spec(cls, request, pk=None):
 
 
 def miniproject_spec(cls, request, pk=None):
-    return [
+    return [ ( add_log_date_and_order(request),
+               projectors.noop
+              ),
         pairs.exclude(status__name_en__in=["Completed", "Canceled"]),
         {"is_new" : (qs.include_fields("addstamp"), 
                      lambda inst : timezone.now() - inst.addstamp < datetime.timedelta(weeks=4)
             )
         },
         {"most_recent_log_date": (qs.noop, producers.attr("most_recent_log_date"))},
+        {"last_look_age": (qs.noop, producers.attr("last_look_age"))},
         {"private_owner": ["id"]},
         {"group": ["id"]},
         "private",

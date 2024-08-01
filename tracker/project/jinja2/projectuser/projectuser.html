@@ -25,12 +25,14 @@
     <script type="module" >
         import {ui_state, inplace_char_edit} from "d3-ui";
         const project_group = {{dumps(inst)|safe}};
-
-        d3.select("#projects ul")
+        const green_yellow_red = ["#2ca02c", "#ff7f0e","#d62728"];
+        const lis = d3.select("#projects ul")
           .selectAll("li.list-group-item")
           .data(project_group.projects,d=>d.id)
           .join("li")
           .attr("class","list-group-item p-1")
+
+        const buttons =  lis
           .selectAll("button.project-link")
           .data(d=>[d],d=>d.id)
           .join("button")
@@ -39,7 +41,6 @@
             "hx-target" : "#main-sub-content",
           })
           .attr("hx-get",d=>d.__url__)
-          .setup_htmx()
           .html(d=>d.name)
           .each(function(d){
              const sel = d3.select(this)
@@ -51,6 +52,24 @@
              }
           })
           .setup_htmx()
+
+        const dots = buttons
+          .selectAll("svg")
+          .data(d=>[d],d=>d.id)
+          .join("svg")
+                .attr("class", "ms-2")
+                .attr("width", 10)
+                .attr("height", 10)
+              .append("circle")
+                  .attr("cx", 5)
+                  .attr("cy", 5)
+                  .attr("r", 5)
+                  .attr("fill", d=>{
+                      console.log(d.last_look_age)
+                      console.log(green_yellow_red[d.last_look_age])
+                      return       green_yellow_red[d.last_look_age]
+                  })
+
 
     </script>
 </div>
