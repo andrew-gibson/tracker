@@ -64,11 +64,7 @@
                   .attr("cx", 5)
                   .attr("cy", 5)
                   .attr("r", 5)
-                  .attr("fill", d=>{
-                      console.log(d.last_look_age)
-                      console.log(green_yellow_red[d.last_look_age])
-                      return       green_yellow_red[d.last_look_age]
-                  })
+                  .attr("fill", d=> green_yellow_red[d.last_look_age] )
 
 
     </script>
