@@ -226,6 +226,30 @@ class ProjectStatus(AutoCompleteCoreModel):
     name_en = CharField(max_length=300, unique=True)
     name_fr = CharField(max_length=300, null=True, blank=True)
 
+@add_to_admin
+class ProjectType(AutoCompleteCoreModel):
+
+    form_fields = ["name_en", "name_fr"]
+
+    class adminClass(admin.ModelAdmin):
+        list_display = ("id", "name_en")
+        list_editable = ("name_en",)
+
+    @classmethod
+    def user_filter(cls, request):
+        return cls.objects.all()
+
+    @property
+    def name(self):
+       return getattr(self, resolve_field_to_current_lang("name"))
+
+    def __str__(self):
+        return self.name_en
+
+    spec = queries.basic_spec
+    order = IntegerField()
+    name_en = CharField(max_length=300, unique=True)
+    name_fr = CharField(max_length=300, null=True, blank=True)
 
 @add_to_admin
 class Tag(AutoCompleteCoreModel):
@@ -378,6 +402,7 @@ class Project(AutoCompleteNexus, AutoCompleteCoreModel):
         text_trigger="+",
     )
     status = ForeignKey(ProjectStatus, blank=True, on_delete=SET_NULL, null=True)
+    type = ForeignKey(ProjectType,blank=True, on_delete=PROTECT, text_trigger="!")
     addstamp = DateTimeField(null=True)
     name_en = CharField(max_length=255)
     name_fr = CharField(max_length=255, null=True, blank=True)
