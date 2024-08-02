@@ -91,22 +91,7 @@ def add_log_date_and_order(request):
     )
 
 
-def force_type(model):
-    m = apps.get_model(model)
-
-    def produce1(inst):
-        return m._meta.label
-
-    def produce2(inst):
-        return reverse("core:main", kwargs={"m": model, "pk": inst.id})
-
-    return [
-        {"__type__": (qs.noop, produce1)},
-        {"__url__": (qs.noop, produce2)},
-    ]
-
-
-def __core_info__(request, include_fields=None, select_related=None):
+def common_model_info(request, include_fields=None, select_related=None, force_model=None):
 
     def perms(user, *attrs):
         prepare = qs.pipe(
@@ -122,10 +107,27 @@ def __core_info__(request, include_fields=None, select_related=None):
 
         return prepare, producer
 
+    if force_model:
+
+        m = apps.get_model(force_model)
+
+        def produce1(inst):
+            return m._meta.label
+
+        def produce2(inst):
+            return reverse("core:main", kwargs={"m": force_model, "pk": inst.id})
+
+        __type__  =   (qs.noop, produce1)
+        __url__   =  (qs.noop, produce2)
+    else:
+        __type__ =   (qs.noop, producers.attrgetter("_meta.label"))
+        __url__  =   (qs.noop, producers.attrgetter("url"))
+
+
     return [
         "id",
-        {"__type__": (qs.noop, producers.attrgetter("_meta.label"))},
-        {"__url__": (qs.noop, producers.attrgetter("url"))},
+        {"__type__": __type__},
+        {"__url__": __url__},
         {"__perms__": perms(request.project_user, include_fields, select_related)},
     ]
 
@@ -136,14 +138,14 @@ def settings_spec(cls, request, pk=None):
         "see_all_projects",
         "id",
         "work_hours",
-        *__core_info__(request),
+        *common_model_info(request),
     ]
 
 
 def basic_spec(cls, request, pk=None):
     return [
         lang_field("name"),
-        *__core_info__(request),
+        *common_model_info(request),
     ]
 
 
@@ -153,14 +155,13 @@ def projectuser_spec(cls, request, pk=None):
     ProjectGroup = apps.get_model("project.ProjectGroup")
 
     spec = (
-        *__core_info__(request),
+        *common_model_info(request),
         "username",
         {"name": "username"},
         {
             "belongs_to": [
-                *force_type("project.ProjectGroup"),
+                *common_model_info(request, force_model="project.ProjectGroup"),
                 lang_field("name"),
-                "id",
             ]
         },
     )
@@ -177,7 +178,7 @@ def projectuser_spec(cls, request, pk=None):
             )
 
         def add_project_data_to_user():
-            prepare_qs, projection = specs.process(miniproject_spec(Project, request))
+            prepare_qs, projection = specs.process(medium_project_spec(Project, request))
 
             def producer(u):
                 return {
@@ -204,15 +205,13 @@ def projectuser_spec(cls, request, pk=None):
             add_manages_descendants(),
             {
                 "manages": [
-                    *force_type("project.ProjectGroup"),
+                    *common_model_info(request,force_model = "project.ProjectGroup"),
                     lang_field("name"),
-                    "id",
                     {
                         "team_members": [
                             pairs.exclude(pk=request.project_user.pk),
-                            *force_type("project.ProjectUser"),
+                            *common_model_info(request,force_model = "project.ProjectUser"),
                             {"name": "username"},
-                            "id",
                         ]
                     },
                 ]
@@ -224,22 +223,22 @@ def projectuser_spec(cls, request, pk=None):
 
 def task_spec(cls, request, pk=None):
     return [
-        *__core_info__(request),
+        *common_model_info(request),
         "order",
         lang_field("text"),
         lang_field("name"),
-        {"project": [*__core_info__(request), lang_field("name")]},
+        {"project": [*common_model_info(request), lang_field("name")]},
         {
             "stream": [
-                *__core_info__(request, select_related=["project"]),
+                *common_model_info(request, select_related=["project"]),
                 lang_field("name"),
             ]
         },
         "start_date",
         "target_date",
-        {"lead": [*__core_info__(request), "username"]},
-        {"teams": [*__core_info__(request), lang_field("name")]},
-        {"competency": [*__core_info__(request), lang_field("name")]},
+        {"lead": [*common_model_info(request), "username"]},
+        {"teams": [*common_model_info(request), lang_field("name")]},
+        {"competency": [*common_model_info(request), lang_field("name")]},
         "done",
     ]
 
@@ -250,7 +249,7 @@ def tag_spec(cls, request, pk=None):
             qs.select_related("group"),
             projectors.noop,
         ),
-        *__core_info__(request),
+        *common_model_info(request),
         "name",
         "public",
     ]
@@ -262,11 +261,11 @@ def contact_spec(cls, request, pk=None):
             qs.select_related("group"),
             projectors.noop,
         ),
-        *__core_info__(request, "group"),
+        *common_model_info(request, "group"),
         "name",
         "email",
-        {"account": [*__core_info__(request), "username"]},
-        {"group": [*__core_info__(request), lang_field("name")]},
+        {"account": [*common_model_info(request), "username"]},
+        {"group": [*common_model_info(request), lang_field("name")]},
     ]
 
 
@@ -278,7 +277,7 @@ def projectgroup_spec(cls, request, pk=None):
             ),
             projectors.noop,
         ),
-        *__core_info__(request),
+        *common_model_info(request),
         lang_field("name"),
     )
     if pk:
@@ -291,7 +290,7 @@ def projectgroup_spec(cls, request, pk=None):
                                  lambda inst : timezone.now() - inst.addstamp < datetime.timedelta(weeks=4)
                         )
                     },
-                    *__core_info__(request),
+                    *common_model_info(request),
                     lang_field("name"),
                     {
                         "viewers": (
@@ -322,7 +321,7 @@ def stream_spec(cls, request, pk=None):
         tasks = []
     tasks += [x for x in task_spec(Task, request) if "project" not in x]
     return [
-        *__core_info__(request),
+        *common_model_info(request),
         (
             qs.include_fields(
                 "project_default",
@@ -331,7 +330,7 @@ def stream_spec(cls, request, pk=None):
         ),
         lang_field("name"),
         {"name_count": name_task_count()},
-        {"project": [*__core_info__(request), lang_field("name")]},
+        {"project": [*common_model_info(request), lang_field("name")]},
         {"tasks": tasks},
     ]
 
@@ -357,7 +356,7 @@ def project_spec(cls, request, pk=None):
             ),
             projectors.noop,
         ),
-        *__core_info__(request),
+        *common_model_info(request),
         {"most_recent_log_date": (qs.noop, producers.attr("most_recent_log_date"))},
         {"last_look_age": (qs.noop, producers.attr("last_look_age"))},
         {"team_size": pairs.count("project_team")},
@@ -412,7 +411,7 @@ def project_spec(cls, request, pk=None):
         {
             "streams": [
                 (qs.include_fields("project_default"), projectors.noop),
-                *__core_info__(request),
+                *common_model_info(request),
                 {"name_count": name_task_count()},
                 lang_field("name"),
                 {"tasks": task_spec(Task, request)},
@@ -420,38 +419,38 @@ def project_spec(cls, request, pk=None):
         },
         {
             "group": [
-                *__core_info__(request),
+                *common_model_info(request),
                 lang_field("name"),
             ],
         },
         {
-            "status": [*__core_info__(request), lang_field("name")],
+            "status": [*common_model_info(request), lang_field("name")],
         },
         {
-            "project_manager": [*__core_info__(request), "username"],
+            "project_manager": [*common_model_info(request), "username"],
         },
         {
-            "log": [*__core_info__(request)],
+            "log": [*common_model_info(request)],
         },
         {
-            "partners": [*__core_info__(request), lang_field("name")],
+            "partners": [*common_model_info(request), lang_field("name")],
         },
         {
             "lead": [
-                *__core_info__(request),
+                *common_model_info(request),
                 "username",
             ],
         },
         {
             "project_team": [
-                *__core_info__(request),
+                *common_model_info(request),
                 "username",
             ],
         },
         {
             "tags": [
                 (qs.include_fields("group"), projectors.noop),
-                *__core_info__(request),
+                *common_model_info(request),
                 "name",
             ],
         },
@@ -472,7 +471,7 @@ def miniproject_spec(cls, request, pk=None):
         {"private_owner": ["id"]},
         {"group": ["id"]},
         "private",
-        *__core_info__(request),
+        *common_model_info(request),
         lang_field("name"),
     ]
 
@@ -480,11 +479,11 @@ def miniproject_spec(cls, request, pk=None):
 def projectlog_spec(cls, request, pk=None):
     ProjectLogEntry = apps.get_model("project.ProjectLogEntry")
     return [
-        *__core_info__(request),
-        {"project": [*__core_info__(request)]},
+        *common_model_info(request),
+        {"project": [*common_model_info(request)]},
         {
             "entries": [
-                *__core_info__(request),
+                *common_model_info(request),
                 "text",
                 {"rendered_text": render_markdown(f"text")},
                 "addstamp",
@@ -495,9 +494,9 @@ def projectlog_spec(cls, request, pk=None):
 
 def projectlogentry_spec(cls, request, pk=None):
     return [
-        *__core_info__(request),
+        *common_model_info(request),
         "text",
-        {"log": [*__core_info__(request)]},
+        {"log": [*common_model_info(request)]},
         {"rendered_text": render_markdown(f"text")},
         "addstamp",
     ]
@@ -505,8 +504,8 @@ def projectlogentry_spec(cls, request, pk=None):
 
 def time_report(cls, request, pk=None):
     return [
-        *__core_info__(request),
-        {"user": [*__core_info__(request), "username"]},
+        *common_model_info(request),
+        {"user": [*common_model_info(request), "username"]},
         {"project": ["id"]},
         "text",
         "time",

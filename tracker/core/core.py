@@ -228,9 +228,7 @@ class CoreModel(LifecycleModelMixin, Model):
         else:
             insts = [
                 projection(p)
-                for p in prepare_qs(cls.objects.user_filter(request)).order_by(
-                    *cls._meta.ordering
-                )
+                for p in prepare_qs(cls.objects.user_filter(request))
                 if cls.app_config.perms.good_request(request.user, request.method, p)
             ]
             if request.json:
