@@ -1,7 +1,7 @@
 <div id="sidebar" class="sidebar">
-   <a class="link body-emphasis d-block mb-2" hx-get="{{url("project:dashboard")}}" href="#" hx-target="#main-content" hx-replace-url="true">Dashboard</a>
+   <a class="link bodb-emphasis d-block mt-3 d-block" hx-get="{{url("project:dashboard")}}" href="#" hx-target="#main-content" hx-replace-url="true">Dashboard</a>
 
-   <a class="link body-emphasis" hx-get="{{url("project:main")}}" href="#" hx-target="#main-content" hx-replace-url="true">My Projects</a>
+   <a class="link body-emphasis d-block mt-3 d-block" hx-get="{{url("project:main")}}" href="#" hx-target="#main-content" hx-replace-url="true">My Projects</a>
    <div id="myprojects">
        <div class="placeholder-glow">
            <div class="col-12 placeholder placeholder-xs"></div>
@@ -16,15 +16,15 @@
            <div class="col-12 placeholder placeholder-xs"></div>
         </div>
    </div> 
-   <div class=" mt-2">
-       <a class="link body-emphasis" 
+   <div class=" mt-3">
+       <a class="link body-emphasis d-block" 
           hx-get="{{url("project:timereporting")}}" 
           href="#" 
           hx-target="#main-content" 
           hx-replace-url="true">Time Reporting</a>
     </div>
 
-   <div id="team-header" class="body-emphasis mt-2">Team</div>
+   <div id="team-header" class="body-emphasis mt-3">Team</div>
    <div id="myteam">
        <div class="placeholder-glow">
            <div class="col-12 placeholder placeholder-xs"></div>
@@ -34,7 +34,7 @@
         </div>
    </div> 
 
-   <div class="body-emphasis mt-2">Groups</div>
+   <div class="body-emphasis mt-3">Groups</div>
    <div id="groups"> 
        <div class="placeholder-glow">
            <div class="col-12 placeholder placeholder-xs"></div>
@@ -47,7 +47,7 @@
            <div class="col-12 placeholder placeholder-xs"></div>
         </div>
    </div> 
-    <a class="link body-emphasis mt-2" hx-get="{{url("project:metadata")}}" href="#" hx-target="#main-content" hx-replace-url="true">Edit Tags / Users</a>
+    <a class="link body-emphasis mt-3 d-block" hx-get="{{url("project:metadata")}}" href="#" hx-target="#main-content" hx-replace-url="true">Edit Tags / Users</a>
 </div>
 
 <script type="module">
@@ -81,7 +81,7 @@ const redraw = (id,data)=> {
      .selectAll("a")
      .data(d=>[d],d=>d.id)
      .join("a")
-     .attr("class" , "link-secondary")
+     .attr("class" , "link-secondary d-block")
      .classed("text-decoration-none",true)
      .attr("hx-get",d=>d.__url__)
      .style("font-size", "0.8rem")
@@ -101,7 +101,7 @@ const redraw = (id,data)=> {
         .classed( "bg-primary text-white p-2 rounded text-white",false);
     // find the sidebar element which links to the active url and set the colours
      d3.select(`#sidebar *[hx-get="${sidebar_state.current_url}"]`)
-        .attr("class", "bg-primary text-white p-2 rounded text-white")
+        .classed("bg-primary text-white p-2 rounded text-white", true)
 
 }
 // don't use d3-ui reaction, since this is a permenant sidebar until a page-refresh
