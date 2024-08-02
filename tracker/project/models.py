@@ -12,6 +12,7 @@ from django.db.models import (
     CASCADE,
     PROTECT,
     SET_NULL,
+    IntegerField,
     BooleanField,
     CharField,
     DateField,
@@ -201,6 +202,7 @@ class ProjectStatus(AutoCompleteCoreModel):
     form_fields = ["name_en", "name_fr"]
 
     class Meta:
+        ordering = ["order"]
         verbose_name_plural = "Statuses"
         verbose_name = "Status"
 
@@ -212,10 +214,15 @@ class ProjectStatus(AutoCompleteCoreModel):
     def user_filter(cls, request):
         return cls.objects.all()
 
+    @property
+    def name(self):
+       return getattr(self, resolve_field_to_current_lang("name"))
+
     def __str__(self):
         return self.name_en
 
     spec = queries.basic_spec
+    order = IntegerField()
     name_en = CharField(max_length=300, unique=True)
     name_fr = CharField(max_length=300, null=True, blank=True)
 
@@ -418,6 +425,17 @@ class Project(AutoCompleteNexus, AutoCompleteCoreModel):
     short_term_outcomes = TextField(blank=True, null=True)
     long_term_outcomes = TextField(blank=True, null=True)
 
+
+class SmallProject(Project):
+    spec = queries.small_project_spec
+
+    class Meta:
+        proxy = True
+
+    @classmethod
+    def user_filter(cls, request):
+        filters = cls.get_filters(request)
+        return cls.objects.filter(filters).order_by("status")
 
 class ProjectLog(CoreModel):
     spec = queries.projectlog_spec

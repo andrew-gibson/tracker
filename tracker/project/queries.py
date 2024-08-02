@@ -456,8 +456,17 @@ def project_spec(cls, request, pk=None):
         },
     ]
 
+def small_project_spec(cls, request, pk=None):
+    return (
+        pairs.exclude(private=True),
+        pairs.order_by("status__order"),
+        *common_model_info(request, force_model="project.Project"),
+        lang_field("name"),
+        lang_field("text"),
+        {"status" : [lang_field("name"), "id", "order"]}
+    )
 
-def miniproject_spec(cls, request, pk=None):
+def medium_project_spec(cls, request, pk=None):
     return [ ( add_log_date_and_order(request),
                projectors.noop
               ),

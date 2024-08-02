@@ -1,0 +1,58 @@
+{% if  standalone %} 
+    {% extends "base.html" %} 
+    {% block sidebar %}
+        {%include "shared/sidebar.html"%}
+    {%endblock%}
+{% endif %}
+
+{% block content%}
+<div id="main-content" class="row" hx-swap-oob="true">
+    {% for status in models["project.ProjectStatus"].objects.all()%}
+    <div  id="status_{{status.id}}">
+        <div class="bg-dark-subtle mt-3 fw-bold" >
+            {{status.name}}
+        </div>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th scope="col">ID</th>
+                    <th scope="col">Name</th>
+                    <th scope="col">Description</th>
+                </tr>
+            </thead>
+            <tbody>
+
+            </tbody>
+        </table>
+    </div>
+    {%endfor%}
+    <script type="module" >
+        import {ui_state, inplace_char_edit} from "d3-ui";
+        const draw_table = (rows, status_id) => {
+           d3.selectAll(`#status_${status_id} tbody`)
+             .selectAll("tr")
+             .data(rows)
+             .join("tr")
+             .each(function(d){
+                const tr = d3.select(this);
+                tr.append("td").html(d.id)
+                tr.append("td")
+                  .append("a")
+                  .classed("btn btn-link text-start pt-0",true)
+                  .attr("hx-get",d=>d.__url__)
+                  .attr("hx-replace", "#main-content")
+                  .attrs({
+                    "href" : "#",
+                    "hx-headers":'{"json-response" : "false"}',
+                    "hx-target":"#main-content",
+                    "hx-replace-url":"true",
+                  })
+                  .html(d.name)
+                  .setup_htmx()
+                tr.append("td").html(d.text)
+             })
+        };
+        _.each(_.groupBy({{dumps(insts)|safe}},d=>d.status.id), draw_table);
+    </script>
+</div>
+{%endblock%}
