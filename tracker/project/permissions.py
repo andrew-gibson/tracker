@@ -128,6 +128,8 @@ def good_request(user, method, obj):
             return True
         case [models.Settings() , "POST" | "GET" | "PUT"]:
             return True
+        case [models.ProjectType() ,  "GET" ]:
+            return True
         case _:
             # default is no permission
             return False
