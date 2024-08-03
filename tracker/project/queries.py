@@ -340,7 +340,7 @@ def project_spec(cls, request, pk=None):
     TimeReport = apps.get_model("project.TimeReport")
     Task = apps.get_model("project.Task")
     ProjectUser = apps.get_model("project.ProjectUser")
-
+    common_model_pairs = common_model_info(request)
     sub_qs = ProjectUser.objects.filter(pk=request.project_user.pk)
 
     return [
@@ -356,7 +356,7 @@ def project_spec(cls, request, pk=None):
             ),
             projectors.noop,
         ),
-        *common_model_info(request),
+        *common_model_pairs,
         {"most_recent_log_date": (qs.noop, producers.attr("most_recent_log_date"))},
         {"last_look_age": (qs.noop, producers.attr("last_look_age"))},
         {"team_size": pairs.count("project_team")},
@@ -391,6 +391,7 @@ def project_spec(cls, request, pk=None):
             )
         },
         "private",
+        {"type" : [ *common_model_pairs,lang_field("name")]},
         lang_field("text"),
         lang_field("name"),
         {"is_new" : (qs.include_fields("addstamp"), 
@@ -411,7 +412,7 @@ def project_spec(cls, request, pk=None):
         {
             "streams": [
                 (qs.include_fields("project_default"), projectors.noop),
-                *common_model_info(request),
+                *common_model_pairs,
                 {"name_count": name_task_count()},
                 lang_field("name"),
                 {"tasks": task_spec(Task, request)},
@@ -419,25 +420,25 @@ def project_spec(cls, request, pk=None):
         },
         {
             "group": [
-                *common_model_info(request),
+                *common_model_pairs,
                 lang_field("name"),
             ],
         },
         {
-            "status": [*common_model_info(request), lang_field("name")],
+            "status": [*common_model_pairs, lang_field("name")],
         },
         {
-            "project_manager": [*common_model_info(request), "username"],
+            "project_manager": [*common_model_pairs, "username"],
         },
         {
-            "log": [*common_model_info(request)],
+            "log": [*common_model_pairs],
         },
         {
-            "partners": [*common_model_info(request), lang_field("name")],
+            "partners": [*common_model_pairs, lang_field("name")],
         },
         {
             "lead": [
-                *common_model_info(request),
+                *common_model_pairs,
                 "username",
             ],
         },
