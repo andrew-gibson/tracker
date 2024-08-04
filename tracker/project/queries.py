@@ -496,6 +496,7 @@ def projectlog_spec(cls, request, pk=None):
             "entries": [
                 *common_model_info(request),
                 "text",
+                {"log" : ["id"]},
                 {"rendered_text": render_markdown(f"text")},
                 "addstamp",
             ]

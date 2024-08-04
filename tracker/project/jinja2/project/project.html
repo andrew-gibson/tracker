@@ -63,31 +63,32 @@
     <script type="module">
         // set projects to be shrinkable
         import { inplace_char_edit, create_button, append_edit_attr, ui_state } from "d3-ui";
-        (project => {
-            const observable_data = mobx.makeAutoObservable( project);
+        const render = project => {
             const root = d3.select(`#project${project.id}`)
                 .call(function(selection){
                     const left_sel = selection.select(".card-body .left");
                     const header_sel = selection.select(".card-header");
 
-                    inplace_char_edit(header_sel, observable_data, "name", "Name",{btn_class : "btn-primary", input_class : "w-25"} );
-                    append_edit_attr(left_sel, observable_data, "status","Status");
-                    append_edit_attr(left_sel, observable_data, "type","Type");
-                    append_edit_attr(left_sel, observable_data, "text","Summary",{display_attr:"text_m"});
-                    append_edit_attr(left_sel, observable_data, "short_term_outcomes","Short Term Outcomes",{display_attr:"short_term_outcomes_m"});
-                    append_edit_attr(left_sel, observable_data, "long_term_outcomes","Long Term Outcomes",{display_attr:"long_term_outcomes_m"});
-                    append_edit_attr(left_sel, observable_data,"lead", "Lead", {name_attr : "username"});
-                    append_edit_attr(left_sel, observable_data,"project_manager", "Project Manager", {name_attr : "username"});
-                    append_edit_attr(left_sel, observable_data,"project_team", "Project Team",{name_attr : "username"} );
-                    append_edit_attr(left_sel, observable_data,"tags", "Tags");
-                    append_edit_attr(left_sel, observable_data,"partners", "Partners");
+                    inplace_char_edit(header_sel, project, "name", "Name",{btn_class : "btn-primary", input_class : "w-25"} );
+                    append_edit_attr(left_sel, project, "status","Status");
+                    append_edit_attr(left_sel, project, "type","Type");
+                    append_edit_attr(left_sel, project, "text","Summary",{display_attr:"text_m"});
+                    append_edit_attr(left_sel, project, "short_term_outcomes","Short Term Outcomes",{display_attr:"short_term_outcomes_m"});
+                    append_edit_attr(left_sel, project, "long_term_outcomes","Long Term Outcomes",{display_attr:"long_term_outcomes_m"});
+                    append_edit_attr(left_sel, project,"lead", "Lead", {name_attr : "username"});
+                    append_edit_attr(left_sel, project,"project_manager", "Project Manager", {name_attr : "username"});
+                    append_edit_attr(left_sel, project,"project_team", "Project Team",{name_attr : "username"} );
+                    append_edit_attr(left_sel, project,"tags", "Tags");
+                    append_edit_attr(left_sel, project,"partners", "Partners");
                     create_button( selection.select("#new-stream"), 
-                                  ()=>mobx.makeAutoObservable({name:"",__type__:"project.Stream",project:observable_data}),
+                                  ()=>mobx.makeAutoObservable({name:"",__type__:"project.Stream",project:project}),
                                   "name",
                                   "+ Workstream",
                                 {on_change : "reloadTasks"})
                 });
-        })({{dumps(inst)|safe}});
+        };
+        const project = ui_state.update_store({{dumps(inst)|safe}});
+        render(project)
     </script>
 </div>
 
