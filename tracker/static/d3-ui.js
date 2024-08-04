@@ -145,15 +145,16 @@ class UIState {
     }
     update_store(obj){
         const store =  this.models[obj.__type__].data;
-        const index = _.findIndex(store, d=>d.id == obj.id);
+        var index = _.findIndex(store, d=>d.id == obj.id);
         if (index!=-1){
             _.assign(store[index],obj);
         } else{
-            this.models[obj.__type__].data = [...this.models[obj.__type__].data, obj];
+            this.models[obj.__type__].data = [...store, obj];
+            index = this.models[obj.__type__].data.length - 1
         }
         // have to use full path to ensure mobX sees the change
         this.models[obj.__type__].refresh_time = Date.now();
-        return store[index];
+        return this.models[obj.__type__].data[index];
     }
     async get_store(model){
         if (this.models[model].data.length == 0) {
