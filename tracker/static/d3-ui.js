@@ -902,6 +902,7 @@ export const append_edit_local_attr = function(selection,observable_data, attr="
             } else if (type == "TextField"){
                 let update_func;
                 normal_mode
+                    .classed("justify-content-between",true)
                     .append("button")
                     .attr("type","button")
                     .classed("btn btn-link mb-1 text-start w-25",true)
@@ -910,7 +911,7 @@ export const append_edit_local_attr = function(selection,observable_data, attr="
                     .html(title)
                 .select_parent()
                     .append("div")
-                    .classed("me-1 w-75 text-start",true)
+                    .classed("me-1 text-start",true)
                     .call(sel=>{
                         update_func =  ()=>sel.html(observable_data[display_attr])
                         reaction(sel.node(), 
