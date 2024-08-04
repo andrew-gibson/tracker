@@ -226,6 +226,7 @@ def task_spec(cls, request, pk=None):
         *common_model_info(request),
         "order",
         lang_field("text"),
+        {"text_m": render_markdown(f"text_{lang()}")},
         lang_field("name"),
         {"project": [*common_model_info(request), lang_field("name")]},
         {
