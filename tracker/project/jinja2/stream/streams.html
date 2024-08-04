@@ -28,28 +28,25 @@ import  {
     make_delete_button} from "d3-ui";
 
 const stream_mini = (stream)=>{
-    const observable_data = mobx.makeAutoObservable(stream);
 
     if (d3.select(`#stream${stream.id}`).node() == null){
         return;
     }
     d3.select(`#stream${stream.id}`)
         .call(function(selection){
-            inplace_char_edit(selection.append("span"), observable_data, "name", "Name",{display_attr : "name_count"});
-            make_delete_button(selection.append("div"), observable_data, d=>d.id, "reloadTasks")
+            inplace_char_edit(selection.append("span"), stream, "name", "Name",{display_attr : "name_count"});
+            make_delete_button(selection.append("div"), stream, d=>d.id, "reloadTasks")
         })
     d3.selectAll(`#stream${stream.id}`).node()
 };
 
-const task_summaries = tasks=>{
-  _.each(tasks, task=> {
-    const observable_data = mobx.makeAutoObservable({...task});
+const task_summary = task=>{
 
-    if (d3.select(`#task${observable_data.id}`).node() == null){
+    if (d3.select(`#task${task.id}`).node() == null){
         return;
     }
 
-    d3.select(`#task${observable_data.id}`)
+    d3.select(`#task${task.id}`)
         .data([task])
         .call(function(selection){
             const header_sel =  selection.select(".card-header");
@@ -58,28 +55,28 @@ const task_summaries = tasks=>{
             const body_sel = selection.select(".card-body");
             const footer_sel = selection.select(".card-footer");
             body_sel.html(""); // clear out placeh9olders
-
-           make_right_dropdown(header_sel,dropdown=>{
-                make_delete_button( dropdown.append("li").append('span').classed("dropdown-item d-grid",true),task,d=>d.id, "reloadTasks",{html : "Delete", _class : "btn btn-danger"})
-           });
-           inplace_char_edit(header_left.append("div").style("width","15%").style("display","inline-block"), observable_data, "order", "Order",{btn_class : "btn-outline-primary", on_change : "reloadTasks", input_class : "w-25"} );
-           inplace_char_edit(header_left.append("div").style("width","85%").style("display","inline-block"), observable_data, "name", "Name");
+            make_right_dropdown(header_sel,dropdown=>{
+                 make_delete_button( dropdown.append("li").append('span').classed("dropdown-item d-grid",true),task,d=>d.id, "reloadTasks",{html : "Delete", _class : "btn btn-danger"})
+            });
+            inplace_char_edit(header_left.append("div").style("width","15%").style("display","inline-block"), task, "order", "Order",{btn_class : "btn-outline-primary", on_change : "reloadTasks", input_class : "w-25"} );
+            inplace_char_edit(header_left.append("div").style("width","85%").style("display","inline-block"), task, "name", "Name");
 
             autoRun(selection.node(),()=>{
                 card_state.redraw
                 body_sel.html("")
-                _.each([["text","Notes",""],
+                _.each([["text","Notes", {display_attr:"text_m"}],
                         ["start_date", "Start Date",""],
                         ["target_date","Target Date",""],
                         ["lead", "Contact",{name_attr : "username"}],
                         ["teams", "Teams",{name_attr : "name"}],
                         ["competency", "Competency",""],
-                        ["stream", "Stream",{on_change : "reloadTasks"}]], 
+                        ["stream", "Stream",{on_change : "reloadTasks"}]
+                        ], 
                     args=>{
-                        if(card_state.minified_cards.includes(observable_data.id) && !is_null(observable_data[args[0]])){
-                            append_edit_attr(body_sel, observable_data, ...args);
-                        } else if ( !card_state.minified_cards.includes(observable_data.id)){
-                            append_edit_attr(body_sel, observable_data, ...args);
+                        if(card_state.minified_cards.includes(task.id) && !is_null(task[args[0]])){
+                            append_edit_attr(body_sel, task, ...args);
+                        } else if ( !card_state.minified_cards.includes(task.id)){
+                            append_edit_attr(body_sel, task, ...args);
                         }
                 });
 
@@ -91,28 +88,25 @@ const task_summaries = tasks=>{
                     .html("")
                     .append("button")
                     .classed("btn btn-small btn-light p-1 mb-1", true)
-                    .html(d=> card_state.minified_cards.includes(observable_data.id) ? "+" : "-")
+                    .html(d=> card_state.minified_cards.includes(task.id) ? "+" : "-")
                     .on("click", e => {
                         card_state.toggle_minified_state("task",task)
                     });
             });
 
-            footer_sel   
-                 .classed("d-flex justify-content-between align-items-center", true)
-                 .append("div")
-                 .call(function(foodter_sel){
-                    append_edit_attr(foodter_sel, observable_data, "done", "Done",{on_change : "reloadTasks"});
-                 })
+           footer_sel   
+                .classed("d-flex justify-content-between align-items-center", true)
+                .append("div")
+                .call(function(foodter_sel){
+                   append_edit_attr(foodter_sel, task, "done", "Done",{on_change : "reloadTasks"});
+                })
         })
-  });
 };
 
-const tasks =  {{dumps(insts)|safe}};
-_.chain(tasks)
- .each(stream_mini)
- .map(s=>s.tasks)
- .each(task_summaries)
- .value()
+const streams =  await ui_state.refresh_model_store("{{model_label}}", {{dumps(insts)|safe}});
+_.each(streams, stream_mini);
+const tasks =  await ui_state.refresh_model_store("project.Task",_.flatten( _.map(streams,d=>d.tasks)) );
+_.each(tasks, task_summary)
 card_state.register(tasks);
 
 </script>

@@ -43,7 +43,6 @@ const prep_data = observable_data =>{
         observable_data.id = "new" + _.random(10000000000000000000)
         observable_data.__perms__ = {POST : type.POST}
     }
-    observable_data.__original__ = _.cloneDeep( {...observable_data})
 }
 
 
@@ -123,16 +122,16 @@ class UIState {
         }
     }
     async refresh_model_store (model,data=null){
-      const filters = _.omitBy(this.models[model].filters, _.isUndefined);
-      const url = this.models[model].main;
-      const get_params = `?f=${btoa(JSON.stringify({filters}))}`;
       if (!data){
+         const filters = _.omitBy(this.models[model].filters, _.isUndefined);
+         const url = this.models[model].main;
+         const get_params = `?f=${btoa(JSON.stringify({filters}))}`;
          const resp = await fetch_recipies.GET(url+get_params);
          if (resp.status == 200) {
              const server_data = await resp.json();
              if ("errors" in server_data) {
-                 //restore the backup from the failed POST/PUT
-                 this.models[model].data = _.map(this.models[model].data, d=>_.get(d,"__original__",d))
+                 // TODO deal with save error
+
              } else {
                  //update the data
                  this.models[model].data = server_data;
@@ -142,12 +141,13 @@ class UIState {
           this.models[model].data = data;
      }
      this.models[model].refresh_time = Date.now();
+      return this.models[model].data;
     }
     update_store(obj){
         const store =  this.models[obj.__type__].data;
         const index = _.findIndex(store, d=>d.id == obj.id);
         if (index!=-1){
-            Object.assign(store[index],obj);
+            _.assign(store[index],obj);
         } else{
             this.models[obj.__type__].data = [...this.models[obj.__type__].data, obj];
         }
@@ -426,14 +426,11 @@ const send_model = async model =>{
         const data = await resp.json();
         if ("errors" in data) {
             //restore the backup from the failed POST/PUT
-            ui_state.d = Object.assign(model, model.__original__);
+            // TODO add in error messages
         } else {
             //update the data
             ui_state.d = ui_state.update_store(data)
-            //document.dispatchEvent(new CustomEvent("edit",{detail : {model}}))
         }
-        // reset the baxkup to the now good data
-        model.__original__ = {...model};
     } else {
         const data = await fetch_recipies.GETjson(obj.__url__);
         Object.assign(model,data);
@@ -622,8 +619,7 @@ export const create_button = function(selection,make_observable_data, attr="",ti
         .on("keyup",function(e) {
             keyup_esc(reset_active)(e)
             keyup_enter(e=>{
-                ui_state.d[attr] =  e.target.value;
-                send_model(ui_state.d);
+                send_model({...observable_data, [attr] : e.target.value});
                 reset_active()
                 this.value = "";
                 if (on_change ){
@@ -708,8 +704,7 @@ export const inplace_char_edit = function(selection,
         .on("keyup",e => {
             keyup_esc(reset_active)(e)
             keyup_enter(e=>{
-                observable_data[attr] = e.target.value;
-                send_model(observable_data);
+                send_model({...observable_data, [attr] : e.target.value});
                 reset_active()
                 if (on_change ){
                     _.delay(()=>{
@@ -808,8 +803,7 @@ export const append_edit_local_attr = function(selection,observable_data, attr="
                         .style("font-size","1.5em")
                         .classed("form-check-input",true)
                         .on("change",e=>{
-                            observable_data[attr] = e.target.checked;
-                            send_model(observable_data);
+                            send_model({...observable_data, [attr] :  e.target.checked});
                             if (on_change ){
                                 _.delay(()=>{
                                    ui_state.signal(on_change)
@@ -841,8 +835,7 @@ export const append_edit_local_attr = function(selection,observable_data, attr="
                         autoRun(selection.node(),()=>selecion.node().value = observable_data[attr] )
                     })
                     .on("change", e => {
-                        observable_data[attr] = e.target.value;
-                        send_model(observable_data);
+                        send_model({...observable_data, [attr] : e.target.value});
                         if (on_change ){
                             _.delay(()=>{
                                ui_state.signal(on_change)
@@ -890,8 +883,7 @@ export const append_edit_local_attr = function(selection,observable_data, attr="
                     .on("keyup",e => {
                         keyup_esc(reset_active)(e)
                         keyup_enter(e=>{
-                            observable_data[attr] = e.target.value;
-                            send_model(observable_data);
+                            send_model({...observable_data, [attr] : e.target.value});
                             if (on_change ){
                                 _.delay(()=>{
                                    ui_state.signal(on_change)
@@ -907,6 +899,7 @@ export const append_edit_local_attr = function(selection,observable_data, attr="
                 .call(make_cancel_button)
 
             } else if (type == "TextField"){
+                let update_func;
                 normal_mode
                     .append("button")
                     .attr("type","button")
@@ -916,10 +909,14 @@ export const append_edit_local_attr = function(selection,observable_data, attr="
                     .html(title)
                 .select_parent()
                     .append("div")
-                    .classed("me-1 w-75 text-end",true)
-                    .call(selection=>{
-                        autoRun(selection.node(), ()=>selection.html(observable_data[display_attr] ))
+                    .classed("me-1 w-75 text-start",true)
+                    .call(sel=>{
+                        update_func =  ()=>sel.html(observable_data[display_attr])
+                        reaction(sel.node(), 
+                                ()=>observable_data[display_attr],
+                                update_func)
                     })
+                _.delay(update_func)
 
                 insert_mode
                     .classed("border p-1",true)
@@ -966,8 +963,7 @@ export const append_edit_local_attr = function(selection,observable_data, attr="
                         .html("Save")
                         .on("click",()=>{
                             const input = d3.select(`#${ids.insert_input}`).node();
-                            observable_data[attr] = input.value;
-                            send_model(observable_data);
+                            send_model({...observable_data, [attr] : input.value});
                             if (on_change ){
                                 _.delay(()=>{
                                    ui_state.signal(on_change)
@@ -1044,8 +1040,9 @@ export const append_edit_fk = function(selection,
             .append("ul")
             .classed("list-group list-group-horizontal border-top border-bottom",true)
             .call( selection=>{
-                autoRun(selection.node(),  ()=>{
-                    ui_state.search_results.length
+                reaction(selection.node(),  
+                    ()=> ui_state.search_results.length,
+                    ()=>{
                     if (ui_state.d && 
                         ui_state.d.id == observable_data.id && 
                         ui_state.attr == attr){
@@ -1096,6 +1093,8 @@ export const append_edit_fk = function(selection,
 
     } 
 
+    let update_normal_mode;
+
     sel
         .append("div")
         .classed(`editor-normal ${attr}-row`,true)
@@ -1138,18 +1137,24 @@ export const append_edit_fk = function(selection,
             "max-width": "80%",
             "scrollbar-width":"none",
         })
-        .call(selection=>{
-            autoRun(selection.node(),()=>{
-                selection
-                    .selectAll("li")
-                    .data(force_list(observable_data[attr]))
-                    .join("li")
-                    .classed("list-group-item d-flex p-1 me-1 bg-opacity-10 border-1 w-100 fw-bold text-nowrap ",true)
-                    .style("background-color",dd=>  ui_state.models[dd.__type__].rgba)
-                    .style("border-color",dd=>  ui_state.models[dd.__type__].hex)
-                    .html(d=>d[name_attr])
-            })
+        .call(sel2=>{
+            update_normal_mode = ()=>  {
+                sel2
+                   .selectAll("li")
+                   .data(force_list(observable_data[attr]))
+                   .join("li")
+                   .classed("list-group-item d-flex p-1 me-1 bg-opacity-10 border-1 w-100 fw-bold text-nowrap ",true)
+                   .style("background-color",dd=>  ui_state.models[dd.__type__].rgba)
+                   .style("border-color",dd=>  ui_state.models[dd.__type__].hex)
+                   .html(d=>d[name_attr])
+            }
         });
+        reaction(
+            selection.node(),
+            ()=>observable_data[attr],
+            update_normal_mode
+        );
+        update_normal_mode();
 };
 
 
