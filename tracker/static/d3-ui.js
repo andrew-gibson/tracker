@@ -759,9 +759,10 @@ export const append_edit_local_attr = function(selection,observable_data, attr="
     const {on_change,display_attr=attr} = options;
     const type = ui_state.models[observable_data.__type__].fields[attr]
     const ids = ui_state.ids({attr,d:observable_data})
-    if (selection.select("#"+ids.insert).node()) {
+    if (selection.select("#"+ids.insert).node() || !observable_data.__perms__["PUT"]) {
         return;
     }
+
     const set_active = e=>{
          ui_state.d = observable_data
          ui_state.attr = attr 
