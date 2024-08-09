@@ -25,7 +25,6 @@
     <script type="module" >
         import {ui_state, inplace_char_edit} from "d3-ui";
         const project_group = {{dumps(inst)|safe}};
-        const green_yellow_red = ["#2ca02c", "#ff7f0e","#d62728"];
         const lis = d3.select("#projects ul")
           .selectAll("li.list-group-item")
           .data(project_group.projects,d=>d.id)
@@ -64,7 +63,7 @@
                   .attr("cx", 5)
                   .attr("cy", 5)
                   .attr("r", 5)
-                  .attr("fill", d=> green_yellow_red[d.last_look_age] )
+                  .attr("class", d=>d.last_look_age )
 
 
     </script>

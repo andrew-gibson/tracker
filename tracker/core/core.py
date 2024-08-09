@@ -43,6 +43,14 @@ class CoreManager(Manager):
             return self.model.user_filter(request)
         return self.filter(group__in=request.user.groups.all())
 
+def apply_spec_to_qs(qs,request):
+    model  = qs.model
+    prepare_qs, projection = model.readers(request)
+    return [
+        projection(p)
+        for p in prepare_qs(qs)
+        if model.app_config.perms.good_request(request.user, request.method, p)
+    ]
 
 class CoreModel(LifecycleModelMixin, Model):
 
@@ -226,11 +234,7 @@ class CoreModel(LifecycleModelMixin, Model):
                 },
             )
         else:
-            insts = [
-                projection(p)
-                for p in prepare_qs(cls.objects.user_filter(request))
-                if cls.app_config.perms.good_request(request.user, request.method, p)
-            ]
+            insts = apply_spec_to_qs(cls.objects.user_filter(request), request)
             if request.json:
                 return JsonResponse(insts, safe=False)
             return render(

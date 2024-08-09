@@ -32,6 +32,9 @@ body {
 .fade-me-out.htmx-swapping.highlight-fade {
   background: #dc3545;
 }
+/*
+ * independently scrolling sidebar
+ */
 .sidebar {
     position: -webkit-sticky;
     position: sticky;
@@ -44,6 +47,9 @@ body {
     scrollbar-width: none;
   }
 
+ /*
+  * Custom purple button
+  */
 .btn-attention {
   --bs-btn-font-weight: 600;
   --bs-btn-color: var(--bs-white);
@@ -56,4 +62,21 @@ body {
   --bs-btn-active-color: var(--bs-btn-hover-color);
   --bs-btn-active-bg: #5a23c8;
   --bs-btn-active-border-color: #5a23c8;
+}
+
+.responsive-svg {
+    width: 100%;
+    height: auto;
+}
+
+.green {
+  fill :   #2ca02c
+}
+
+.yellow {
+  fill :  #ff7f0e 
+}
+
+.red {
+  fill : #d62728
 }

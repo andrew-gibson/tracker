@@ -1,0 +1,112 @@
+{% if  standalone %} 
+  {% extends "base.html" %} 
+
+  {% block sidebar %}
+      {%include "shared/sidebar.html"%}
+  {%endblock%}
+
+{% endif %}
+
+{% block nav %}
+    {%with navbar=[],navdropdown=[]%}
+        {%include "navbar.html"%}
+    {%endwith%}
+{%endblock%}
+
+
+{% block content %}
+<div id="main-content" hx-swap-oob="true">
+    <div class="row" >
+        <div class="col-12">
+            <table class="table" id="eisenhower_matrix">
+                <thead>
+                    <tr>
+                        <td> </td>
+                        <th scope="col"> Important </th>
+                        <th scope="col"> Non Important </th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <th scope="row">Urgent</th>
+                        <td id="true-true" > 
+                              <ul class="list-group list-group-flush" style="max-height: 400px; overflow-y:auto">
+                              </ul>
+                        </td>
+                        <td id="true-false" >
+                              <ul class="list-group list-group-flush" style="max-height: 400px; overflow-y:auto">
+                              </ul>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row">Non Urgent</th>
+                        <td id="false-true" >
+                              <ul class="list-group list-group-flush" style="max-height: 400px; overflow-y:auto">
+                              </ul>
+                        </td>
+                        <td id="false-false" >
+                              <ul class="list-group list-group-flush" style="max-height: 400px; overflow-y:auto">
+                              </ul>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div class="row" style="height: 400px">
+        <!--
+        <div class="col-6">
+          <svg viewBox="0 0 100 100" class="responsive-svg">
+            <circle cx="50" cy="50" r="40" class="yellow" />
+          </svg>
+        </div>
+        -->
+    </div>
+
+
+    <script type="module">
+        import {ui_state, inplace_char_edit} from "d3-ui";
+        const projects = {{dumps(projects)|safe}};
+        const eisenhower_tags = {{dumps(eisenhower_tags)|safe}};
+        const competencies = {{dumps(competencies)|safe}};
+        const eisenhower_matrix = ()=> {
+            _.each(projects, project =>{
+                 const tag_ids = _.map(project.tags,d=>d.id);
+                 const quadrant_id =  `#${tag_ids.includes(eisenhower_tags.Urgent)}-${tag_ids.includes(eisenhower_tags.Important)}`;
+                 const button = d3.select(quadrant_id)
+                                  .select("ul")
+                                  .append("li")
+                                  .attr("class","list-item")
+                                  .append("a")
+                                  .attr( "class", "btn btn-link project-link text-start p-1")
+                                  .attrs({
+                                    "hx-target" : "#main-content",
+                                     "hx-replace-url":"true",
+                                  })
+                                  .attr("hx-get",project.__url__)
+                                  .html(project.name)
+                if (project.is_new){
+                     button
+                        .append("span")
+                        .attr("class","badge rounded-pill text-bg-success ms-2 d-inline")
+                        .html("New")
+                }
+                const dot = button
+                  .append("svg")
+                        .attr("class", "ms-2")
+                        .attr("width", 15)
+                        .attr("height", 15)
+                      .append("circle")
+                          .attr("cx", 8)
+                          .attr("cy", 8)
+                          .attr("r", 8)
+                          .attr("class", project.last_look_age )
+                button.setup_htmx()
+            });
+        };
+        eisenhower_matrix();
+
+    </script>
+
+</div>
+{%endblock%}

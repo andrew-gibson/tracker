@@ -73,7 +73,8 @@ def good_request(user, method, obj):
 
         case [models.Tag(), "PUT" | "DELETE"]:
             # only tag alterations are allowed by the group members
-            return obj.group in user.belongs_to.descendants
+            return (obj not in models.Tag.eisenhower_tags() 
+                    and  obj.group in user.belongs_to.descendants)
 
         case [models.Tag(), "GET"]:
             # only tag reads are allowed by the group members except for public tags

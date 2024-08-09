@@ -7,7 +7,7 @@ import dateparser
 from django.contrib.auth.models import UserManager, GroupManager
 from django.apps import apps
 from django.contrib import admin
-from django.core.validators import MinValueValidator
+from django.core.validators import MinValueValidator,ValidationError
 from django.db.models import (
     CASCADE,
     PROTECT,
@@ -225,6 +225,7 @@ class ProjectStatus(AutoCompleteCoreModel):
     order = IntegerField()
     name_en = CharField(max_length=300, unique=True)
     name_fr = CharField(max_length=300, null=True, blank=True)
+    active = BooleanField(db_default=True)
 
 @add_to_admin
 class ProjectType(AutoCompleteCoreModel):
@@ -268,6 +269,16 @@ class Tag(AutoCompleteCoreModel):
         filters = cls.get_filters(request)
         q = Q(group__in=request.user.groups.all()) | Q(public=True)
         return cls.objects.filter(q).filter(filters).distinct()
+
+    @hook(BEFORE_DELETE)
+    @hook(BEFORE_UPDATE)
+    def prevent_eisenhower_tag_delete(self):
+        if self.id in Tag.eisenhower_tags().values():
+            raise ValidationError(f"Cannot delete this core tag: {self.name}")
+     
+    @classmethod
+    def eisenhower_tags(cls):
+        return {t.name : t.id for t in cls.objects.filter(name__in=["Urgent", "Important"])}
 
     def __str__(self):
         return self.name

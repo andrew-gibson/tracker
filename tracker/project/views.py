@@ -19,6 +19,7 @@ from django.urls import reverse
 from text.translate import gettext_lazy as _
 from .time_utils import get_last_n_weeks
 from . import models
+from core.core import apply_spec_to_qs
 
 api = API(namespace="project", session={})
 
@@ -36,22 +37,20 @@ def whoami(request):
 
 @api.get("model_info/")
 def model_info(request):
-    resp =          {
-            "user": {
-                "main": "/project/whoami/",
-                "filters": [],
-                "data": _whoami(request),
-                "refresh_time": datetime.datetime.now().timestamp(),
-            },
-            **{
-                m._meta.label: m.model_info(request)
-                for m in apps.get_models()
-                if hasattr(m, "model_info") and m._meta.app_label == "project"
-            },
-        } 
-    return JsonResponse(
-       resp
-    )
+    resp = {
+        "user": {
+            "main": "/project/whoami/",
+            "filters": [],
+            "data": _whoami(request),
+            "refresh_time": datetime.datetime.now().timestamp(),
+        },
+        **{
+            m._meta.label: m.model_info(request)
+            for m in apps.get_models()
+            if hasattr(m, "model_info") and m._meta.app_label == "project"
+        },
+    }
+    return JsonResponse(resp)
 
 
 @api.get("main/")
@@ -101,7 +100,24 @@ def timereporting(request):
         },
     )
 
+
 @api.get("dashboard/")
 def dashboard(request):
-    pass
+    projects = apply_spec_to_qs(
+        models.Project.objects.filter(
+            group__in=request.project_user.manages.descendants, status__active=True
+        ),
+        request,
+    )
+    competencies = apply_spec_to_qs(models.EXCompetency.objects.all(), request)
 
+    return render(
+        request,
+        "shared/dashboard.html",
+        {
+            "standalone": not request.htmx,
+            "projects": projects,
+            "competencies": competencies,
+            "eisenhower_tags": models.Tag.eisenhower_tags(),
+        },
+    )

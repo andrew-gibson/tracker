@@ -80,11 +80,11 @@ def add_log_date_and_order(request):
                 output_field=BooleanField(),
             ),
             last_look_age = Case(
-               When(most_recent_log_date__gte = two_weeks_ago, then=Value(0)),
-               When(most_recent_log_date__gte = four_weeks_ago, then=Value(1)),
-               When(most_recent_log_date__lt = four_weeks_ago, then=Value(2)),
-               When(has_log_date = False, then=Value(2)),
-               output_field=IntegerField()
+               When(most_recent_log_date__gte = two_weeks_ago, then=Value("green")),
+               When(most_recent_log_date__gte = four_weeks_ago, then=Value("orange")),
+               When(most_recent_log_date__lt = four_weeks_ago, then=Value("red")),
+               When(has_log_date = False, then=Value("red")),
+               output_field=CharField()
             ),
         ),
         qs.order_by("has_log_date", "most_recent_log_date"),
@@ -426,7 +426,7 @@ def project_spec(cls, request, pk=None):
             ],
         },
         {
-            "status": [*common_model_pairs, lang_field("name")],
+            "status": [*common_model_pairs, lang_field("name"),"active"],
         },
         {
             "project_manager": [*common_model_pairs, "username"],
