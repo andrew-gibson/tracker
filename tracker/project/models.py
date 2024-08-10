@@ -255,6 +255,9 @@ class ProjectType(AutoCompleteCoreModel):
 @add_to_admin
 class Tag(AutoCompleteCoreModel):
 
+    class Meta:
+        unique_together = ("group","name")
+
     class adminClass(admin.ModelAdmin):
         list_display = ("id", "name", "public", "group")
         list_editable = ("name", "public", "group")
