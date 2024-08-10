@@ -135,20 +135,16 @@ def toggle_link(request, m1, pk1, m2, pk2, attr=""):
 )
 async def post_and_link(request, m1, pk1, m2, attr=""):
     # create the new m2
-    resp = await refetch(
+    resp_dict = await refetch(
         request,
         url_name="core:main",
         url_kwargs={"m": m2},
         method="POST",
         payload=request.POST,
     )
-    if r.ok:
-        resp_dict = await resp.json()
-    else:
-        return HttpResponseBadRequest()
 
     # now link the new lookup to m1
-    reap2 = await refetch(
+    reap2_data = await refetch(
         request,
         url_name="core:toggle_link",
         url_kwargs={
@@ -160,10 +156,7 @@ async def post_and_link(request, m1, pk1, m2, attr=""):
         },
         method="POST",
     )
-    if resp2.ok:
-        return JsonResponse(await resp2.json())
-    else:
-        return HttpResponseBadRequest()
+    return JsonResponse(reap2_data)
 
 
 @api.GET(["text_ac/<str:m>/<int:pk>/<str:attr>/", 

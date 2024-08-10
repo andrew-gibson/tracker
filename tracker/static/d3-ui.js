@@ -475,7 +475,16 @@ const toggle_fk_attr = async (result) => {
     if (result.selected){
         resp = await fetch_recipies.DELETE(result.__url__);
     } else {
-        resp = await fetch_recipies.POST(result.__url__, "",true);
+        if (result.new){
+            const obj = {...result};
+            delete obj.id
+            resp = await fetch_recipies.POST(
+                result.__url__, 
+                 new URLSearchParams(obj).toString(),
+                true);
+        } else {
+            resp = await fetch_recipies.POST(result.__url__, "",true);
+        }
     }
     if (ui_state.attr){
         const  attr  = ui_state.attr;
@@ -1044,7 +1053,7 @@ export const append_edit_fk = function(selection,
             .classed("list-group list-group-horizontal border-top border-bottom",true)
             .call( selection=>{
                 reaction(selection.node(),  
-                    ()=> ui_state.search_results.length,
+                    ()=> ui_state.search_results.slice(),
                     ()=>{
                     if (ui_state.d && 
                         ui_state.d.id == observable_data.id && 

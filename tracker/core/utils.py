@@ -161,9 +161,9 @@ async def refetch(
             case "POST":
                 async with session.post(url, data=request.POST) as r:
                     if r.ok:
-                        return r
+                        return await r.json()
                     else:
-                        return HttpResponseBadRequest()
+                        raise Http404(f"error when {method} to {url}")
             case "PUT":
                 pass
             case "GET":
