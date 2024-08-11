@@ -28,8 +28,6 @@ from django.db.models import (
     F,
     Count,
     TextField,
-
-
 )
 from django.db.models.functions import Concat, Replace
 from django.http import QueryDict
@@ -631,7 +629,7 @@ class Task(AutoCompleteCoreModel, AutoCompleteNexus):
 
         # add the extra dictionary to results
         results["targt_date"] = {
-            "text_trigger": uuid.uuid4().hex,
+            "trigger": "",
             "model_info": {
                 "hex": "90e0ef",
                 "rbga": "rgb(144,224,239)",
