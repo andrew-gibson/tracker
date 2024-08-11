@@ -41,7 +41,11 @@ const prep_data = observable_data =>{
     const type = ui_state.models[observable_data.__type__]
     if (!observable_data.id){
         observable_data.id = "new" + _.random(10000000000000000000)
-        observable_data.__perms__ = {POST : type.POST}
+        if (!observable_data.__perms__){
+            observable_data.__perms__ = {POST : type.POST}
+        } else {
+            observable_data.__perms__["POST"]= type.POST
+        }
     }
 }
 

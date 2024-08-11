@@ -32,8 +32,13 @@
         .insert("li","li:first-child")
         .classed("list-group-item",true)
         .call(selection=>{
-          append_edit_attr
-                const new_log = mobx.makeAutoObservable({log,text:"",__type__ : "project.ProjectLogEntry"})
+                const new_log = mobx.makeAutoObservable({
+                    log,
+                    text:"",
+                    __perms__ : {"PUT" : true},
+                    __url__ : ui_state.models['project.ProjectLogEntry'].main,
+                    __type__ : "project.ProjectLogEntry"
+                })
                 append_edit_attr(selection, new_log,"text", "New Log Entry",{on_change : "reloadLog"});
         })
     </script>
