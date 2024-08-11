@@ -667,8 +667,17 @@ class Task(AutoCompleteCoreModel, AutoCompleteNexus):
         else:
             self.order = 1
 
+    @hook(BEFORE_UPDATE, when="target_date",has_changed=True)
+    def archive_date(self):
+        self.old_target_dates = [*self.old_target_dates, {"old": self.target_date.isoformat() , "@" : date.today().isoformat()}]
+
+    @hook(BEFORE_UPDATE, when="old_target_dates",has_changed=True)
+    def blah(self):
+        raise ValidationError(f"this field cannot be changed directly")
+
     def __str__(self):
         return f"{self.pk}-{self.name_en}"
+
 
     order = PositiveIntegerField(null=True, blank=True)
     project = ForeignKey(Project, on_delete=CASCADE, related_name="tasks")
@@ -677,6 +686,7 @@ class Task(AutoCompleteCoreModel, AutoCompleteNexus):
     )
     start_date = DateField(default=date.today, blank=True, null=True)
     target_date = DateField(blank=True, null=True)
+    old_target_dates = JSONField(default=list)
     name_en = CharField(max_length=255)
     name_fr = CharField(max_length=255, null=True, blank=True)
     text_en = TextField(blank=True, null=True)

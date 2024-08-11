@@ -91,6 +91,22 @@ def add_log_date_and_order(request):
     )
 
 
+def has_task_target_date_changed_recently():
+    '''
+      looks up the last target date to see if it has changed recently 
+    '''
+    def produce(inst):
+        today = timezone.now().date()
+        two_weeks_ago = today - datetime.timedelta(weeks=2)
+        if inst.old_target_dates:
+            last_change_date = datetime.date.fromisoformat(inst.old_target_dates[-1]["@"])
+            return last_change_date > two_weeks_ago
+        else:
+            return False
+
+    return qs.noop, produce
+
+
 def common_model_info(request, include_fields=None, select_related=None, force_model=None):
 
     def perms(user, *attrs):
@@ -237,6 +253,7 @@ def task_spec(cls, request, pk=None):
         },
         "start_date",
         "target_date",
+        {"has_task_target_date_changed_recently" : has_task_target_date_changed_recently()},
         {"lead": [*common_model_info(request), "username"]},
         {"teams": [*common_model_info(request), lang_field("name")]},
         {"competency": [*common_model_info(request), lang_field("name")]},
