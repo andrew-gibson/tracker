@@ -1,0 +1,60 @@
+{% if project is undefined  %}
+{% set  project = {"id": decode_get_params(request.GET).get("f",{"filters" : {"project" : None}})["filters"]["project"]} %}
+{%endif%}
+<ul class="list-group list-group-flush mt-0">
+</ul>
+<script type="module">
+import { inplace_char_edit,append_edit_attr, ui_state ,make_delete_button} from "d3-ui";
+_.delay( async ()=> {
+
+    const links = await ui_state.refresh_model_store("project.Link",{{dumps(insts)|safe}});
+    const project = {"id" : {{project.id}}};
+    const height = d3.select(`#project${project.id} .card-body .left`).node().offsetHeight;
+    d3.select(`#project${project.id} .card-body .right`).style("max-height", `${height}px`);
+    d3.select(`#link .list-group`)
+        .selectAll("li")
+        .data(links)
+        .join("li")
+        .classed("list-group-item",true)
+        .each(function(d,i){
+           //d3.select(this).append("div").styles({"width":"90%","display" : "inline-block"}), 
+           const _this = d3.select(this).append("div").attr("class","row")
+           console.log(d.title)
+           inplace_char_edit(_this.append("div").attr("class","col-4"),
+                            d,
+                            "title",
+                            "Title",
+                            {on_change : "reloadLink",static_override : d.title ? d.title : "Set Title"});
+           inplace_char_edit(_this.append("div").attr("class","col-4"),
+                            d,
+                            "link",
+                            "Edit",
+                            {on_change : "reloadLink", type: "url", static_override : "Edit"});
+          _this.append("div").attr("class","col-2")
+                 .append("a")
+                 .attr("class","link-opacity-10-hover")
+                 .attr("href",d.link)
+                 .attr("target","_new")
+                 .html("link");
+           make_delete_button( 
+               _this.append("div").attr("class","col-1 text-end"),
+               d,
+               d=>d.id, 
+               "reloadLink")
+        })
+    d3.select(`#link .list-group`)
+        .insert("li","li:first-child")
+        .classed("list-group-item",true)
+        .call(selection=>{
+                const new_link = mobx.makeAutoObservable({
+                    project,
+                    link:"",
+                    title :"",
+                    __perms__ : {"PUT" : true},
+                    __url__ : ui_state.models['project.Link'].main,
+                    __type__ : "project.Link"
+                })
+                append_edit_attr(selection, new_link,"link", "New Link",{on_change : "reloadLink"});
+        })
+})
+</script>

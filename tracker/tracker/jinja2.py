@@ -88,6 +88,7 @@ def environment(**options):
             "print": print,
             "dumps": dumps,
             "add_encode_parameter": add_encode_parameter,
+            "decode_get_params":  decode_get_params,
         }
     )
     return env

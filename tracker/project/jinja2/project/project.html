@@ -23,16 +23,42 @@
             <div class="col-6 left ">
             </div>
             <div class="col-6 right border-start border-2 p-0" style="overflow-y:scroll;scrollbar-width:none; ">
-                {%with _url =  url("core:main", kwargs={ "m" : "project.ProjectLog","pk" : project.log.id })    %}
-                    <div hx-trigger="load,reloadLog from:document" 
-                         hx-get="{{_url}}">
-                    </div>
-                {%endwith%}
+                <ul class="nav nav-underline ms-3" style=" font-size: 0.8em; " id="loglinkmenu">
+                  <li class="nav-item">
+                    <a class="nav-link active" aria-current="page" href="#" data-toggle-id="#log">Activity Log</a>
+                  </li>
+                  <li class="nav-item">
+                      <a class="nav-link"  data-toggle-id="#link" href="#">Document Links</a>
+                  </li>
+                </ul>
+                {% with insts=project.logs ,
+                        filter_param="?" + add_encode_parameter("f",{"filters" : {"project" : project.id}}) %}
+                <div class="loglink" id="log" hx-trigger="reloadLog from:document" hx-get="{{ url("core:main", kwargs={"m" : "project.Log"})+filter_param }}">
+                        {% include "log/logs.html"%}
+                </div>
+                {% endwith %}
+                {% with insts=project.links ,
+                        filter_param="?" + add_encode_parameter("f",{"filters" : {"project" : project.id}}) %}
+                <div class="loglink d-none" id="link" hx-trigger="reloadLink from:document" hx-get="{{url("core:main", kwargs={"m" : "project.Link"})+filter_param}}">
+                        {% include "link/links.html"%}
+                </div>
+                {% endwith %}
+                <script type="module">
+                    d3.select(".nav.nav-underline")
+                      .selectAll("a")
+                      .on("click", e=>{
+                           d3.selectAll(".nav.nav-underline a").classed("active",false);
+                           d3.select(e.target).classed("active",true);
+                           d3.selectAll(".loglink").classed("d-none",true);
+                           const id_to_show = e.target.attributes["data-toggle-id"].value;
+                           d3.select(id_to_show).classed("d-none",false);
+                      })
+                </script>
+
             </div>
         </div>
         <div class="row align-items-center card-footer text-body-secondary fs-6 p-2">
             <div class=" col-4" id="new-stream">
-
             </div>
             <div class="col-8">
                 {%with params=add_encode_parameter("f",{"ac_filters" :  { "stream" : { "project_id" :inst.id }},

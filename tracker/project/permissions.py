@@ -80,10 +80,6 @@ def good_request(user, method, obj):
             # only tag reads are allowed by the group members except for public tags
             return (obj.group in user.belongs_to.descendants) or obj.public
 
-        case [models.ProjectLog(), "POST" | "PUT" | "DELETE" ]:
-            # project logs are created automatically
-            return False
-
         case [models.Stream() | models.Task(), "POST"] if not obj.id:
             # can a user in general create a blank version of these objects?
             # return None to indicate that it's depends
@@ -99,9 +95,11 @@ def good_request(user, method, obj):
             #    pdb.set_trace()
 
             return False
+        case [ models.Link(), "POST"  ] if not obj.id:
+            return True
 
         case [
-            models.Stream() | models.Task() | models.ProjectLog(),
+            models.Stream() | models.Task() | models.Link(),
             "POST" | "PUT" | "DELETE" | "GET",
         ]:
             # default to the owner project for permissions
@@ -119,12 +117,12 @@ def good_request(user, method, obj):
             return good_project_request(user, method, obj)
 
         case [
-            models.ProjectLogEntry() | models.TimeReport(),
+            models.Log() | models.TimeReport(),
             "GET" | "PUT" | "DELETE",
         ]:
             # Logentry and TimeReport belong exclusively to the owning users
             return user == obj.user
-        case [models.ProjectLogEntry() | models.TimeReport(), "POST"]:
+        case [models.Log() | models.TimeReport(), "POST"]:
             # Logentry and TimeReport belong exclusively to the owning users
             return True
         case [models.Settings() , "POST" | "GET" | "PUT"]:

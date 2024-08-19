@@ -64,12 +64,12 @@ def name_task_count():
 def add_log_date_and_order(request):
     two_weeks_ago = timezone.now() - timezone.timedelta(weeks=2)
     four_weeks_ago = timezone.now() - timezone.timedelta(weeks=3)
-    ProjectLogEntry = apps.get_model("project.ProjectLogEntry")
+    Log = apps.get_model("project.Log")
     return qs.pipe(
         qs.annotate(
             most_recent_log_date=Subquery(
-                ProjectLogEntry.objects.filter(
-                    log__project=OuterRef("pk"), user=request.project_user
+                Log.objects.filter(
+                    project=OuterRef("pk"), user=request.project_user
                 )
                 .order_by("-addstamp")
                 .values("addstamp")[:1]
@@ -98,8 +98,8 @@ def has_task_target_date_changed_recently():
     def produce(inst):
         today = timezone.now().date()
         two_weeks_ago = today - datetime.timedelta(weeks=2)
-        if inst.old_target_dates:
-            last_change_date = datetime.date.fromisoformat(inst.old_target_dates[-1]["@"])
+        if inst.target_date_history:
+            last_change_date = datetime.date.fromisoformat(inst.target_date_history[-1]["@"])
             return last_change_date > two_weeks_ago
         else:
             return False
@@ -442,14 +442,24 @@ def project_spec(cls, request, pk=None):
                 lang_field("name"),
             ],
         },
+        {"logs" : [
+                *common_model_pairs,
+                "text",
+                {"rendered_text": render_markdown(f"text")},
+                "addstamp",
+            ]
+        },
+        {"links" : [
+                *common_model_pairs,
+                "link",
+                "title",
+            ]
+        },
         {
             "status": [*common_model_pairs, lang_field("name"),"active"],
         },
         {
             "project_manager": [*common_model_pairs, "username"],
-        },
-        {
-            "log": [*common_model_pairs],
         },
         {
             "partners": [*common_model_pairs, lang_field("name")],
@@ -462,14 +472,14 @@ def project_spec(cls, request, pk=None):
         },
         {
             "project_team": [
-                *common_model_info(request),
+                *common_model_pairs,
                 "username",
             ],
         },
         {
             "tags": [
                 (qs.include_fields("group"), projectors.noop),
-                *common_model_info(request),
+                *common_model_pairs,
                 "name",
             ],
         },
@@ -505,31 +515,22 @@ def medium_project_spec(cls, request, pk=None):
 
 
 def projectlog_spec(cls, request, pk=None):
-    ProjectLogEntry = apps.get_model("project.ProjectLogEntry")
-    return [
-        *common_model_info(request),
-        {"project": [*common_model_info(request)]},
-        {
-            "entries": [
-                *common_model_info(request),
-                "text",
-                {"log" : ["id"]},
-                {"rendered_text": render_markdown(f"text")},
-                "addstamp",
-            ]
-        },
-    ]
-
-
-def projectlogentry_spec(cls, request, pk=None):
     return [
         *common_model_info(request),
         "text",
-        {"log": [*common_model_info(request)]},
         {"rendered_text": render_markdown(f"text")},
         "addstamp",
+        {"project": [ *common_model_info(request) ] },
     ]
 
+
+def link_spec(cls, request, pk=None):
+    return [
+        *common_model_info(request),
+        "link",
+        "title",
+        {"project" :[ *common_model_info(request) ] },
+    ]
 
 def time_report(cls, request, pk=None):
     return [

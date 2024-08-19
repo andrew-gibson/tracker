@@ -17,6 +17,7 @@ from django.db.models import (
     CharField,
     DateField,
     DateTimeField,
+    URLField,
     EmailField,
     JSONField,
     DecimalField,
@@ -107,16 +108,6 @@ class ProjectGroup(Group):
         request.project_user.groups.add(self)
 
 
-class MyProjectGroup(Group):
-    objects = ProjectGroupManager()
-    spec = queries.projectgroup_spec
-
-    class Meta:
-        proxy = True
-
-    @classmethod
-    def user_filter(cls, request):
-        return cls.objects.filter(id__in=[x.id for x in request.project_user.belongs_to.descendants])
 
 
 class GroupPrefetcherManager(UserManager):
@@ -367,10 +358,6 @@ class Project(AutoCompleteNexus, AutoCompleteCoreModel):
     def add_default_stream(self):
         self.streams.create(name_en="New", name_fr="Nouvelles", project_default=True)
 
-    @hook(AFTER_CREATE)
-    def add_project_log(self):
-        ProjectLog(project=self).save()
-
     def add_user_and_save(self, request):
         try:
             self.group
@@ -462,39 +449,9 @@ class Project(AutoCompleteNexus, AutoCompleteCoreModel):
     short_term_outcomes = TextField(blank=True, null=True)
     long_term_outcomes = TextField(blank=True, null=True)
 
-
-class SmallProject(Project):
-    spec = queries.small_project_spec
-
-    class Meta:
-        proxy = True
-
-    @classmethod
-    def user_filter(cls, request):
-        filters = cls.get_filters(request)
-        return cls.objects.filter(filters).order_by("status")
-
-class ProjectLog(CoreModel):
+class Log(CoreModel):
     spec = queries.projectlog_spec
-    form_fields = ["project"]
-
-    @classmethod
-    def user_filter(cls, request):
-        filters = cls.get_filters(request)
-        return cls.objects.filter(project__group__in=request.user.groups.all()).filter(
-            filters
-        )
-
-    @property
-    def id(self):
-        return self.project.id
-
-    project = OneToOneField(Project, on_delete=CASCADE, related_name="log")
-
-
-class ProjectLogEntry(CoreModel):
-    spec = queries.projectlogentry_spec
-    form_fields = ["log", "text"]
+    form_fields = ["project", "text"]
 
     class Meta:
         ordering = ("-addstamp",)
@@ -502,9 +459,7 @@ class ProjectLogEntry(CoreModel):
     @classmethod
     def user_filter(cls, request):
         filters = cls.get_filters(request)
-        return cls.objects.filter(
-            log__project__group__in=request.user.groups.all()
-        ).filter(filters)
+        return cls.objects.filter( user=request.project_user).filter(filters)
 
     def add_user_and_save(self, request):
         self.user = request.user
@@ -514,7 +469,23 @@ class ProjectLogEntry(CoreModel):
     addstamp = DateTimeField(auto_now_add=True)
     editstamp = DateTimeField(auto_now=True)
     user = ForeignKey(ProjectUser, on_delete=CASCADE, related_name="log_entries")
-    log = ForeignKey(ProjectLog, on_delete=CASCADE, related_name="entries")
+    project = ForeignKey(Project, on_delete=CASCADE, related_name="logs", null=True)
+
+
+class Link(CoreModel):
+    spec = queries.link_spec
+    form_fields = ["title","link", "project"]
+
+    @classmethod
+    def user_filter(cls, request):
+        filters = cls.get_filters(request)
+        return cls.objects.filter(project__group__in=request.user.groups.all()).filter(
+            filters
+        )
+
+    project = ForeignKey(Project, on_delete=CASCADE, related_name="links")
+    title = CharField(max_length=600, blank=True, null=True)
+    link = URLField(max_length=600, blank=True)
 
 
 @add_to_admin
@@ -667,13 +638,15 @@ class Task(AutoCompleteCoreModel, AutoCompleteNexus):
         else:
             self.order = 1
 
-    @hook(BEFORE_UPDATE, when="target_date",has_changed=True)
+    @hook(BEFORE_UPDATE)
     def archive_date(self):
-        self.old_target_dates = [*self.old_target_dates, {"old": self.target_date.isoformat() , "@" : date.today().isoformat()}]
-
-    @hook(BEFORE_UPDATE, when="old_target_dates",has_changed=True)
-    def blah(self):
-        raise ValidationError(f"this field cannot be changed directly")
+        if self.has_changed("target_date"):
+            self.target_date_history = [*self.target_date_history, {"old": self.target_date.isoformat() , "@" : date.today().isoformat()}]
+        if self.has_changed("done"):
+            self.done_history = [*self.done_history, {"old": self.done , "@" : date.today().isoformat()}]
+        for history in ("target_date","done"):
+            if self.has_changed(history+"_history"):
+                raise ValidationError(f"{history} field cannot be changed directly")
 
     def __str__(self):
         return f"{self.pk}-{self.name_en}"
@@ -686,7 +659,6 @@ class Task(AutoCompleteCoreModel, AutoCompleteNexus):
     )
     start_date = DateField(default=date.today, blank=True, null=True)
     target_date = DateField(blank=True, null=True)
-    old_target_dates = JSONField(default=list)
     name_en = CharField(max_length=255)
     name_fr = CharField(max_length=255, null=True, blank=True)
     text_en = TextField(blank=True, null=True)
@@ -708,6 +680,8 @@ class Task(AutoCompleteCoreModel, AutoCompleteNexus):
     )
     done = BooleanField(db_default=False, blank=True)
 
+    target_date_history = JSONField(default=list)
+    done_history = JSONField(default=list)
 
 class TimeReport(CoreModel):
 
@@ -752,3 +726,32 @@ class TimeReport(CoreModel):
     )
     text = TextField(blank=True)
     week = DateField()
+
+
+
+
+############### Proxy Models #################
+
+class MyProjectGroup(Group):
+    objects = ProjectGroupManager()
+    spec = queries.projectgroup_spec
+
+    class Meta:
+        proxy = True
+
+    @classmethod
+    def user_filter(cls, request):
+        return cls.objects.filter(id__in=[x.id for x in request.project_user.belongs_to.descendants])
+
+
+# used for listing all projects
+class SmallProject(Project):
+    spec = queries.small_project_spec
+
+    class Meta:
+        proxy = True
+
+    @classmethod
+    def user_filter(cls, request):
+        filters = cls.get_filters(request)
+        return cls.objects.filter(filters).order_by("status")

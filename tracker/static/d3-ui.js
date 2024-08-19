@@ -346,7 +346,7 @@ mobx.reaction(
         d3.selectAll(".editor-insert").classed("d-none",true);
         d3.selectAll(".editor-normal").classed("d-none",false);
         if (ui_state.attr){
-            const ids = ui_state.ids()
+            const ids = ui_state.ids();
             d3.select(`#${ids.insert}`).classed("d-none",false);
             d3.select(`#${ids.normal}`).classed("d-none",true);
             _.delay(()=> {
@@ -695,7 +695,14 @@ export const inplace_char_edit = function(selection,
                                     title="" , 
                                     options={} ){
 
-    const {btn_class="btn-light", on_change=null,input_class="",display_attr=attr, type="text"} = options;
+    const {
+        btn_class="btn-light", 
+        on_change=null,
+        input_class="",
+        display_attr=attr,
+        static_override=null,
+        type="text"} = options;
+    console.log(static_override)
     prep_data(observable_data)
     const ids = ui_state.ids({attr,d:observable_data})
     if (selection.select("#"+ids.normal).node()) {
@@ -750,10 +757,10 @@ export const inplace_char_edit = function(selection,
             }
             autoRun(selection.node(),
                     ()=>{
-                        selection.html(observable_data[display_attr] || "+")
+                        selection.html(static_override || observable_data[display_attr] || "+")
                     }
             )
-            selection.html(observable_data[display_attr] || "+")
+            selection.html(static_override || observable_data[display_attr] || "+")
         });
 
 }
@@ -859,7 +866,7 @@ export const append_edit_local_attr = function(selection,observable_data, attr="
                     })
 
 
-            } else if ([ "CharField" , "EmailField", "DecimalField"].includes(type)){
+            } else if ([ "CharField" , "EmailField", "DecimalField", "URLField"].includes(type)){
                 normal_mode
                     .style( "font-size","0.8em")
                     .append("button")
@@ -893,7 +900,12 @@ export const append_edit_local_attr = function(selection,observable_data, attr="
                         "id": ids.insert_input,
                         "name" : attr,
                         "data-1p-ignore" : "true",
-                        "type" : type ==  "DecimalField"  ? "number" : "text"
+                        "type" :   ({
+                            "DecimalField" : "number",
+                            "CharField" : "text",
+                            "EmailField" : "email",
+                            "URLField" : "url",
+                        })[type]
                     })
                     .on("keyup",e => {
                         keyup_esc(reset_active)(e)

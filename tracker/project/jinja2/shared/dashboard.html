@@ -17,6 +17,9 @@
 {% block content %}
 <div id="main-content" hx-swap-oob="true">
     <div class="row" >
+        <div class="col-12 bg-dark-subtle p-2 fw-bold">
+            Eisenhower Matrix
+        </div>
         <div class="col-12">
             <table class="table" id="eisenhower_matrix">
                 <thead>
@@ -53,20 +56,25 @@
             </table>
         </div>
     </div>
-    <div class="row" style="height: 400px">
-        <!--
-        <div class="col-6">
-          <svg viewBox="0 0 100 100" class="responsive-svg">
-            <circle cx="50" cy="50" r="40" class="yellow" />
-          </svg>
+    <div class="row">
+        <div class="col-12 bg-dark-subtle p-2 fw-bold">
+            Upcoming Deliverables
         </div>
-        -->
+    </div>
+    <div class="row" style="height: 400px;overflow-x:auto">
+        <ul class="list-group list-group-horizontal border-top border-bottom">
+            <li class="list-group-item d-flex p-1 me-1 border-0 ">
+                <div class="card">
+                  <div class="card-header text-nowrap">Title title title tile</div>
+                  <div class="card-body"></div>
+        </ul>
     </div>
 
 
     <script type="module">
         import {ui_state, inplace_char_edit} from "d3-ui";
         const projects = {{dumps(projects)|safe}};
+        const tasks = _.chain(projects).map(d=>d.streams).flatten().map(d=>d.tasks).flatten().filter(d=>!d.done).value()
         const eisenhower_tags = {{dumps(eisenhower_tags)|safe}};
         const competencies = {{dumps(competencies)|safe}};
         const eisenhower_matrix = ()=> {
@@ -78,7 +86,7 @@
                                   .append("li")
                                   .attr("class","list-item")
                                   .append("a")
-                                  .attr( "class", "btn btn-link project-link text-start p-1")
+                                  .attr( "class", "btn btn-link project-link text-start pb-2 pe-2")
                                   .attrs({
                                     "hx-target" : "#main-content",
                                      "hx-replace-url":"true",
@@ -93,9 +101,9 @@
                 }
                 const dot = button
                   .append("svg")
-                        .attr("class", "ms-2")
-                        .attr("width", 15)
-                        .attr("height", 15)
+                        .attr("class", "m-1")
+                        .attr("width", 16)
+                        .attr("height", 16)
                       .append("circle")
                           .attr("cx", 8)
                           .attr("cy", 8)

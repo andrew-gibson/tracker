@@ -1,17 +1,16 @@
-<div id="projectlog{{inst.id}}">
-    <ul class="list-group list-group-flush mt-0">
-    </ul>
-
-    <script type="module">
-    import { append_edit_attr, ui_state ,make_delete_button} from "d3-ui";
-
-    const log = ui_state.update_store({{dumps(inst)|safe}});
-    const entries = await ui_state.refresh_model_store("project.ProjectLogEntry",log.entries);
-    const height = d3.select(`#project${log.project.id} .card-body .left`).node().offsetHeight;
-
-    d3.select(`#project${log.project.id} .card-body .right`).style("max-height", `${height}px`);
-
-    d3.select(`#projectlog${log.id} .list-group`)
+{% if project is undefined  %}
+{% set  project = {"id": decode_get_params(request.GET).get("f",{"filters" : {"project" : None}})["filters"]["project"]} %}
+{%endif%}
+<ul class="list-group list-group-flush mt-0">
+</ul>
+<script type="module">
+import { append_edit_attr, ui_state ,make_delete_button} from "d3-ui";
+_.delay( async ()=> {
+    const entries = await ui_state.refresh_model_store("project.Log",{{dumps(insts)|safe}});
+    const project = {"id" : {{project.id}}};
+    const height = d3.select(`#project${project.id} .card-body .left`).node().offsetHeight;
+    d3.select(`#project${project.id} .card-body .right`).style("max-height", `${height}px`);
+    d3.select(`#log .list-group`)
         .selectAll("li")
         .data(entries)
         .join("li")
@@ -27,19 +26,18 @@
                d=>d.id, 
                "reloadLog")
         })
-
-    d3.select(`#projectlog${log.id} .list-group`)
+    d3.select(`#log .list-group`)
         .insert("li","li:first-child")
         .classed("list-group-item",true)
         .call(selection=>{
                 const new_log = mobx.makeAutoObservable({
-                    log,
+                    project,
                     text:"",
                     __perms__ : {"PUT" : true},
-                    __url__ : ui_state.models['project.ProjectLogEntry'].main,
-                    __type__ : "project.ProjectLogEntry"
+                    __url__ : ui_state.models['project.Log'].main,
+                    __type__ : "project.Log"
                 })
                 append_edit_attr(selection, new_log,"text", "New Log Entry",{on_change : "reloadLog"});
         })
-    </script>
-</div>
+},100);
+</script>
