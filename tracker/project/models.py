@@ -640,13 +640,13 @@ class Task(AutoCompleteCoreModel, AutoCompleteNexus):
 
     @hook(BEFORE_UPDATE)
     def archive_date(self):
+        if self.has_changed("target_date_history"):
+            raise ValidationError(f"target_date_history field cannot be changed directly")
         if self.has_changed("target_date"):
-            self.target_date_history = [*self.target_date_history, {"old": self.target_date.isoformat() , "@" : date.today().isoformat()}]
+            history_date = self.target_date.isoformat() if self.target_date else "unset"
+            self.target_date_history = [*self.target_date_history, {"old":  history_date, "@" : date.today().isoformat()}]
         if self.has_changed("done"):
-            self.done_history = [*self.done_history, {"old": self.done , "@" : date.today().isoformat()}]
-        for history in ("target_date","done"):
-            if self.has_changed(history+"_history"):
-                raise ValidationError(f"{history} field cannot be changed directly")
+            self.done_date = date.today()
 
     def __str__(self):
         return f"{self.pk}-{self.name_en}"
@@ -679,9 +679,9 @@ class Task(AutoCompleteCoreModel, AutoCompleteNexus):
         EXCompetency, on_delete=PROTECT, null=True, blank=True, text_trigger="`"
     )
     done = BooleanField(db_default=False, blank=True)
+    done_date = DateTimeField(null=True)
 
     target_date_history = JSONField(default=list)
-    done_history = JSONField(default=list)
 
 class TimeReport(CoreModel):
 

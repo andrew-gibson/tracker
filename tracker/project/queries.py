@@ -17,6 +17,7 @@ from django.db.models import (
     Max,
     When,
     Case,
+    ExpressionWrapper,
 )
 from django.db.models.functions import Concat, Replace
 from django.utils import timezone
@@ -68,23 +69,21 @@ def add_log_date_and_order(request):
     return qs.pipe(
         qs.annotate(
             most_recent_log_date=Subquery(
-                Log.objects.filter(
-                    project=OuterRef("pk"), user=request.project_user
-                )
+                Log.objects.filter(project=OuterRef("pk"), user=request.project_user)
                 .order_by("-addstamp")
                 .values("addstamp")[:1]
             ),
-            has_log_date = Case(
+            has_log_date=Case(
                 When(most_recent_log_date__isnull=True, then=Value(False)),
                 When(most_recent_log_date__isnull=False, then=Value(True)),
                 output_field=BooleanField(),
             ),
-            last_look_age = Case(
-               When(most_recent_log_date__gte = two_weeks_ago, then=Value("green")),
-               When(most_recent_log_date__gte = four_weeks_ago, then=Value("orange")),
-               When(most_recent_log_date__lt = four_weeks_ago, then=Value("red")),
-               When(has_log_date = False, then=Value("red")),
-               output_field=CharField()
+            last_look_age=Case(
+                When(most_recent_log_date__gte=two_weeks_ago, then=Value("green")),
+                When(most_recent_log_date__gte=four_weeks_ago, then=Value("orange")),
+                When(most_recent_log_date__lt=four_weeks_ago, then=Value("red")),
+                When(has_log_date=False, then=Value("red")),
+                output_field=CharField(),
             ),
         ),
         qs.order_by("has_log_date", "most_recent_log_date"),
@@ -92,14 +91,17 @@ def add_log_date_and_order(request):
 
 
 def has_task_target_date_changed_recently():
-    '''
-      looks up the last target date to see if it has changed recently 
-    '''
+    """
+    looks up the last target date to see if it has changed recently
+    """
+
     def produce(inst):
         today = timezone.now().date()
         two_weeks_ago = today - datetime.timedelta(weeks=2)
         if inst.target_date_history:
-            last_change_date = datetime.date.fromisoformat(inst.target_date_history[-1]["@"])
+            last_change_date = datetime.date.fromisoformat(
+                inst.target_date_history[-1]["@"]
+            )
             return last_change_date > two_weeks_ago
         else:
             return False
@@ -107,7 +109,9 @@ def has_task_target_date_changed_recently():
     return qs.noop, produce
 
 
-def common_model_info(request, include_fields=None, select_related=None, force_model=None):
+def common_model_info(
+    request, include_fields=None, select_related=None, force_model=None
+):
 
     def perms(user, *attrs):
         prepare = qs.pipe(
@@ -133,12 +137,11 @@ def common_model_info(request, include_fields=None, select_related=None, force_m
         def produce2(inst):
             return reverse("core:main", kwargs={"m": force_model, "pk": inst.id})
 
-        __type__  =   (qs.noop, produce1)
-        __url__   =  (qs.noop, produce2)
+        __type__ = (qs.noop, produce1)
+        __url__ = (qs.noop, produce2)
     else:
-        __type__ =   (qs.noop, producers.attrgetter("_meta.label"))
-        __url__  =   (qs.noop, producers.attrgetter("url"))
-
+        __type__ = (qs.noop, producers.attrgetter("_meta.label"))
+        __url__ = (qs.noop, producers.attrgetter("url"))
 
     return [
         "id",
@@ -194,7 +197,9 @@ def projectuser_spec(cls, request, pk=None):
             )
 
         def add_project_data_to_user():
-            prepare_qs, projection = specs.process(medium_project_spec(Project, request))
+            prepare_qs, projection = specs.process(
+                medium_project_spec(Project, request)
+            )
 
             def producer(u):
                 return {
@@ -221,12 +226,14 @@ def projectuser_spec(cls, request, pk=None):
             add_manages_descendants(),
             {
                 "manages": [
-                    *common_model_info(request,force_model = "project.ProjectGroup"),
+                    *common_model_info(request, force_model="project.ProjectGroup"),
                     lang_field("name"),
                     {
                         "team_members": [
                             pairs.exclude(pk=request.project_user.pk),
-                            *common_model_info(request,force_model = "project.ProjectUser"),
+                            *common_model_info(
+                                request, force_model="project.ProjectUser"
+                            ),
                             {"name": "username"},
                         ]
                     },
@@ -238,8 +245,32 @@ def projectuser_spec(cls, request, pk=None):
 
 
 def task_spec(cls, request, pk=None):
+    now = timezone.now()
+    two_weeks_ago = now - datetime.timedelta(weeks=2)
     return [
         *common_model_info(request),
+        (
+            qs.annotate(
+                done_recently = Case(
+                    When(done_date__gte=two_weeks_ago, then=Value(True)),
+                    default=Value(False),
+                    output_field=BooleanField(),
+                )
+            ),
+            projectors.noop,
+        ),
+        {"done_recently": (qs.noop, producers.attr("done_recently"))},
+        (
+            qs.annotate(
+                overdue = Case(
+                    When(Q(target_date__lt=now,done=False), then=Value(True)),
+                    default=Value(False),
+                    output_field=BooleanField(),
+                )
+            ),
+            projectors.noop,
+        ),
+        {"overdue": (qs.noop, producers.attr("overdue"))},
         "order",
         lang_field("text"),
         {"text_m": render_markdown(f"text_{lang()}")},
@@ -253,11 +284,14 @@ def task_spec(cls, request, pk=None):
         },
         "start_date",
         "target_date",
-        {"has_task_target_date_changed_recently" : has_task_target_date_changed_recently()},
+        {
+            "has_task_target_date_changed_recently": has_task_target_date_changed_recently()
+        },
         {"lead": [*common_model_info(request), "username"]},
         {"teams": [*common_model_info(request), lang_field("name")]},
         {"competency": [*common_model_info(request), lang_field("name")]},
         "done",
+        "done_date",
     ]
 
 
@@ -304,8 +338,11 @@ def projectgroup_spec(cls, request, pk=None):
                 "projects": [
                     pairs.filter(private=False),
                     pairs.exclude(status__name_en__in=["Completed", "Canceled"]),
-                    {"is_new" : (qs.include_fields("addstamp"), 
-                                 lambda inst : timezone.now() - inst.addstamp < datetime.timedelta(weeks=4)
+                    {
+                        "is_new": (
+                            qs.include_fields("addstamp"),
+                            lambda inst: timezone.now() - inst.addstamp
+                            < datetime.timedelta(weeks=4),
                         )
                     },
                     *common_model_info(request),
@@ -368,7 +405,7 @@ def project_spec(cls, request, pk=None):
                     "viewers", related_queryset=sub_qs
                 ),
                 qs.exclude(status__name_en__in=["Completed", "Canceled"]),
-                qs.include_fields("addstamp","group", "private", "private_owner"),
+                qs.include_fields("addstamp", "group", "private", "private_owner"),
                 qs.select_related("group"),
                 add_log_date_and_order(request),
             ),
@@ -409,11 +446,14 @@ def project_spec(cls, request, pk=None):
             )
         },
         "private",
-        {"type" : [ *common_model_pairs,lang_field("name")]},
+        {"type": [*common_model_pairs, lang_field("name")]},
         lang_field("text"),
         lang_field("name"),
-        {"is_new" : (qs.include_fields("addstamp"), 
-                     lambda inst : timezone.now() - inst.addstamp < datetime.timedelta(weeks=4)
+        {
+            "is_new": (
+                qs.include_fields("addstamp"),
+                lambda inst: timezone.now() - inst.addstamp
+                < datetime.timedelta(weeks=4),
             )
         },
         {"text_m": render_markdown(f"text_{lang()}")},
@@ -442,21 +482,23 @@ def project_spec(cls, request, pk=None):
                 lang_field("name"),
             ],
         },
-        {"logs" : [
+        {
+            "logs": [
                 *common_model_pairs,
                 "text",
                 {"rendered_text": render_markdown(f"text")},
                 "addstamp",
             ]
         },
-        {"links" : [
+        {
+            "links": [
                 *common_model_pairs,
                 "link",
                 "title",
             ]
         },
         {
-            "status": [*common_model_pairs, lang_field("name"),"active"],
+            "status": [*common_model_pairs, lang_field("name"), "active"],
         },
         {
             "project_manager": [*common_model_pairs, "username"],
@@ -485,6 +527,7 @@ def project_spec(cls, request, pk=None):
         },
     ]
 
+
 def small_project_spec(cls, request, pk=None):
     return (
         pairs.exclude(private=True),
@@ -492,16 +535,19 @@ def small_project_spec(cls, request, pk=None):
         *common_model_info(request, force_model="project.Project"),
         lang_field("name"),
         lang_field("text"),
-        {"status" : [lang_field("name"), "id", "order"]}
+        {"status": [lang_field("name"), "id", "order"]},
     )
 
+
 def medium_project_spec(cls, request, pk=None):
-    return [ ( add_log_date_and_order(request),
-               projectors.noop
-              ),
+    return [
+        (add_log_date_and_order(request), projectors.noop),
         pairs.exclude(status__name_en__in=["Completed", "Canceled"]),
-        {"is_new" : (qs.include_fields("addstamp"), 
-                     lambda inst : timezone.now() - inst.addstamp < datetime.timedelta(weeks=4)
+        {
+            "is_new": (
+                qs.include_fields("addstamp"),
+                lambda inst: timezone.now() - inst.addstamp
+                < datetime.timedelta(weeks=4),
             )
         },
         {"most_recent_log_date": (qs.noop, producers.attr("most_recent_log_date"))},
@@ -520,7 +566,7 @@ def projectlog_spec(cls, request, pk=None):
         "text",
         {"rendered_text": render_markdown(f"text")},
         "addstamp",
-        {"project": [ *common_model_info(request) ] },
+        {"project": [*common_model_info(request)]},
     ]
 
 
@@ -529,8 +575,9 @@ def link_spec(cls, request, pk=None):
         *common_model_info(request),
         "link",
         "title",
-        {"project" :[ *common_model_info(request) ] },
+        {"project": [*common_model_info(request)]},
     ]
+
 
 def time_report(cls, request, pk=None):
     return [

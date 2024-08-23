@@ -58,35 +58,49 @@
     </div>
     <div class="row">
         <div class="col-12 bg-dark-subtle p-2 fw-bold">
-            Upcoming Deliverables
+            Deliverables with no Deadlines
         </div>
     </div>
-    <div class="row" style="height: 400px;overflow-x:auto">
-        <ul class="list-group list-group-horizontal border-top border-bottom">
-            <li class="list-group-item d-flex p-1 me-1 border-0 ">
-                <div class="card">
-                  <div class="card-header text-nowrap">Title title title tile</div>
-                  <div class="card-body"></div>
-        </ul>
+    <div id="no-deadline" class="row flex-nowrap py-2" style="overflow-x:auto; scrollbar-width:thin;">
+
+    </div>
+    <div class="row">
+        <div class="col-12 bg-dark-subtle p-2 fw-bold">
+            Upcoming and Recently Completed Deliverables
+        </div>
+    </div>
+    <div id="upcoming-deadlines"  class="row flex-nowrap mb-5 py-2" style="overflow-x:auto;scrollbar-width:thin; ">
+
     </div>
 
 
     <script type="module">
-        import {ui_state, inplace_char_edit} from "d3-ui";
-        const projects = {{dumps(projects)|safe}};
-        const tasks = _.chain(projects).map(d=>d.streams).flatten().map(d=>d.tasks).flatten().filter(d=>!d.done).value()
-        const eisenhower_tags = {{dumps(eisenhower_tags)|safe}};
-        const competencies = {{dumps(competencies)|safe}};
-        const eisenhower_matrix = ()=> {
-            _.each(projects, project =>{
+        const _id= d=>d.id
+        import {ui_state, inplace_char_edit, append_edit_attr, reaction } from "d3-ui";
+        const _projects = {{dumps(projects)|safe}};
+        const _tasks = _.chain(_projects)
+                           .map(d=>d.streams)
+                           .flatten()
+                           .map(d=>d.tasks)
+                           .flatten()
+                           .value();
+        const eisenhower_tags = {{dumps(eisenhower_tags)|safe}}; // don't both putting in store, since these won't mutate
+        const competencies = {{dumps(competencies)|safe}};  // don't both putting in store, since these won't mutate
+        const root = d3.select("#main-content");
+        const eisenhower_matrix = async projects => {
+            _.each(projects, project => {
                  const tag_ids = _.map(project.tags,d=>d.id);
                  const quadrant_id =  `#${tag_ids.includes(eisenhower_tags.Urgent)}-${tag_ids.includes(eisenhower_tags.Important)}`;
                  const button = d3.select(quadrant_id)
                                   .select("ul")
-                                  .append("li")
-                                  .attr("class","list-item")
-                                  .append("a")
-                                  .attr( "class", "btn btn-link project-link text-start pb-2 pe-2")
+                                  .selectAll(`li.id${project.id}` )
+                                  .data([project], _id)
+                                  .join("li")
+                                  .attr("class",`list-item id${project.id}`)
+                                  .selectAll(`a.id${project.id}`)
+                                  .data(d=>[d], _id)
+                                  .join("a")
+                                  .attr( "class", `btn btn-link project-link text-start pb-2 pe-2 id${project.id}`)
                                   .attrs({
                                     "hx-target" : "#main-content",
                                      "hx-replace-url":"true",
@@ -94,11 +108,13 @@
                                   .attr("hx-get",project.__url__)
                                   .html(project.name)
                 if (project.is_new){
+                     button.select("span").remove();
                      button
                         .append("span")
-                        .attr("class","badge rounded-pill text-bg-success ms-2 d-inline")
+                        .attr("class",`badge rounded-pill text-bg-success ms-2 d-inline ${project.id}` )
                         .html("New")
                 }
+                button.select("svg").remove();
                 const dot = button
                   .append("svg")
                         .attr("class", "m-1")
@@ -112,7 +128,108 @@
                 button.setup_htmx()
             });
         };
-        eisenhower_matrix();
+        const tasks_no_due_date = async (all_tasks)=>{
+            const no_due_dates = _.filter(all_tasks, t=> !t.target_date);
+            const root = d3.select("#no-deadline")
+            const cards = root.selectAll("div.card")
+                              .data(no_due_dates, _id)
+                              .join("div")
+                              .attr("class","card col-3 px-0 me-2")
+            cards.selectAll("div.card-header")
+                              .data(d=>[d], _id)
+                              .join("div")
+                              .attr("class","card-header")
+                              .html(d=>d.name)
+            cards.selectAll("div.card-body")
+                              .data(d=>[d], _id)
+                              .join("div")
+                              .attr("class","card-body px-2")
+                              .each(function(d){
+                                const _this = d3.select(this);
+                                append_edit_attr(_this, d, "target_date","Target Date");
+                              });
+        };
+        const upcoming_tasks = async (all_tasks)=>{
+            const upcoming_and_recent_done = _.filter(all_tasks, t=> t.target_date);
+            const root = d3.select("#upcoming-deadlines")
+            const cards = root.selectAll("div.card")
+                              .data(upcoming_and_recent_done, d=>d.id)
+                              .join("div")
+                              .attr("class","card col-3 p-0 me-2")
+            cards.selectAll("div.card-header")
+                              .data(d=>[d], d=>d.id)
+                              .join("div")
+                              .attr("class","card-header text-nowrap overflow-hidden fw-bold")
+                              .html(d=>d.name)
+            cards.selectAll("div.card-body")
+                              .data(d=>[d], d=>d.id)
+                              .join("div")
+                              .attr("class","card-body px-2 h-100")
+                              .each(function(task){
+                                const _this = d3.select(this);
+                                _this.html("");
+
+                                const project_row = _this.append("div")
+                                     .attr("class","justify-content-between d-flex align-items-center mb-1")
+                                
+                                project_row.append("span")
+                                      .attr("class", "fw-bold me-2 w-25")
+                                      .style("font-size", "0.8em")
+                                      .html("Project:")
+                                project_row.append("a")
+                                     .attr("class","link  w-75 text-end")
+                                      .style("font-size", "0.8em")
+                                     .html(task.project.name)
+                                append_edit_attr(_this, task, "text","Text",{display_attr:"text_m"});
+                                append_edit_attr(_this, task, "target_date","Due Date");
+
+                                const tags = _this.append("div").attr("class","position-absolute bottom-0 start-0 mb-2")
+                                if (task.has_task_target_date_changed_recently) {
+                                    tags.append("span")
+                                          .attr("class", "badge rounded-pill bg-attention mx-1 p-2")
+                                          .html("Recent Due Date Change")
+                                }
+                                if (task.done_recently) {
+                                    tags.append("span")
+                                          .attr("class", "badge rounded-pill bg-success mx-1 p-2")
+                                          .html("Recently Completed")
+                                }
+                                if (task.overdue) {
+                                    tags.append("span")
+                                          .attr("class", "badge rounded-pill bg-danger mx-1 p-2")
+                                          .html("Overdue")
+                                }
+
+                              });
+        };
+        const project_changed = async ()=>{
+            const projects = await ui_state.get_store("project.Project")
+            eisenhower_matrix(projects);
+        }
+        const task_changed = async ()=>{
+            const all_tasks = _.chain( await ui_state.get_store("project.Task") )
+                           .sortBy(["target_date"])
+                           .filter( t=> (
+                               (t.done && t.done_recently) || !t.done 
+                           ))
+                           .value();
+            tasks_no_due_date(all_tasks);
+            upcoming_tasks(all_tasks);
+        }
+        reaction(
+           root,
+           ()=>ui_state.models["project.Project"].refresh_time,
+           project_changed
+        );
+        reaction(
+           root,
+           ()=> ui_state.models["project.Task"].refresh_time,
+           task_changed
+        );
+        await ui_state.refresh_model_store("project.Project",_projects )
+        project_changed();
+        await ui_state.refresh_model_store("project.Task",_tasks )
+        task_changed();
 
     </script>
 

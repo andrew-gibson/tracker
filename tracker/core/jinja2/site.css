@@ -63,6 +63,35 @@ body {
   --bs-btn-active-bg: #5a23c8;
   --bs-btn-active-border-color: #5a23c8;
 }
+ /*
+  * Custom purple button
+  */
+.bg-attention-subtle {
+  font-weight: 600;
+  background-color : rgba(90,35,200,0.3);
+}
+
+.bg-attention {
+  font-weight: 600;
+  background-color : rgba(90,35,200,1);
+}
+
+
+.btn-attention {
+  --bs-btn-font-weight: 600;
+  --bs-btn-color: var(--bs-white);
+  --bs-btn-bg: #5a23c8;
+  --bs-btn-border-color: var(--bd-violet-bg);
+  --bs-btn-hover-color: var(--bs-white);
+  --bs-btn-hover-bg: #6528e0;
+  --bs-btn-hover-border-color: #6528e0;
+  --bs-btn-focus-shadow-rgb: var(--bd-violet-rgb);
+  --bs-btn-active-color: var(--bs-btn-hover-color);
+  --bs-btn-active-bg: #5a23c8;
+  --bs-btn-active-border-color: #5a23c8;
+}
+
+
 
 .responsive-svg {
     width: 100%;
