@@ -17,7 +17,7 @@
 <div id={% if not target %}"main-content"{%else%}"{{target}}"{%endif %}
     hx-swap-oob="true">
     <div id="project{{project.id}}" class="card task p-0">
-        <div class="card-header">
+        <div class="card-header bg-project-header">
         </div>
         <div class="card-body pt-0 pb-0 row" style="font-size: 1.2em">
             <div class="col-6 left ">
@@ -57,7 +57,7 @@
 
             </div>
         </div>
-        <div class="row align-items-center card-footer text-body-secondary fs-6 p-2">
+        <div class="row align-items-center card-footer bg-project-footer  fs-6 p-2">
             <div class=" col-4" id="new-stream">
             </div>
             <div class="col-8">
@@ -95,7 +95,7 @@
                     const left_sel = selection.select(".card-body .left");
                     const header_sel = selection.select(".card-header");
 
-                    inplace_char_edit(header_sel, project, "name", "Name",{btn_class : "btn-primary", input_class : "w-25"} );
+                    inplace_char_edit(header_sel, project, "name", "Name",{btn_class : "btn-link link-light fw-bold", input_class : "w-25"} );
                     append_edit_attr(left_sel, project, "status","Status");
                     append_edit_attr(left_sel, project, "type","Type");
                     append_edit_attr(left_sel, project, "text","Summary",{display_attr:"text_m"});
@@ -110,7 +110,7 @@
                                   ()=>mobx.makeAutoObservable({name:"",__type__:"project.Stream",project:project}),
                                   "name",
                                   "+ Workstream",
-                                {on_change : "reloadTasks"})
+                                {on_change : "reloadTasks", _class : "btn btn-link link-dark"})
                 });
         };
         const project = ui_state.update_store({{dumps(inst)|safe}});

@@ -13,14 +13,18 @@
                const body_sel = selection.select(".card-body");
                const footer_sel = selection.select(".card-footer");
                const header_sel =  selection.select(".card-header");
-               make_right_dropdown(header_sel,dropdown=>{
-                    make_delete_button( dropdown.append("li"),project,d=>d.id, "reloadProjects",{html : "Delete"})
-               });
+               make_right_dropdown(
+                   header_sel,
+                   dropdown=>{
+                        make_delete_button( dropdown.append("li"),project,d=>d.id, "reloadProjects",{html : "Delete"})
+                   },
+                  {_class : "btn me-1 text-white"}
+               );
                header_sel
                     .append("div")
                     .classed(`mb-1 name-row editor-normal`, true)
-                    .append("button")
-                    .classed("btn btn-link pb-1 ps-0 text-end d-inline",true)
+                    .append("a")
+                    .classed("btn btn-link link-light py1 fw-bold ps-0 text-end d-inline",true)
                     .attrs({
                         "hx-replace-url":"true",
                         "hx-target" : "#main-content",
@@ -68,23 +72,28 @@
                               .selectAll("div.left")                                                 
                               .data([1])
                               .join("div")
-                              .classed("left fs-6 d-flex justify-content-center align-items-center expand-task text-body-tertiary text-body", true)
+                              .classed("left fs-6 d-flex justify-content-center align-items-center", true)
                               .html("")
                               .append("button")
-                              .classed("btn btn-small btn-light p-1 mb-1", true)
+                              .classed("btn btn-small  py-0 px-1 my-1", true)
                               .html(d=> card_state.minified_cards.includes(project.id) ? "+" : "-")
                               .on("click", e => {
                                   card_state.toggle_minified_state("project",project)
                               });
+
+
+                        footer_sel   
+                              .selectAll("div.right")                                                 
+                              .data([1])
+                              .join("div")
+                              .classed("right d-flex justify-content-between align-items-center", true)
+                              .call(function(sel){
+                                 append_edit_attr(sel, project, "private", "Private");
+                              })
+
                       }
                 })
                 
-                footer_sel   
-                     .classed("d-flex justify-content-between align-items-center", true)
-                     .append("div")
-                     .call(function(foodter_sel){
-                        append_edit_attr(foodter_sel, project, "private", "Private");
-                     })
             })
     };
 

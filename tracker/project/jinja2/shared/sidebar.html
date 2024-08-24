@@ -100,10 +100,10 @@ const redraw = (id,data)=> {
 
      // remove any markers of the active element
      d3.selectAll(`#sidebar *[hx-get]`)
-        .classed( "bg-primary text-white p-2 rounded text-white",false);
+        .classed( "bg-project-header text-white p-2 rounded text-white",false);
     // find the sidebar element which links to the active url and set the colours
      d3.select(`#sidebar *[hx-get="${sidebar_state.current_url}"]`)
-        .classed("bg-primary text-white p-2 rounded text-white", true)
+        .classed("bg-project-header text-white p-2 rounded text-white", true)
 
 }
 // don't use d3-ui reaction, since this is a permenant sidebar until a page-refresh

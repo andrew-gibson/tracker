@@ -195,6 +195,7 @@ class UIState {
         this.signal(e);
     }
 }
+
 export const ui_state = new UIState()
 const reset_active = e=>{
    ui_state.reset_active(e)
@@ -579,12 +580,13 @@ export const make_cancel_button = function(selection){
             .on("click", reset_active)
     };
 
-export const make_right_dropdown = function(selection, call){
+export const make_right_dropdown = function(selection, call, options={}){
+    const {_class="btn btn-light"} = options;
     selection
         .append("div")
             .classed("dropdown d-flex justify-content-end",true)
             .append("button")
-                .classed("btn btn-light m-0 p-1",true)
+                .classed(`${_class} m-0 p-1`,true)
                 .attrs({
                  "type": "button",
                  "data-bs-toggle" : "dropdown",
@@ -603,6 +605,7 @@ export const create_button = function(selection,make_observable_data, attr="",ti
     prep_data(observable_data)
     const ids = ui_state.ids({attr,d: observable_data });
     const {on_change} = options;
+    const {_class="btn btn-sm btn-light"} = options;
     if (!selection.selectAll("div").empty()) {
         // already been created, so bail
         return;
@@ -651,7 +654,7 @@ export const create_button = function(selection,make_observable_data, attr="",ti
         .classed(`editor-normal ${attr}-row`,true)
         .attr("id",ids.normal)
         .append("button")
-        .classed("btn btn-sm btn-light p-1 m-1",true)
+        .classed(`${_class} p-1 m-1`,true)
         .on("click", () => {
             d3.select(`#${ids.insert_input}`).node().value = "";
             ui_state.d = observable_data;
@@ -776,7 +779,7 @@ export const append_edit_attr = function(selection,observable_data, ...args ){
 }
 
 export const append_edit_local_attr = function(selection,observable_data, attr="",title="",options={}  ){
-    const {on_change,display_attr=attr} = options;
+    const {on_change,display_attr=attr, add_bottom_margin=true} = options;
     const type = ui_state.models[observable_data.__type__].fields[attr]
     const ids = ui_state.ids({attr,d:observable_data})
     if (selection.select("#"+ids.insert).node() || !observable_data.__perms__["PUT"]) {
@@ -789,7 +792,7 @@ export const append_edit_local_attr = function(selection,observable_data, attr="
     }
     const sel = selection
         .append("div")
-        .classed(`mb-1`, true)
+        .classed(`mb-1`, add_bottom_margin)
 
     const insert_mode = sel
         .append("div")

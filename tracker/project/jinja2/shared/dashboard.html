@@ -17,7 +17,7 @@
 {% block content %}
 <div id="main-content" hx-swap-oob="true">
     <div class="row" >
-        <div class="col-12 bg-dark-subtle p-2 fw-bold">
+        <div class="col-12 bg-project-header p-2 fw-bold text-white">
             Eisenhower Matrix
         </div>
         <div class="col-12">
@@ -57,7 +57,7 @@
         </div>
     </div>
     <div class="row">
-        <div class="col-12 bg-dark-subtle p-2 fw-bold">
+        <div class="col-12 bg-project-header p-2 fw-bold text-white">
             Deliverables with no Deadlines
         </div>
     </div>
@@ -65,7 +65,7 @@
 
     </div>
     <div class="row">
-        <div class="col-12 bg-dark-subtle p-2 fw-bold">
+        <div class="col-12 bg-project-header p-2 fw-bold text-white">
             Upcoming and Recently Completed Deliverables
         </div>
     </div>
@@ -138,7 +138,7 @@
             cards.selectAll("div.card-header")
                               .data(d=>[d], _id)
                               .join("div")
-                              .attr("class","card-header")
+                              .attr("class","card-header bg-task-header")
                               .html(d=>d.name)
             cards.selectAll("div.card-body")
                               .data(d=>[d], _id)
@@ -155,12 +155,34 @@
             const cards = root.selectAll("div.card")
                               .data(upcoming_and_recent_done, d=>d.id)
                               .join("div")
-                              .attr("class","card col-3 p-0 me-2")
+                              .attr("class","card col-3 p-0 me-2 bg-task")
             cards.selectAll("div.card-header")
                               .data(d=>[d], d=>d.id)
                               .join("div")
-                              .attr("class","card-header text-nowrap overflow-hidden fw-bold")
-                              .html(d=>d.name)
+                              .attr("class","card-header text-nowrap overflow-hidden fw-bold   bg-task-header" )
+                              .each(function(task){
+                                const _this = d3.select(this);
+                                _this.html("");
+                                const dots = _this.append("span")
+                                if (task.has_task_target_date_changed_recently) {
+                                    dots.append("span")
+                                          .attr("class", "text-warning mx-1")
+                                          .html("⬤")
+                                }
+                                if (task.done_recently) {
+                                    dots.append("span")
+                                          .attr("class", "text-success mx-1")
+                                          .html("⬤")
+                                }
+                                if (task.overdue) {
+                                    dots.append("span")
+                                          .attr("class", "text-danger mx-1")
+                                          .html("⬤")
+                                }
+
+                                _this.append("span").html(task.name)
+                              })
+
             cards.selectAll("div.card-body")
                               .data(d=>[d], d=>d.id)
                               .join("div")
@@ -177,28 +199,21 @@
                                       .style("font-size", "0.8em")
                                       .html("Project:")
                                 project_row.append("a")
-                                     .attr("class","link  w-75 text-end")
+                                      .attrs({
+                                        "href" : "#",
+                                        "class" : "link  w-75 text-end",
+                                        "hx-target" : "#main-content",
+                                         "hx-replace-url":"true",
+                                      })
+                                      .attr("hx-get",task.project.__url__)
                                       .style("font-size", "0.8em")
                                      .html(task.project.name)
-                                append_edit_attr(_this, task, "text","Text",{display_attr:"text_m"});
-                                append_edit_attr(_this, task, "target_date","Due Date");
+                                     .setup_htmx()
 
-                                const tags = _this.append("div").attr("class","position-absolute bottom-0 start-0 mb-2")
-                                if (task.has_task_target_date_changed_recently) {
-                                    tags.append("span")
-                                          .attr("class", "badge rounded-pill bg-attention mx-1 p-2")
-                                          .html("Recent Due Date Change")
-                                }
-                                if (task.done_recently) {
-                                    tags.append("span")
-                                          .attr("class", "badge rounded-pill bg-success mx-1 p-2")
-                                          .html("Recently Completed")
-                                }
-                                if (task.overdue) {
-                                    tags.append("span")
-                                          .attr("class", "badge rounded-pill bg-danger mx-1 p-2")
-                                          .html("Overdue")
-                                }
+                                const body = _this.append("div")
+                                append_edit_attr(body, task, "text","Text",{display_attr:"text_m"});
+                                append_edit_attr(body, task, "target_date","Due Date");
+
 
                               });
         };

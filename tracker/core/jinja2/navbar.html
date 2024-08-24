@@ -3,8 +3,8 @@
      {%include template%}
  {%endfor%}
   <li class="nav-item dropdown">
-     <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-         {{request.user.username}} 👤
+     <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false" style="color:white">
+         {{request.user.username}}  ☰
      </a>
      <ul class="dropdown-menu" id="nav-dropdown">
          {%for template in navdropdown %}

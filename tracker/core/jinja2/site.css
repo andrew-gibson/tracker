@@ -76,6 +76,25 @@ body {
   background-color : rgba(90,35,200,1);
 }
 
+ /*
+  * colours from https://www.colorhexa.com/7882a4
+  */
+
+.bg-task-header {
+  background-color : #bec3d3;
+}
+
+.bg-task-footer {
+  background-color : #e1e4eb;
+}
+
+.bg-project-header {
+  background-color :rgb(120, 130, 164);
+}
+
+.bg-project-footer {
+  background-color : #a7adc4;
+}
 
 .btn-attention {
   --bs-btn-font-weight: 600;

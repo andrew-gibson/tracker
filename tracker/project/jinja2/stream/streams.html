@@ -55,11 +55,21 @@ const task_summary = task=>{
             const body_sel = selection.select(".card-body");
             const footer_sel = selection.select(".card-footer");
             body_sel.html(""); // clear out placeh9olders
-            make_right_dropdown(header_sel,dropdown=>{
-                 make_delete_button( dropdown.append("li").append('span').classed("dropdown-item d-grid",true),task,d=>d.id, "reloadTasks",{html : "Delete", _class : "btn btn-danger"})
-            });
-            inplace_char_edit(header_left.append("div").style("width","15%").style("display","inline-block"), task, "order", "Order",{btn_class : "btn-outline-primary", on_change : "reloadTasks", input_class : "w-25"} );
-            inplace_char_edit(header_left.append("div").style("width","85%").style("display","inline-block"), task, "name", "Name");
+            make_right_dropdown(
+                header_sel,
+                dropdown=>{
+                     make_delete_button( dropdown.append("li").append('span').classed("dropdown-item d-grid",true),task,d=>d.id, "reloadTasks",{html : "Delete", _class : "btn btn-danger"})
+                },
+                {_class : "btn me-1"}
+            );
+            inplace_char_edit(header_left.append("div").style("width","15%").style("display","inline-block"), task, "order", "Order",{btn_class : "btn-outline-dark", on_change : "reloadTasks", input_class : "w-25"} );
+            inplace_char_edit(
+               header_left.append("div").style("width","85%").style("display","inline-block"), 
+               task, 
+               "name", 
+               "Name",
+               {btn_class : "btn-link link-dark"}
+               );
 
             autoRun(selection.node(),()=>{
                 card_state.redraw
@@ -84,10 +94,10 @@ const task_summary = task=>{
                     .selectAll("div.left")                                                 
                     .data([1])
                     .join("div")
-                    .classed("left fs-6 d-flex justify-content-center align-items-center expand-task text-body-tertiary text-body", true)
+                    .classed("left fs-6 d-flex justify-content-center align-items-center", true)
                     .html("")
                     .append("button")
-                    .classed("btn btn-small btn-light p-1 mb-1", true)
+                    .classed("btn btn-small  py-0 px-1 my-1", true)
                     .html(d=> card_state.minified_cards.includes(task.id) ? "+" : "-")
                     .on("click", e => {
                         card_state.toggle_minified_state("task",task)
@@ -98,7 +108,7 @@ const task_summary = task=>{
                 .classed("d-flex justify-content-between align-items-center", true)
                 .append("div")
                 .call(function(foodter_sel){
-                   append_edit_attr(foodter_sel, task, "done", "Done",{on_change : "reloadTasks"});
+                   append_edit_attr(foodter_sel, task, "done", "",{on_change : "reloadTasks", add_bottom_margin : false});
                 })
         })
 };
