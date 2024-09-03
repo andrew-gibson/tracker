@@ -63,7 +63,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "core",
     "project",
-    "silk",
+    #"silk",
 ]
 
 AUTHENTICATION_BACKENDS = (
@@ -73,7 +73,7 @@ AUTHENTICATION_BACKENDS = (
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
-   'silk.middleware.SilkyMiddleware',
+   #'silk.middleware.SilkyMiddleware',
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -118,31 +118,17 @@ WSGI_APPLICATION = "tracker.wsgi.application"
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
 
-if TESTING:
-    DATABASES = {
-        "default": {
-            "ENGINE": "django.db.backends.postgresql",
-            "NAME": "tracker_test",
-            "USER": "tracker_test",
-            "PASSWORD": config("TEST_DB_PASSWORD"),
-            "HOST": "localhost",
-            "PORT": "",
-            "OPTIONS": {"sslmode": "require"},
-        }
+DATABASES = {
+    "default": {
+        "ENGINE": "django.db.backends.postgresql",
+        "USER": "app",
+        "PASSWORD": config("DB_PASSWORD"),
+        "HOST": config("DB_HOST"),
+        "PORT": config("DB_PORT"),
+        "NAME": config("DB_NAME"),
+        "OPTIONS": {"sslmode": "require"},
     }
-
-else:
-    DATABASES = {
-        "default": {
-            "ENGINE": "django.db.backends.postgresql",
-            "USER": "app",
-            "PASSWORD": config("DB_PASSWORD"),
-            "HOST": config("DB_HOST"),
-            "PORT": config("DB_PORT"),
-            "NAME": config("DB_NAME"),
-            "OPTIONS": {"sslmode": "require"},
-        }
-    }
+}
 
 
 # Password validation
