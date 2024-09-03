@@ -25,4 +25,4 @@ urlpatterns = [
     path("project/", include((project_api.urlpatterns, "project"))),
 ]
 
-urlpatterns += [path('silk/', include('silk.urls', namespace='silk'))]
+#urlpatterns += [path('silk/', include('silk.urls', namespace='silk'))]
