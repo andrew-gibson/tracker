@@ -427,7 +427,7 @@ class AutoCompleteNexus:
     @classmethod
     def save_from_parse(cls, request, results, attr, attr_val):
         f = decode_get_params(request.GET).get("f", {})
-        obj = cls(**{attr: attr_val})
+        obj = cls(**{attr: attr_val.strip()})
 
         if attache:=cls.check_for_attach_instruction(request):
             setattr(obj, attache["attr"], attache["attachee"])
@@ -465,16 +465,17 @@ class AutoCompleteNexus:
                         y["id"] for y in flattened_results if "new" not in y
                     ]
                     new_objs = [
-                        x["model"].objects.create(
+                        x["model"](
                             **{
                                 k: v
                                 for k, v in new_one.items()
-                                if k not in ["name", "id", "new"]
+                                if k not in ["id", "new", "__type__"]
                             }
                         )
                         for new_one in new_ones
                     ]
-                    [x.add_user_and_save(request) for x in new_objs]
+                    for new_obj in new_objs:
+                        new_obj.add_user_and_save(request)
 
                     existing_objs = (
                         x["model"]
@@ -486,7 +487,7 @@ class AutoCompleteNexus:
                         getattr(obj, rel_name).add(*existing_objs)
                     else:
                         if new_ones:
-                            setattr(obj, rel_name, new_ones[0])
+                            setattr(obj, rel_name, new_objs[0])
                         if existing_objs:
                             setattr(obj, rel_name, existing_objs[0])
         obj.save()
@@ -561,10 +562,9 @@ class AutoCompleteCoreModel(CoreModel):
             # not ending in space -- always create fake new one unless it
             # duplicates i.e. cursor was right at the end of the word
             new_el = {
-                "name": query,
                 "id": -1,
                 "new": True,
-                field_obj.__search_field__: query,
+                field_obj.__search_field__: query.strip(),
                 "__type__": cls._meta.label,
             }
 

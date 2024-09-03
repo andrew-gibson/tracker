@@ -122,7 +122,6 @@ class ProjectUser(User, AutoCompleteCoreModel):
     objects = GroupPrefetcherManager()
     spec = queries.projectuser_spec
     proxy_map = {"belongs_to": ProjectGroup}
-
     form_fields = ["username", "belongs_to"]
 
     class Meta:
@@ -138,6 +137,10 @@ class ProjectUser(User, AutoCompleteCoreModel):
         if not self.password:
             self.is_active = False
 
+    def add_user_and_save(self, request):
+        if request.project_user.manages:
+             self.belongs_to = request.project_user.manages
+        self.save()
 
 class Settings(CoreModel):
 
@@ -228,6 +231,10 @@ class ProjectType(AutoCompleteCoreModel):
     @classmethod
     def user_filter(cls, request):
         return cls.objects.all()
+
+    @classmethod
+    def default(cls):
+        return cls.objects.get(name_en="Project")
 
     @property
     def name(self):
@@ -398,10 +405,9 @@ class Project(AutoCompleteNexus, AutoCompleteCoreModel):
         blank=True,
         on_delete=PROTECT,
         related_name="projects",
-        text_trigger="+",
     )
     status = ForeignKey(ProjectStatus, blank=True, on_delete=SET_NULL, null=True)
-    type = ForeignKey(ProjectType,blank=True, on_delete=PROTECT, text_trigger="!")
+    type = ForeignKey(ProjectType,blank=True, on_delete=PROTECT, default=ProjectType.default)
     addstamp = DateTimeField(null=True)
     name_en = CharField(max_length=255)
     name_fr = CharField(max_length=255, null=True, blank=True)

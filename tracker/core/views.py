@@ -24,7 +24,7 @@ from django.http import (
     JsonResponse,
     Http404,
 )
-from django.shortcuts import get_object_or_404, aget_object_or_404, redirect, render
+from django.shortcuts import get_object_or_404, aget_object_or_404, redirect
 from django.urls import reverse
 from django.utils import safestring
 from django.views.decorators.csrf import ensure_csrf_cookie
