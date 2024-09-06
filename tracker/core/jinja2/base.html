@@ -33,7 +33,7 @@
       {% include "site.css" %}
     </style>
 </head>
-<body>
+<body >
   <nav class="navbar navbar-expand-md fixed-top" style="background-color: rgb(84,93,124); color : white;">
     <div class="container-fluid">
       <span class="navbar-brand mb-0 h1" style="color : white;">{{ _("Project Tracker") }}</span>
@@ -72,10 +72,12 @@
   </main>
   <div id="ws-scripts"> </div>
   <script type="module">
+
         import  {fetch_recipies} from "d3-ui";
         document.body.addEventListener('htmx:configRequest', (event) => {
           event.detail.headers['X-CSRFToken'] = fetch_recipies.csrf_token;
         });
+        htmx.config.historyCacheSize = 0;
 
 
         const setClipboard = (text) => {

@@ -1,7 +1,7 @@
 <div id="sidebar" class="sidebar">
-   <a class="link bodb-emphasis d-block mt-3 d-block" hx-get="{{url("project:dashboard")}}" href="#" hx-target="#main-content" hx-replace-url="true">Dashboard</a>
+   <a class="link bodb-emphasis d-block mt-3 d-block" hx-get="{{url("project:dashboard")}}" href="#" hx-target="#main-content" hx-push-url="true">Dashboard</a>
 
-   <a class="link body-emphasis d-block mt-3 d-block" hx-get="{{url("project:main")}}" href="#" hx-target="#main-content" hx-replace-url="true">My Projects</a>
+   <a class="link body-emphasis d-block mt-3 d-block" hx-get="{{url("project:main")}}" href="#" hx-target="#main-content" hx-push-url="true">My Projects</a>
    <div id="myprojects">
        <div class="placeholder-glow">
            <div class="col-12 placeholder placeholder-xs"></div>
@@ -21,7 +21,7 @@
           hx-get="{{url("project:timereporting")}}" 
           href="#" 
           hx-target="#main-content" 
-          hx-replace-url="true">Time Reporting</a>
+          hx-push-url="true">Time Reporting</a>
     </div>
 
    <div id="team-header" class="body-emphasis mt-3">Team</div>
@@ -47,8 +47,8 @@
            <div class="col-12 placeholder placeholder-xs"></div>
         </div>
    </div> 
-    <a class="link body-emphasis mt-3 d-block" hx-get="{{url("project:metadata")}}" href="#" hx-target="#main-content" hx-replace-url="true">Edit Tags / Users</a>
-    <a class="link body-emphasis mt-3 d-block" hx-get="{{url("core:main",kwargs={"m" : 'project.SmallProject'})}}" href="#" hx-target="#main-content" hx-replace-url="true">All Projects</a>
+    <a class="link body-emphasis mt-3 d-block" hx-get="{{url("project:metadata")}}" href="#" hx-target="#main-content" hx-push-url="true">Edit Tags / Users</a>
+    <a class="link body-emphasis mt-3 d-block" hx-get="{{url("core:main",kwargs={"m" : 'project.SmallProject'})}}" href="#" hx-target="#main-content" hx-push-url="true">All Projects</a>
 
 </div>
 
@@ -92,7 +92,7 @@ const redraw = (id,data)=> {
        "href" : "#",
        "hx-headers":'{"json-response" : "false"}',
        "hx-target":"#main-content",
-       "hx-replace-url":"true",
+       "hx-push-url" : "true"
      })
      .setup_htmx()
      .html(d=>{
@@ -125,7 +125,7 @@ mobx.reaction(
 
 // redraw before a url changing request
 document.addEventListener("htmx:beforeRequest",event => {
-   if ("hx-replace-url" in event.target.attributes){
+   if ("hx-push-url" in event.target.attributes){
          sidebar_state.current_url =  event.target.attributes["hx-get"].value
          sidebar_state.redraw++;
    }

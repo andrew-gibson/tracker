@@ -103,7 +103,7 @@
                                   .attr( "class", `btn btn-link project-link text-start pb-2 pe-2 id${project.id}`)
                                   .attrs({
                                     "hx-target" : "#main-content",
-                                     "hx-replace-url":"true",
+                                     "hx-push-url":"true",
                                   })
                                   .attr("hx-get",project.__url__)
                                   .html(project.name)
@@ -203,7 +203,7 @@
                                         "href" : "#",
                                         "class" : "link  w-75 text-end",
                                         "hx-target" : "#main-content",
-                                         "hx-replace-url":"true",
+                                         "hx-push-url":"true",
                                       })
                                       .attr("hx-get",task.project.__url__)
                                       .style("font-size", "0.8em")
