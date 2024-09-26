@@ -15,7 +15,9 @@ def good_m2m_request(user, method, obj1, obj2, attr):
 
 def good_request(user, method, obj):
 
+
     match [obj, method]:
+
 
         case [models.ProjectGroup(), "POST"] if not obj.id:
             # only group alterations are allowed by the group owner
@@ -25,8 +27,7 @@ def good_request(user, method, obj):
             # only group alterations are allowed by the group owner
             p1 =  obj.app == "project"
             p2 =  bool(user.manages)
-            p3 =  (obj in user.manages.descendants)
-            return  p1 and p2 and p3
+            return  p1 and p2 and  (obj in user.manages.descendants)
 
         case [
             models.ProjectGroup() | models.EXCompetency() | models.ProjectStatus(),
@@ -102,6 +103,7 @@ def good_request(user, method, obj):
             models.Stream() | models.Task() | models.Link(),
             "POST" | "PUT" | "DELETE" | "GET",
         ]:
+
             # default to the owner project for permissions
             #if "project" not in obj._state.fields_cache:
             #    import pdb
@@ -109,6 +111,8 @@ def good_request(user, method, obj):
 
             return good_project_request(user, method, obj.project)
 
+        case [ models.Project(), "POST" ] if not obj.id:
+            return True
         case [
             models.Project(),
             "POST" | "PUT" | "DELETE" | "GET",

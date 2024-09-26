@@ -8,7 +8,7 @@ from django.apps import apps
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Field, Model, Q, PROTECT, ForeignKey, Manager
 from django.forms import ModelForm, modelform_factory
-from django.http import JsonResponse, Http404, QueryDict, HttpResponse
+from django.http import JsonResponse, Http404, QueryDict, HttpResponse, HttpResponseForbidden
 from django_lifecycle import LifecycleModelMixin
 from django.urls import reverse
 from django_readers import specs
@@ -122,7 +122,7 @@ class CoreModel(LifecycleModelMixin, Model):
     @classmethod
     def get_projection_by_pk(cls, request, pk, method=""):
         """
-        can't user model.objects.get because need to apply all the
+        can't use model.objects.get because need to apply all the
         preparing functions to then apply the producers and then the projections
         """
         prepare_qs, projection = cls.readers(request, pk)
@@ -138,7 +138,7 @@ class CoreModel(LifecycleModelMixin, Model):
         except cls.DoesNotExist:
             raise Http404("No object matches the given query")
         except AssertionError:
-            raise Http404("Invaolid permissions")
+            return HttpResponseForbidden("Invaolid permissions")
 
     @classproperty
     def _name(cls):
@@ -167,25 +167,29 @@ class CoreModel(LifecycleModelMixin, Model):
         form = cls.form(request)(request.POST)
         context = {"form": form}
         preoare_qs, projection = cls.readers(request)
-        if form.is_valid() and cls.app_config.perms.good_request(
+        form.is_valid()
+        allowed =  cls.app_config.perms.good_request(
             request.user, "POST", cls(**form.cleaned_data)
-        ):
+        )
+        if form.is_valid() and allowed:
             inst = form.instance
             # by default associasave()te objects with their creator
             inst.add_user_and_save(request)
             _, context["inst"] = cls.get_projection_by_pk(request, inst.pk)
             if request.json:
                 return JsonResponse(context["inst"])
-        else:
+            else:
+                return render(
+                    request,
+                    f"{cls._name}/{cls._name}.html",
+                    context,
+                )
+        elif allowed:
             context["inst"] = form.instance
-            if request.json:
-                return JsonResponse({"errors": form.errors})
+            return JsonResponse({"errors": form.errors})
+        else:
+            return HttpResponse("Invaolid permissions",status=403)
 
-        return render(
-            request,
-            f"{cls._name}/{cls._name}.html",
-            context,
-        )
 
     @classmethod
     def PUT(cls, request, pk):
@@ -252,9 +256,13 @@ class CoreModel(LifecycleModelMixin, Model):
     @classmethod
     def DELETE(cls, request, pk):
         obj = get_object_or_404(cls, pk=pk)
-        if cls.app_config.perms.good_request(request.user, "DELETE", obj):
+        try: 
+            assert cls.app_config.perms.good_request(request.user, "DELETE", obj)
             obj.delete()
-        return HttpResponse("Deleted")
+            return HttpResponse("Deleted")
+        except AssertionError:
+            return HttpResponseForbidden("Invaolid permissions")
+
 
     @classmethod
     def filter(cls, qs, request):
@@ -271,7 +279,7 @@ class CoreModel(LifecycleModelMixin, Model):
             try:
                 assert cls.app_config.perms.good_request(request.user, "GET", attachee)
             except:
-                raise Http404("Invaolid permissions")
+                return HttpResponseForbidden("Invaolid permissions")
             return {
                 "attr" :   instructions["attr"],
                 "attachee" : attachee
@@ -369,6 +377,7 @@ class AutoCompleteNexus:
             remainder = text_input = request.GET.get("q", "")
 
         fields = {f.name : f for f in  cls.get_autocompletes(exclude)}
+
         results = {
             f.name: {
                 "trigger": f.__text_trigger__,

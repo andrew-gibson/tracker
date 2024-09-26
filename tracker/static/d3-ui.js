@@ -272,7 +272,7 @@ document.addEventListener('htmx:configRequest', event => {
 });
 // if the url is being replaced, them reset the UI and wipe out all mobX listeners
 document.addEventListener("htmx:beforeRequest",event => {
-   if ("hx-replace-url" in event.target.attributes){
+   if ("hx-push-url" in event.target.attributes){
        ui_state.reset_ui();
    }
 })

@@ -1,4 +1,4 @@
-from functools import lru_cache
+from functools import cached_property, lru_cache
 from django.contrib.auth.models import (
     AbstractUser,
     UserManager,
@@ -83,8 +83,7 @@ class Group(AbstractGroup, AutoCompleteCoreModel):
     def user_filter(cls, request):
         return cls.objects.all()
 
-    @property
-    @lru_cache()
+    @cached_property
     def descendants(self):
         query = f'''
             WITH RECURSIVE children_cte AS (

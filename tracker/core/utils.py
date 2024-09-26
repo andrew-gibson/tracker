@@ -516,7 +516,7 @@ class API:
 
                 @wraps(view)
                 async def set_from_headers(request, *args, **kwargs):
-                    request.htmx = "Hx-Request" in request.headers
+                    request.htmx = "Hx-Request" in request.headers and "hx-history-restore-request" not in request.headers
                     request.json = (
                         "json" in request.headers.get("Content-Type", "")
                         or request.headers.get("json-response", "") == "true"
@@ -531,7 +531,7 @@ class API:
 
                 @wraps(view)
                 def set_from_headers(request, *args, **kwargs):
-                    request.htmx = "Hx-Request" in request.headers
+                    request.htmx = "Hx-Request" in request.headers and "hx-history-restore-request" not in request.headers
                     request.json = (
                         "json" in request.headers.get("content-type", "")
                         or request.headers.get("json-response", "") == "true"

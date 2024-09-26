@@ -31,7 +31,7 @@ from django.db.models import (
     TextField,
 )
 from django.db.models.functions import Concat, Replace
-from django.http import QueryDict
+from django.http import QueryDict, HttpResponseForbidden
 from django.urls import reverse
 from django_lifecycle import (
     AFTER_CREATE,
@@ -90,6 +90,9 @@ class ProjectGroup(Group):
     spec = queries.projectgroup_spec
     form_fields = [
         "name_en",
+        "name_fr",
+        "acronym_fr",
+        "acronym_en"
     ]
 
     class Meta:
@@ -104,10 +107,13 @@ class ProjectGroup(Group):
         super().save(*args, **kwargs)
 
     def add_user_and_save(self, request):
+        if request.user.manages:
+            self.parent = request.user.manages
+        # clear the cache 
+        if "descendants" in request.project_user.manages.__dict__:
+            del request.project_user.manages.__dict__["descendants"]
+
         self.save()
-        request.project_user.groups.add(self)
-
-
 
 
 class GroupPrefetcherManager(UserManager):
@@ -138,9 +144,18 @@ class ProjectUser(User, AutoCompleteCoreModel):
             self.is_active = False
 
     def add_user_and_save(self, request):
-        if request.project_user.manages:
-             self.belongs_to = request.project_user.manages
-        self.save()
+        user = request.project_user
+        try:
+            if self.belongs_to and user.manages and self.belongs_to in user.manages.descendants:
+                self.save()
+                return
+        except:
+            self.belongs_to = None
+        if user.manages:
+            self.belongs_to = user.manages
+            self.save()
+            return
+        raise  HttpResponseForbidden("Unauthorized parameters")
 
 class Settings(CoreModel):
 
@@ -368,11 +383,11 @@ class Project(AutoCompleteNexus, AutoCompleteCoreModel):
     def add_user_and_save(self, request):
         try:
             self.group
-        except self.__class__.group.RelatedObjectDoesNotExist:
+        except Project.group.RelatedObjectDoesNotExist:
             self.group = request.user.manages or request.user.belongs_to
         try:
             self.lead
-        except self.__class__.lead.RelatedObjectDoesNotExist:
+        except Project.lead.RelatedObjectDoesNotExist:
             self.lead = request.project_user
         self.save()
 
@@ -408,7 +423,7 @@ class Project(AutoCompleteNexus, AutoCompleteCoreModel):
     )
     status = ForeignKey(ProjectStatus, blank=True, on_delete=SET_NULL, null=True)
     type = ForeignKey(ProjectType,blank=True, on_delete=PROTECT, default=ProjectType.default)
-    addstamp = DateTimeField(null=True)
+    addstamp = DateTimeField(auto_now_add=True,null=True)
     name_en = CharField(max_length=255)
     name_fr = CharField(max_length=255, null=True, blank=True)
     text_en = TextField(blank=True, null=True)
